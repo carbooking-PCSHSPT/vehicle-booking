@@ -1,0 +1,899 @@
+/* ═══════════════════════════════════════════════════════════
+   Store — ชั้นข้อมูลของระบบยานพาหนะ
+   ทำงานได้ 2 แบบ (หน้าเว็บเรียกใช้เหมือนกันทุกอย่าง):
+   1) โหมดทดลอง (LOCAL): เก็บข้อมูลใน localStorage ของเบราว์เซอร์ พร้อมข้อมูลตัวอย่าง
+   2) โหมดจริง: Firebase Auth + Firestore (เรียลไทม์) + Apps Script (เก็บไฟล์ใน Google Drive)
+   ═══════════════════════════════════════════════════════════ */
+const Store = (() => {
+  'use strict';
+  const CFG = window.APP_CONFIG || {};
+  const QP = new URLSearchParams(location.search);
+  const LOCAL = !(CFG.firebase && CFG.firebase.apiKey) || location.protocol === 'file:' || QP.has('local');
+  const DOMAINS = (CFG.domains || ['pcshspt.ac.th']).map(s => s.toLowerCase());
+  const UDOMAIN = CFG.usernameDomain || 'vehicle.pcshspt.local';
+  const BOOT = (CFG.bootstrapAdmins || []).map(s => s.toLowerCase());
+  const KEY = 'pcs-vehicle-db-v1';
+  const DAY = 864e5, HOUR = 36e5;
+
+  const uid = (p = '') => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const nowISO = () => new Date().toISOString();
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const beYear = d => new Date(d).getFullYear() + 543;
+  const emailOf = username => `${String(username).trim().toLowerCase()}@${UDOMAIN}`;
+  const isUsernameEmail = e => String(e || '').endsWith('@' + UDOMAIN);
+  const usernameOf = e => isUsernameEmail(e) ? e.split('@')[0] : '';
+
+  // ───────── ค่าคงที่ของระบบ ─────────
+  const ROLES = {
+    teacher: 'ครู/บุคลากร', driver: 'พนักงานขับรถ', admin: 'แอดมิน', executive: 'ผู้บริหาร', superadmin: 'ผู้ดูแลระบบสูงสุด'
+  };
+  const STATUS = {
+    pending:   { label: 'รอตรวจสอบ', tone: 'wait' },
+    revise:    { label: 'ส่งกลับให้แก้ไข', tone: 'warn' },
+    approved:  { label: 'อนุมัติแล้ว', tone: 'ok' },
+    ontrip:    { label: 'กำลังเดินทาง', tone: 'live', pulse: true },
+    returned:  { label: 'กลับถึงแล้ว', tone: 'done' },
+    closed:    { label: 'ปิดงานแล้ว', tone: 'done' },
+    rejected:  { label: 'ไม่อนุมัติ', tone: 'bad' },
+    cancelled: { label: 'ยกเลิก', tone: 'mute' }
+  };
+  const ASSIGN = { assigned: 'รอออกเดินทาง', ontrip: 'กำลังเดินทาง', returned: 'กลับถึงแล้ว' };
+  const VSTATE = {
+    free: { label: 'ว่าง', tone: 'free' }, booked: { label: 'มีคิววันนี้', tone: 'booked' },
+    ontrip: { label: 'กำลังเดินทาง', tone: 'live', pulse: true }, maint: { label: 'ซ่อมบำรุง', tone: 'bad' }, off: { label: 'งดให้บริการ', tone: 'mute' }
+  };
+  const KINDS = { van: 'รถตู้', bus: 'รถบัส', minibus: 'รถโดยสาร 6 ล้อ', car: 'รถเก๋ง', pickup: 'รถกระบะ', truck: 'รถบรรทุก', special: 'รถเฉพาะกิจ' };
+  const FEATURES = ['แอร์', 'ไมโครโฟน/ลำโพง', 'จอทีวี', 'ช่องชาร์จ USB', 'ช่องเก็บสัมภาระ', 'เข็มขัดนิรภัยทุกที่นั่ง', 'กล้องหน้ารถ', 'ถังดับเพลิง', 'ชุดปฐมพยาบาล', 'ทางลาด/รองรับวีลแชร์'];
+  const EXPENSE = { fuel: 'ค่าน้ำมัน', toll: 'ค่าทางด่วน', parking: 'ค่าที่จอดรถ', other: 'ค่าใช้จ่ายอื่น' };
+  const PAY = { cash: 'เงินสด', card: 'บัตรเติมน้ำมัน', transfer: 'โอน/เบิกภายหลัง', credit: 'เครดิตปั๊ม' };
+  const RATE_KEYS = { punctual: 'ตรงต่อเวลา', safety: 'ขับขี่ปลอดภัย', manner: 'มารยาทและการบริการ', clean: 'ความสะอาดของรถ' };
+  const DEPTS = ['ฝ่ายบริหารงานทั่วไป', 'ฝ่ายบริหารงานวิชาการ', 'ฝ่ายบริหารงานบุคคล', 'ฝ่ายบริหารงานงบประมาณ', 'ฝ่ายกิจการนักเรียนและหอพัก',
+    'กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี', 'กลุ่มสาระคณิตศาสตร์', 'กลุ่มสาระภาษาไทย', 'กลุ่มสาระภาษาต่างประเทศ', 'กลุ่มสาระสังคมศึกษาฯ',
+    'กลุ่มสาระสุขศึกษาและพลศึกษา', 'กลุ่มสาระศิลปะ', 'กลุ่มสาระการงานอาชีพ', 'งานแนะแนว', 'งานห้องสมุด', 'อื่น ๆ'];
+
+  const DEFAULT_CATS = [
+    { id: 'meeting', name: 'อบรม/ประชุม', icon: 'users' }, { id: 'contest', name: 'แข่งขัน', icon: 'trophy' },
+    { id: 'activity', name: 'ร่วมกิจกรรม', icon: 'sparkles' }, { id: 'intl', name: 'วิเทศสัมพันธ์', icon: 'globe' },
+    { id: 'guest', name: 'รับ-ส่งแขก', icon: 'user' }, { id: 'goods', name: 'ยืม-คืน รับ-ซื้อของ', icon: 'package' },
+    { id: 'medical', name: 'พยาบาล', icon: 'heart' }, { id: 'finance', name: 'การเงิน', icon: 'banknote' },
+    { id: 'docs', name: 'ส่งเอกสาร', icon: 'file' }, { id: 'community', name: 'บริการชุมชน', icon: 'home' },
+    { id: 'other', name: 'อื่น ๆ (ระบุ)', icon: 'info', fixed: true }
+  ];
+  const CAT_ICONS = ['users', 'trophy', 'sparkles', 'globe', 'user', 'package', 'heart', 'banknote', 'file', 'home', 'flag', 'star', 'flask', 'student', 'teacher', 'bus', 'info'];
+
+  // ───────── สถานะ ─────────
+  let db = emptyDb();
+  let me = null;
+  let authState = 'loading';      // loading | out | in
+  let authError = '';
+  const listeners = new Set();
+  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {} }; }
+  function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
+
+  function defaultSettings() {
+    return {
+      schoolName: 'โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ปทุมธานี',
+      schoolNameEn: 'Princess Chulabhorn Science High School Pathum Thani',
+      division: 'ฝ่ายบริหารงานทั่วไป', unit: 'งานยานพาหนะ',
+      leadDays: 2,
+      school: { name: 'โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ปทุมธานี', lat: 14.0436, lng: 100.3773, address: 'ลาดหลุมแก้ว ปทุมธานี' },
+      // หมวดงาน (แอดมินแก้ไขได้) — เก็บรหัสหมวดในคำขอ เปลี่ยนชื่อภายหลังสถิติยังถูกต้อง
+      categories: DEFAULT_CATS.map((c, i) => ({ ...c, active: true, order: i })),
+      contactNote: 'ติดต่อสอบถามเรื่องการขอใช้รถส่วนกลาง ในวันและเวลาราชการ',
+      contactPhone: '', contactLine: '', contactRoom: '',
+      committee: [
+        { id: 'c1', level: 1, position: 'รองผู้อำนวยการ ฝ่ายบริหารงานทั่วไป', name: '', phone: '', email: '', photo: '' },
+        { id: 'c2', level: 2, position: 'หัวหน้าฝ่ายบริหารงานทั่วไป', name: '', phone: '', email: '', photo: '' },
+        { id: 'c3', level: 2, position: 'หัวหน้างานยานพาหนะ', name: '', phone: '', email: '', photo: '' },
+        { id: 'c4', level: 3, position: 'เจ้าหน้าที่งานยานพาหนะ', name: '', phone: '', email: '', photo: '' },
+        { id: 'c5', level: 3, position: 'เจ้าหน้าที่งานยานพาหนะ', name: '', phone: '', email: '', photo: '' }
+      ],
+      counter: {}
+    };
+  }
+
+  // ───────── ตัวช่วยเรื่องคำขอ ─────────
+  const overlap = (a1, a2, b1, b2) => new Date(a1) < new Date(b2) && new Date(b1) < new Date(a2);
+  const blocking = r => r.status === 'approved' || r.status === 'ontrip';
+  function rollup(r) {
+    if (!['approved', 'ontrip', 'returned'].includes(r.status)) return r.status;
+    const a = r.assignments || [];
+    if (!a.length) return 'approved';
+    if (a.some(x => x.status === 'ontrip')) return 'ontrip';
+    if (a.every(x => x.status === 'returned')) return 'returned';
+    return a.some(x => x.status === 'returned') ? 'ontrip' : 'approved';
+  }
+  function vehicleConflicts(vehicleId, start, end, exceptId) {
+    const out = [];
+    db.requests.forEach(r => {
+      if (r.id === exceptId || !blocking(r)) return;
+      (r.assignments || []).forEach(a => { if (a.vehicleId === vehicleId && a.status !== 'returned' && overlap(start, end, r.startAt, r.endAt)) out.push(r); });
+    });
+    const v = vehicle(vehicleId);
+    if (v && v.maint && v.maint.active && overlap(start, end, v.maint.from || '1970-01-01', v.maint.to || '2999-01-01')) out.push({ id: 'MAINT', dest: v.maint.note || 'ซ่อมบำรุง', maint: true });
+    if (v && v.bookable === false) out.push({ id: 'OFF', dest: 'งดให้บริการ', maint: true });
+    return out;
+  }
+  function driverConflicts(driverId, start, end, exceptId) {
+    const out = [];
+    db.requests.forEach(r => {
+      if (r.id === exceptId || !blocking(r)) return;
+      (r.assignments || []).forEach(a => { if (a.driverId === driverId && a.status !== 'returned' && overlap(start, end, r.startAt, r.endAt)) out.push(r); });
+    });
+    return out;
+  }
+  function vehicleState(v, at = new Date()) {
+    if (v.bookable === false) return { key: 'off', ...VSTATE.off, note: v.note || 'งดให้บริการชั่วคราว' };
+    if (v.maint && v.maint.active && (!v.maint.from || new Date(v.maint.from) <= at) && (!v.maint.to || new Date(v.maint.to) >= at)) return { key: 'maint', ...VSTATE.maint, note: v.maint.note || 'ซ่อมบำรุง' };
+    let on = null, next = null;
+    db.requests.forEach(r => {
+      if (!['approved', 'ontrip'].includes(r.status)) return;
+      (r.assignments || []).forEach(a => {
+        if (a.vehicleId !== v.id) return;
+        if (a.status === 'ontrip') on = { r, a };
+        else if (a.status === 'assigned' && new Date(r.endAt) > at && sameDay(r.startAt, at) && (!next || r.startAt < next.r.startAt)) next = { r, a };
+      });
+    });
+    if (on) return { key: 'ontrip', ...VSTATE.ontrip, note: `→ ${destName(on.r)} · กลับประมาณ ${UIfmt.when(on.r.endAt)}`, req: on.r };
+    if (next) return { key: 'booked', ...VSTATE.booked, note: `ออก ${UIfmt.time(next.r.startAt)} → ${destName(next.r)}`, req: next.r };
+    return { key: 'free', ...VSTATE.free, note: 'พร้อมให้บริการ' };
+  }
+  const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+  const destName = r => (r.destinations || []).map(d => d.name).filter(Boolean).join(' · ') || '-';
+  const passengers = r => (+r.teachers || 0) + (+r.students || 0) + (+r.others || 0);
+  // หมวดงาน
+  const categories = (all = false) => (db.settings.categories && db.settings.categories.length ? db.settings.categories : DEFAULT_CATS.map((c, i) => ({ ...c, active: true, order: i })))
+    .filter(c => all || c.active !== false).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const catOf = id => categories(true).find(c => c.id === id);
+  const catName = r => { if (!r || !r.category) return 'ไม่ระบุ'; if (r.category === 'other') return r.categoryOther ? `อื่น ๆ: ${r.categoryOther}` : 'อื่น ๆ'; const c = catOf(r.category); return c ? c.name : 'ไม่ระบุ'; };
+  const seatsOf = list => (list || []).reduce((s, a) => s + (+(vehicle(a.vehicleId) || {}).seats || 0), 0);
+
+  // ฟอร์แมตเวลาแบบย่อ (ใช้ภายใน store; หน้าเว็บมี UI.fmt ที่ครบกว่า)
+  const UIfmt = {
+    time: d => new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' น.',
+    when: d => sameDay(d, new Date()) ? UIfmt.time(d) : new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + ' ' + UIfmt.time(d)
+  };
+
+  // ───────── การค้นหา ─────────
+  const vehicle = id => db.vehicles.find(v => v.id === id);
+  const driver = id => db.drivers.find(d => d.id === id);
+  const user = email => db.users.find(u => u.email === String(email || '').toLowerCase());
+  const request = id => db.requests.find(r => r.id === id);
+  const has = (u, role) => !!u && (u.roles || []).includes(role);
+  const isAdmin = u => has(u, 'admin') || has(u, 'superadmin');
+  const isSuper = u => has(u, 'superadmin');
+  const isExec = u => has(u, 'executive');
+  const isDriver = u => has(u, 'driver');
+  const isBack = u => isAdmin(u) || isExec(u);
+  const driverOfUser = u => u && db.drivers.find(d => d.email && d.email === u.email);
+
+  // ───────── การแจ้งเตือนในเว็บ (คำนวณจากประวัติ) ─────────
+  const SEEN_KEY = () => 'pcs-vehicle-seen-' + (me ? me.email : '');
+  function notifications() {
+    if (!me) return [];
+    // ครั้งแรกที่ใช้เครื่องนี้: นับเป็น "ใหม่" เฉพาะความเคลื่อนไหว 3 วันล่าสุด
+    let seen = localStorage.getItem(SEEN_KEY());
+    if (!seen) { seen = new Date(Date.now() - 3 * DAY).toISOString(); localStorage.setItem(SEEN_KEY(), seen); }
+    const out = [];
+    const myDriver = driverOfUser(me);
+    const T = {
+      approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
+      depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน'
+    };
+    db.requests.forEach(r => {
+      (r.history || []).forEach(h => {
+        if (h.by === me.email) return;
+        let mine = false, link = '';
+        if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
+        if (isAdmin(me) && ['submit', 'resubmit', 'cancel'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
+        if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
+        if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen });
+      });
+    });
+    pendingRatings().forEach(p => out.push({ id: 'rate' + p.r.id + p.i, at: p.a.returnedAt, title: 'ประเมินคนขับรถ', body: `${p.r.id} · ${destName(p.r)} · ${(driver(p.a.driverId) || {}).name || ''}`, link: `#/rate/${p.r.id}/${p.i}`, unread: true, rate: true }));
+    return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
+  }
+  function markSeen() { localStorage.setItem(SEEN_KEY(), nowISO()); emit(); }
+  function pendingRatings() {
+    if (!me) return [];
+    const out = [];
+    db.requests.forEach(r => {
+      if (!r.requester || r.requester.email !== me.email) return;
+      (r.assignments || []).forEach((a, i) => {
+        if (a.status === 'returned' && !a.rated && !a.ratingSkipped && a.returnedAt && Date.now() - new Date(a.returnedAt) < 7 * DAY) out.push({ r, a, i });
+      });
+    });
+    return out;
+  }
+
+  // ═══════════════════════ ข้อมูลตัวอย่าง (โหมดทดลอง) ═══════════════════════
+  function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  function seed() {
+    const R = rng(20261104);
+    const pick = a => a[Math.floor(R() * a.length)];
+    const S = defaultSettings();
+    const D = [
+      ['d1', 'นายสวง เพไร', '081-448-5831', 'sawong'], ['d2', 'นายบุญทัน กองไธสง', '080-601-3159', 'boontan'], ['d3', 'นายพัลลภ สุนทร', '062-451-3747', 'pallop'],
+      ['d4', 'นายมานะชัย จันทร์บำรุง', '085-385-3492', 'manachai'], ['d5', 'นายอธิเทพ นาคทอง', '092-396-3804', 'athithep'], ['d6', 'นายไชยวัฒน์ กุณฑล', '093-565-6662', 'chaiwat'],
+      ['d7', 'นายนัดระพงษ์ ยืนบั่ง', '099-205-4081', 'nattapong']
+    ];
+    const drivers = D.map(([id, name, phone, un], i) => ({ id, name, phone, email: emailOf(un), photo: '', licenseNo: '', licenseExpiry: addDays(new Date(), 120 + i * 90).toISOString().slice(0, 10), note: '', active: true, order: i }));
+    const V = [
+      [1, 'รถตู้ 01', '1นฌ 8758 กทม.', 'TOYOTA', 'Commuter', 'van', 12, 'd1', 'สีเงิน'], [2, 'รถตู้ 02', '1นซ 1976 กทม.', 'TOYOTA', 'Commuter', 'van', 12, 'd2', 'สีเงิน'],
+      [3, 'รถตู้ 03', 'ฮล 4536 กทม.', 'TOYOTA', 'Commuter', 'van', 12, 'd3', 'สีขาว'], [4, 'รถตู้ 04', 'ฮจ 1618 กทม.', 'TOYOTA', 'Hiace', 'van', 12, 'd4', 'สีขาว'],
+      [5, 'รถตู้ 05', 'ย 0567 ปทุมธานี', 'TOYOTA', 'Hiace', 'van', 12, 'd4', 'สีขาว'], [6, 'รถกระบะ 06', 'ย 0566 ปทุมธานี', 'TOYOTA', 'Hilux Revo', 'pickup', 3, 'd5', 'สีขาว'],
+      [7, 'รถโดยสาร 6 ล้อ', '40-0686 ปทุมธานี', 'MITSUBISHI', 'Fuso', 'minibus', 25, 'd2', 'สีขาว-น้ำเงิน'], [8, 'รถบัสโดยสาร', '40-0889 ปทุมธานี', 'HINO', 'RN8J', 'bus', 35, 'd2', 'ขาว-แดง-น้ำเงิน'],
+      [9, 'รถกระบะ 09', '1ฒศ 4050 กทม.', 'TOYOTA', 'Hilux Revo', 'pickup', 3, 'd6', 'สีเทา'], [10, 'รถเก๋ง', '3ขว 9163 กทม.', 'TOYOTA', 'Camry', 'car', 4, 'd7', 'สีดำ'],
+      [11, 'รถกระเช้า', '83-9417 ปทุมธานี', 'ISUZU', 'FRR', 'truck', 2, 'd6', 'สีขาว'], [12, 'รถขนขยะ', '82-8443 ปทุมธานี', 'TOYOTA', 'Dyna', 'truck', 2, 'd5', 'สีเขียว'],
+      [13, 'รถขนน้ำ', 'ไม่มีเลขทะเบียน', 'KUBOTA', 'RT', 'special', 1, 'd5', 'สีส้ม'], [14, 'รถกอล์ฟไฟฟ้า', 'ไม่มีเลขทะเบียน', 'EI-GO', 'Golf cart', 'special', 4, 'd4', 'สีขาว']
+    ];
+    const photoOf = { 1: ['images/fleet.jpg'], 2: ['images/fleet.jpg'], 8: ['images/bus-side.jpg', 'images/bus-team.jpg', 'images/fleet.jpg'] };
+    const vehicles = V.map(([no, name, plate, brand, model, kind, seats, driverId, color], i) => ({
+      id: 'v' + no, no, name, plate, brand, model, kind, type: KINDS[kind], color, seats, driverId, order: i,
+      photos: photoOf[no] || [], features: kind === 'van' ? ['แอร์', 'ช่องชาร์จ USB', 'ช่องเก็บสัมภาระ', 'เข็มขัดนิรภัยทุกที่นั่ง'] : kind === 'bus' ? ['แอร์', 'ไมโครโฟน/ลำโพง', 'จอทีวี', 'ช่องเก็บสัมภาระ', 'ถังดับเพลิง', 'ชุดปฐมพยาบาล'] : kind === 'minibus' ? ['แอร์', 'ไมโครโฟน/ลำโพง', 'ช่องเก็บสัมภาระ'] : kind === 'car' ? ['แอร์', 'ช่องชาร์จ USB'] : [],
+      suitable: kind === 'bus' ? 'ทัศนศึกษา ค่าย และการเดินทางเป็นหมู่คณะใหญ่' : kind === 'van' ? 'ประชุม อบรม แข่งขัน คณะไม่เกิน 12 คน' : kind === 'car' ? 'ผู้บริหาร/ประชุมระยะใกล้ 1–3 คน' : kind === 'pickup' ? 'ขนวัสดุอุปกรณ์ ไม่เหมาะกับการรับส่งคน' : 'งานเฉพาะกิจภายในโรงเรียน',
+      rules: kind === 'bus' || kind === 'van' || kind === 'minibus' ? 'งดรับประทานอาหารที่มีกลิ่นในรถ · คาดเข็มขัดนิรภัยทุกครั้ง · ตรวจสอบสัมภาระก่อนลงจากรถ' : '',
+      note: '(ข้อมูลตัวอย่าง — แก้ไขได้ในหลังบ้าน)', bookable: true,
+      maint: no === 5 ? { active: true, from: addDays(new Date(), -1).toISOString(), to: addDays(new Date(), 2).toISOString(), note: 'เปลี่ยนยาง + เช็กระยะ 100,000 กม.' } : { active: false, from: '', to: '', note: '' }
+    }));
+    const vprivate = {};
+    vehicles.forEach((v, i) => {
+      vprivate[v.id] = {
+        id: v.id, chassisNo: '', engineNo: '', fuelType: v.kind === 'special' && v.no === 14 ? 'ไฟฟ้า' : 'ดีเซล', fuelCard: '',
+        actExpiry: addDays(new Date(), i === 2 ? 18 : 40 + i * 23).toISOString().slice(0, 10),
+        taxExpiry: addDays(new Date(), i === 5 ? 9 : 60 + i * 17).toISOString().slice(0, 10),
+        insurance: { company: pick(['วิริยะประกันภัย', 'ทิพยประกันภัย', 'กรุงเทพประกันภัย']), cls: pick(['ชั้น 1', 'ชั้น 2+', 'ชั้น 3']), policyNo: 'POL-' + (68000 + i * 37), expiry: addDays(new Date(), 50 + i * 21).toISOString().slice(0, 10), phone: '1557' },
+        repairs: i < 6 ? [
+          { id: uid('rp'), date: addDays(new Date(), -40 - i * 9).toISOString().slice(0, 10), item: pick(['เปลี่ยนน้ำมันเครื่อง + กรอง', 'เปลี่ยนผ้าเบรกหน้า', 'ซ่อมระบบแอร์', 'เปลี่ยนแบตเตอรี่']), garage: pick(['ศูนย์ TOYOTA รังสิต', 'อู่ช่างเอก ลาดหลุมแก้ว']), cost: 1800 + Math.round(R() * 6000), mileage: 80000 + i * 7000, note: '', photos: [] },
+          { id: uid('rp'), date: addDays(new Date(), -120 - i * 11).toISOString().slice(0, 10), item: 'เช็กระยะตามรอบ', garage: 'ศูนย์บริการ', cost: 2500 + Math.round(R() * 3000), mileage: 70000 + i * 7000, note: '', photos: [] }
+        ] : [],
+        maintenancePlan: [{ id: uid('mp'), item: 'เปลี่ยนน้ำมันเครื่อง', everyKm: 10000, everyMonths: 6, lastDate: addDays(new Date(), -100).toISOString().slice(0, 10), lastKm: 85000 }],
+        accidents: [], notes: ''
+      };
+    });
+    const T = [
+      ['kanokwan.s', 'ครูกนกวรรณ ศรีสุข', 'กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี'], ['thanapol.w', 'ครูธนพล วงศ์ใหญ่', 'กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี'], ['wilaiporn.m', 'ครูวิไลพร มณีรัตน์', 'ฝ่ายบริหารงานวิชาการ'],
+      ['attapol.k', 'ครูอรรถพล แก้วประเสริฐ', 'กลุ่มสาระคณิตศาสตร์'], ['supawadee.t', 'ครูสุภาวดี ทองคำ', 'ฝ่ายบริหารงานทั่วไป'], ['piyanuch.j', 'ครูปิยะนุช ใจดี', 'กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี'],
+      ['nattawut.p', 'ครูณัฐวุฒิ พรหมมา', 'กลุ่มสาระการงานอาชีพ'], ['somjai.r', 'ครูสมใจ รักวิทยา', 'กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี'], ['chanida.l', 'ครูชนิดา ลือชัย', 'กลุ่มสาระภาษาต่างประเทศ'], ['prasert.n', 'ครูประเสริฐ นิลสุวรรณ', 'ฝ่ายกิจการนักเรียนและหอพัก']
+    ];
+    const teacherUsers = T.map(([u, name, dept], i) => ({ email: `${u}@pcshspt.ac.th`, name, dept, phone: `08${i}-${100 + i * 7}-${2000 + i * 13}`, position: 'ครู', roles: ['teacher'], active: true, provider: 'google', createdAt: addDays(new Date(), -200).toISOString() }));
+    const users = [
+      { email: 'tripop@pcshspt.ac.th', name: 'นายตรีภพ (ผู้ดูแลระบบ)', dept: 'ฝ่ายบริหารงานทั่วไป', phone: '', position: 'ครู', roles: ['teacher', 'admin', 'superadmin'], active: true, provider: 'google' },
+      { email: emailOf('admin'), name: 'แอดมินงานยานพาหนะ', dept: 'ฝ่ายบริหารงานทั่วไป', phone: '', position: 'เจ้าหน้าที่', roles: ['admin'], active: true, provider: 'username', password: 'admin1234' },
+      { email: 'director@pcshspt.ac.th', name: 'ผู้อำนวยการโรงเรียน (ตัวอย่าง)', dept: 'ผู้บริหาร', phone: '', position: 'ผู้อำนวยการ', roles: ['executive'], active: true, provider: 'google' },
+      ...teacherUsers,
+      ...drivers.map(d => ({ email: d.email, name: d.name, dept: 'งานยานพาหนะ', phone: d.phone, position: 'พนักงานขับรถ', roles: ['driver'], active: true, provider: 'username', password: '1234', driverId: d.id }))
+    ];
+    const P = [
+      ['สพม.ปทุมธานี', 'ต.บางปรอก อ.เมืองปทุมธานี จ.ปทุมธานี', 'ปทุมธานี', 14.0167, 100.5300, 24, 35], ['อุทยานวิทยาศาสตร์ประเทศไทย (สวทช.)', 'ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี', 'ปทุมธานี', 14.0790, 100.6040, 31, 40],
+      ['มหาวิทยาลัยเกษตรศาสตร์ บางเขน', 'แขวงลาดยาว เขตจตุจักร กรุงเทพมหานคร', 'กรุงเทพมหานคร', 13.8470, 100.5717, 44, 60], ['มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต', 'ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี', 'ปทุมธานี', 14.0700, 100.6020, 30, 40],
+      ['กระทรวงศึกษาธิการ', 'แขวงวัดโสมนัส เขตป้อมปราบศัตรูพ่าย กรุงเทพมหานคร', 'กรุงเทพมหานคร', 13.7590, 100.5080, 52, 75], ['ท่าอากาศยานสุวรรณภูมิ', 'ต.หนองปรือ อ.บางพลี จ.สมุทรปราการ', 'สมุทรปราการ', 13.6900, 100.7501, 72, 80],
+      ['อุทยานแห่งชาติเขาใหญ่', 'อ.ปากช่อง จ.นครราชสีมา', 'นครราชสีมา', 14.4390, 101.3720, 165, 150], ['สำนักงานคณะกรรมการการศึกษาขั้นพื้นฐาน (สพฐ.)', 'แขวงวัดโสมนัส เขตป้อมปราบศัตรูพ่าย กรุงเทพมหานคร', 'กรุงเทพมหานคร', 13.7600, 100.5100, 52, 75],
+      ['มหาวิทยาลัยมหิดล ศาลายา', 'ต.ศาลายา อ.พุทธมณฑล จ.นครปฐม', 'นครปฐม', 13.7940, 100.3240, 38, 50], ['สถาบันส่งเสริมการสอนวิทยาศาสตร์และเทคโนโลยี (สสวท.)', 'แขวงพระโขนง เขตคลองเตย กรุงเทพมหานคร', 'กรุงเทพมหานคร', 13.7250, 100.5850, 60, 80],
+      ['โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ลพบุรี', 'อ.เมืองลพบุรี จ.ลพบุรี', 'ลพบุรี', 14.7990, 100.6530, 110, 100], ['ศูนย์ประชุมแห่งชาติสิริกิติ์', 'แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร', 'กรุงเทพมหานคร', 13.7230, 100.5590, 58, 80]
+    ];
+    const places = P.map(([name, address, province, lat, lng, km, mins], i) => ({ id: 'p' + i, name, address, province, lat, lng, km, mins, count: 1 + Math.round(R() * 8) }));
+    const catFor = p => /ประชุม|อบรม/.test(p) ? 'meeting' : /แข่ง|โครงงาน/.test(p) ? 'contest' : /ทัศน|ค่าย|ดูงาน|กิจกรรม/.test(p) ? 'activity' : /วิทยากร|ต้อนรับ|รับ-ส่ง/.test(p) ? (/ต่างประเทศ/.test(p) ? 'intl' : 'guest') : /เอกสาร|ส่งผลงาน/.test(p) ? 'docs' : /เงิน|ธนาคาร/.test(p) ? 'finance' : /ซื้อ|ยืม|วัสดุ/.test(p) ? 'goods' : /โรงพยาบาล/.test(p) ? 'medical' : /จิตอาสา|ชุมชน/.test(p) ? 'community' : 'other';
+    const PURPOSE = ['เบิกเงินและฝากเงินธนาคาร', 'ซื้อวัสดุอุปกรณ์การเรียน', 'นำนักเรียนส่งโรงพยาบาล', 'ต้อนรับคณะครูจากต่างประเทศ', 'จิตอาสาพัฒนาชุมชน', 'ประชุมเชิงปฏิบัติการ', 'นำนักเรียนแข่งขันวิชาการ', 'ทัศนศึกษา', 'อบรมพัฒนาครู', 'ยื่นเอกสารราชการ', 'รับ-ส่งวิทยากร', 'นำเสนอโครงงานวิทยาศาสตร์', 'ค่ายวิทยาศาสตร์', 'ศึกษาดูงาน'];
+    const requests = [], ratings = [], seedBusy = [];
+    let n = 0;
+    const mkId = d => { n++; return `VR-${beYear(d)}-${String(n).padStart(4, '0')}`; };
+    const vansAndBus = vehicles.filter(v => ['van', 'bus', 'minibus', 'car'].includes(v.kind) && v.no !== 5);
+    function mk(startAt, endAt, opts = {}) {
+      const t = opts.teacher || pick(teacherUsers), p = opts.place || pick(places);
+      const students = opts.students != null ? opts.students : (R() < .5 ? Math.round(R() * 30) : 0), teachers = opts.teachers || 1 + Math.round(R() * 3);
+      const pax = students + teachers;
+      let vs = opts.vehicles;
+      if (!vs) { const big = pax > 12; vs = big ? [vehicles.find(v => v.no === 8)] : [pick(vansAndBus.filter(v => v.kind === 'van' || (pax <= 4 && v.kind === 'car')))]; if (pax > 35) vs.push(vehicles.find(v => v.no === 1)); }
+      const created = addDays(new Date(startAt), -3 - Math.round(R() * 6)).toISOString();
+      const id = mkId(startAt);
+      const r = {
+        id, createdAt: created, updatedAt: created, startAt: new Date(startAt).toISOString(), endAt: new Date(endAt).toISOString(),
+        requester: { email: t.email, name: t.name, dept: t.dept, phone: t.phone },
+        purpose: opts.purpose || pick(PURPOSE), project: opts.project || '', category: '', categoryOther: '', destinations: [{ ...p, id: p.id }], totalKm: p.km * 2, totalMins: p.mins,
+        overnight: !sameDay(startAt, endAt), lodging: !sameDay(startAt, endAt) ? 'ที่พักของหน่วยงานผู้จัด' : '', teachers, students, others: 0, passengerNames: '',
+        pickup: 'หน้าอาคารอำนวยการ', contactPhone: t.phone, note: '', attachments: [], status: opts.status || 'closed', emergency: false, createdBy: t.email,
+        history: [{ at: created, by: t.email, byName: t.name, action: 'submit', note: '' }], decision: null, assignments: [], expenses: []
+      };
+      if (!['pending', 'revise', 'rejected', 'cancelled'].includes(r.status)) {
+        const at = addDays(new Date(created), 1).toISOString();
+        r.decision = { by: 'tripop@pcshspt.ac.th', byName: 'นายตรีภพ (ผู้ดูแลระบบ)', at, action: 'approve', note: opts.decisionNote || (R() < .4 ? 'ขอให้มาถึงจุดนัดก่อนเวลา 15 นาที' : '') };
+        r.history.push({ at, by: 'tripop@pcshspt.ac.th', byName: 'นายตรีภพ (ผู้ดูแลระบบ)', action: 'approve', note: r.decision.note });
+        // ข้อมูลตัวอย่าง: เลือกคนขับที่ไม่ติดงานอื่นในช่วงเวลาเดียวกัน (ใช้ผู้ดูแลรถก่อน)
+        const used = new Set();
+        const free = id => !used.has(id) && !seedBusy.some(b => b.d === id && new Date(startAt) < b.e && b.s < new Date(endAt));
+        const drv = v => { const d = free(v.driverId) ? v.driverId : ((drivers.find(x => free(x.id)) || {}).id || v.driverId); used.add(d); seedBusy.push({ d, s: new Date(startAt), e: new Date(endAt) }); return d; };
+        r.assignments = vs.map(v => ({ vehicleId: v.id, driverId: drv(v), note: v.kind === 'bus' ? `รถบัสนั่งได้ ${v.seats} ที่นั่ง` : '', status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false }));
+      }
+      if (r.status === 'rejected') { const at = addDays(new Date(created), 1).toISOString(); r.decision = { by: 'tripop@pcshspt.ac.th', byName: 'นายตรีภพ (ผู้ดูแลระบบ)', at, action: 'reject', note: 'รถไม่ว่างในช่วงเวลาดังกล่าว แนะนำให้เลื่อนวันเดินทาง' }; r.history.push({ at, by: r.decision.by, byName: r.decision.byName, action: 'reject', note: r.decision.note }); }
+      if (r.status === 'revise') { const at = addDays(new Date(created), 1).toISOString(); r.decision = { by: 'tripop@pcshspt.ac.th', byName: 'นายตรีภพ (ผู้ดูแลระบบ)', at, action: 'revise', note: 'บันทึกข้อความยังไม่มีลายเซ็นผู้อำนวยการ กรุณาแนบฉบับที่ลงนามแล้ว' }; r.history.push({ at, by: r.decision.by, byName: r.decision.byName, action: 'revise', note: r.decision.note }); }
+      if (['closed', 'returned', 'ontrip'].includes(r.status)) {
+        r.assignments.forEach(a => {
+          const odo0 = 60000 + Math.round(R() * 40000);
+          a.status = r.status === 'ontrip' ? 'ontrip' : 'returned';
+          a.departedAt = new Date(new Date(r.startAt).getTime() + Math.round(R() * 15) * 6e4).toISOString(); a.odoStart = odo0;
+          if (a.status === 'returned') {
+            a.returnedAt = new Date(new Date(r.endAt).getTime() + Math.round(R() * 40 - 10) * 6e4).toISOString(); a.odoEnd = odo0 + r.totalKm + Math.round(R() * 10);
+            r.history.push({ at: a.departedAt, by: (drivers.find(d => d.id === a.driverId) || {}).email, byName: (drivers.find(d => d.id === a.driverId) || {}).name, action: 'depart', note: vehicle2(vehicles, a.vehicleId).name });
+            r.history.push({ at: a.returnedAt, by: (drivers.find(d => d.id === a.driverId) || {}).email, byName: (drivers.find(d => d.id === a.driverId) || {}).name, action: 'return', note: vehicle2(vehicles, a.vehicleId).name });
+            const v = vehicle2(vehicles, a.vehicleId), kmpl = v.kind === 'bus' ? 4.2 : v.kind === 'minibus' ? 6 : v.kind === 'car' ? 13 : 9.5;
+            const liters = Math.round((a.odoEnd - a.odoStart) / kmpl * 10) / 10, ppl = 31.94 + Math.round(R() * 80) / 100;
+            if (r.totalKm > 40 || R() < .6) r.expenses.push({ id: uid('ex'), vehicleId: a.vehicleId, type: 'fuel', date: a.returnedAt.slice(0, 10), station: pick(['ปตท. ลาดหลุมแก้ว', 'บางจาก คลองหลวง', 'เชลล์ รังสิต']), liters, pricePerL: ppl, amount: Math.round(liters * ppl), odo: a.odoEnd, pay: pick(['card', 'cash', 'credit']), photos: [], note: '', by: 'tripop@pcshspt.ac.th', at: a.returnedAt });
+            if (/กรุงเทพ|สมุทรปราการ/.test(r.destinations[0].province)) r.expenses.push({ id: uid('ex'), vehicleId: a.vehicleId, type: 'toll', date: a.returnedAt.slice(0, 10), station: 'ทางพิเศษ', liters: 0, pricePerL: 0, amount: 50 + Math.round(R() * 4) * 25, odo: null, pay: 'cash', photos: [], note: '', by: 'tripop@pcshspt.ac.th', at: a.returnedAt });
+            if (r.status === 'closed' && R() < .85) {
+              a.rated = true;
+              const sc = () => R() < .15 ? 4 : 5;
+              ratings.push({ id: uid('rt'), at: a.returnedAt, driverId: a.driverId, vehicleId: a.vehicleId, scores: { punctual: sc(), safety: sc(), manner: sc(), clean: R() < .3 ? 4 : 5 }, comment: R() < .35 ? pick(['ขับรถสุภาพ ปลอดภัยมากค่ะ', 'มาตรงเวลา ช่วยยกของให้ด้วย ขอบคุณครับ', 'รถสะอาด แอร์เย็น', 'บริการดีมาก']) : '' });
+            }
+          } else {
+            r.history.push({ at: a.departedAt, by: (drivers.find(d => d.id === a.driverId) || {}).email, byName: (drivers.find(d => d.id === a.driverId) || {}).name, action: 'depart', note: vehicle2(vehicles, a.vehicleId).name });
+          }
+        });
+        if (r.status === 'closed') r.history.push({ at: addDays(new Date(r.endAt), 1).toISOString(), by: 'tripop@pcshspt.ac.th', byName: 'นายตรีภพ (ผู้ดูแลระบบ)', action: 'close', note: '' });
+      }
+      r.category = opts.category || catFor(r.purpose); if (r.category === 'other') r.categoryOther = 'ขนย้ายอุปกรณ์งานพิธี';
+      r.status = rollupLike(r);
+      r.driverEmails = r.assignments.map(a => (drivers.find(d => d.id === a.driverId) || {}).email).filter(Boolean);
+      requests.push(r);
+      return r;
+    }
+    // ย้อนหลัง ~5 เดือน
+    for (let d = -150; d <= -1; d++) {
+      const day = addDays(startOfDay(new Date()), d);
+      if (day.getDay() === 0 || day.getDay() === 6) continue;
+      const k = R() < .25 ? 2 : R() < .55 ? 1 : 0;
+      for (let j = 0; j < k; j++) {
+        const st = new Date(day); st.setHours(6 + Math.round(R() * 4), R() < .5 ? 0 : 30, 0, 0);
+        const p = pick(places), multi = p.km > 100 && R() < .6;
+        const en = multi ? addDays(st, 1 + Math.round(R())) : new Date(st.getTime() + (3 + Math.round(R() * 6)) * HOUR);
+        const roll = R();
+        mk(st, en, { place: p, status: roll < .07 ? 'rejected' : roll < .11 ? 'cancelled' : 'closed' });
+      }
+    }
+    // วันนี้ (อ้างอิงเวลาปัจจุบัน)
+    // ถ้าสร้างข้อมูลนอกเวลาทำการ ให้ยึด 10:30 น. ของวันนี้ (ตัวอย่างจะเห็นรถเลยเวลากลับ → แจ้งเตือนในหลังบ้าน)
+    const t0 = new Date(); const hh = t0.getHours();
+    if (hh < 7 || hh > 16) t0.setHours(10, 30, 0, 0); else t0.setMinutes(t0.getMinutes() < 30 ? 0 : 30, 0, 0);
+    const at = h => new Date(t0.getTime() + h * HOUR);
+    const tByU = u => teacherUsers.find(x => x.email.startsWith(u));
+    const V8 = vehicles.find(v => v.no === 8), V1 = vehicles.find(v => v.no === 1), V2 = vehicles.find(v => v.no === 2), V3 = vehicles.find(v => v.no === 3), V10 = vehicles.find(v => v.no === 10), V7 = vehicles.find(v => v.no === 7), V4 = vehicles.find(v => v.no === 4);
+    const r1 = mk(at(-4.5), at(-1.5), { teacher: tByU('kanokwan'), place: places[5], purpose: 'รับวิทยากรค่ายโอลิมปิกวิชาการ', students: 0, teachers: 1, vehicles: [V1], status: 'returned' });
+    r1.assignments[0].rated = false;
+    const r1b = mk(at(-5), at(-2), { teacher: tByU('somjai'), place: places[1], purpose: 'ส่งผลงานโครงงานวิทยาศาสตร์', students: 4, teachers: 1, vehicles: [V4], status: 'returned' });
+    r1b.assignments[0].rated = false;
+    mk(at(-1.5), at(5), { teacher: tByU('thanapol'), place: places[2], purpose: 'ทัศนศึกษางานเกษตรแฟร์ ม.4', students: 40, teachers: 5, vehicles: [V8, V2], status: 'ontrip', decisionNote: 'ใช้รถบัส + รถตู้ 02 เนื่องจากผู้เดินทาง 45 คน รถบัสนั่งได้ 35 คน' });
+    mk(at(1.5), at(5), { teacher: tByU('attapol'), place: places[1], purpose: 'นำเสนอโครงงานวิทยาศาสตร์', students: 10, teachers: 2, vehicles: [V3], status: 'approved' });
+    mk(at(2.5), at(6), { teacher: tByU('supawadee'), place: places[4], purpose: 'ยื่นเอกสารโครงการห้องเรียนพิเศษ', students: 0, teachers: 2, vehicles: [V10], status: 'approved' });
+    mk(at(3.5), addDays(at(3.5), 2), { teacher: tByU('piyanuch'), place: places[6], purpose: 'ค่ายวิทยาศาสตร์ธรรมชาติ ม.5', students: 22, teachers: 3, vehicles: [V7], status: 'approved' });
+    // ล่วงหน้า + รอตรวจสอบ
+    for (let d = 1; d <= 20; d++) {
+      const day = addDays(startOfDay(new Date()), d);
+      if (day.getDay() === 0 || day.getDay() === 6) continue;
+      if (R() < .55) { const st = new Date(day); st.setHours(7 + Math.round(R() * 3), 0, 0, 0); mk(st, new Date(st.getTime() + (4 + Math.round(R() * 4)) * HOUR), { status: d >= 3 && R() < .45 ? 'pending' : 'approved' }); }
+    }
+    const pd = addDays(startOfDay(new Date()), 4); pd.setHours(8, 0, 0, 0);
+    mk(pd, new Date(pd.getTime() + 6 * HOUR), { teacher: tByU('nattawut'), place: places[3], purpose: 'แข่งขันหุ่นยนต์ระดับภาค', students: 6, teachers: 2, status: 'pending' });
+    const rv = addDays(startOfDay(new Date()), 6); rv.setHours(8, 30, 0, 0);
+    mk(rv, new Date(rv.getTime() + 5 * HOUR), { teacher: tByU('somjai'), place: places[9], purpose: 'อบรมครูวิทยาศาสตร์ สสวท.', students: 0, teachers: 3, status: 'revise' });
+    const pd2 = addDays(startOfDay(new Date()), 9); pd2.setHours(7, 0, 0, 0);
+    mk(pd2, addDays(pd2, 1), { teacher: tByU('somjai'), place: places[10], purpose: 'ศึกษาดูงานเครือข่าย จภ.', students: 8, teachers: 2, status: 'pending' });
+    S.counter = { [beYear(new Date())]: n };
+    return { settings: S, vehicles, drivers, users, requests, places, ratings, vprivate };
+  }
+  function vehicle2(list, id) { return list.find(v => v.id === id) || {}; }
+  function rollupLike(r) { return rollup(r); }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+
+  // ═══════════════════════ ตัวเชื่อมข้อมูล (Adapter) ═══════════════════════
+  let A = null;
+
+  // ───── โหมดทดลอง ─────
+  function makeLocal() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
+    db = saved && saved.v === 1 ? saved.db : seed();
+    if (!db.settings.categories) db.settings.categories = defaultSettings().categories;
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, db })); } catch (e) { console.warn('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม', e); if (typeof UI !== 'undefined') UI.toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม (โหมดทดลอง) ลองลบรูปบางส่วน', 'error'); } };
+    save();
+    const sessKey = 'pcs-vehicle-session';
+    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id' };
+    return {
+      async start() {
+        // โหมดทดลองเท่านั้น: ?as=อีเมล หรือ ?as=username เพื่อเข้าเป็นบัญชีตัวอย่างทันที (ใช้สาธิต/ทดสอบ)
+        if (QP.get('as')) { const a = QP.get('as').toLowerCase(); localStorage.setItem(sessKey, a.includes('@') ? a : emailOf(a)); }
+        const em = localStorage.getItem(sessKey);
+        const u = em && user(em);
+        if (u && u.active) { me = u; authState = 'in'; } else { authState = 'out'; }
+        emit();
+      },
+      async put(col, id, data) {
+        if (col === 'settings') db.settings = clone(data);
+        else if (col === 'vprivate') db.vprivate[id] = clone(data);
+        else {
+          const k = cols[col], list = db[col], i = list.findIndex(x => x[k] === id);
+          if (i >= 0) list[i] = clone(data); else list.push(clone(data));
+        }
+        if (me) me = user(me.email) || me;
+        save(); emit();
+      },
+      async del(col, id) {
+        if (col === 'vprivate') delete db.vprivate[id];
+        else db[col] = db[col].filter(x => x[cols[col]] !== id);
+        save(); emit();
+      },
+      async nextId(d) {
+        const y = beYear(d || new Date());
+        db.settings.counter = db.settings.counter || {};
+        db.settings.counter[y] = (db.settings.counter[y] || 0) + 1;
+        save();
+        return `VR-${y}-${String(db.settings.counter[y]).padStart(4, '0')}`;
+      },
+      async loginGoogle(email) {
+        email = String(email || '').toLowerCase();
+        let u = user(email);
+        if (!u) {
+          const okDomain = DOMAINS.some(d => email.endsWith('@' + d));
+          if (!okDomain) throw new Error('ใช้ได้เฉพาะอีเมล @' + DOMAINS[0] + ' หรืออีเมลที่แอดมินเพิ่มไว้');
+          u = { email, name: '', dept: '', phone: '', position: 'ครู', roles: BOOT.includes(email) ? ['teacher', 'admin', 'superadmin'] : ['teacher'], active: true, provider: 'google', needsProfile: true, createdAt: nowISO() };
+          await this.put('users', email, u);
+        }
+        if (!u.active) throw new Error('บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อแอดมิน');
+        localStorage.setItem(sessKey, email); me = user(email); authState = 'in'; emit();
+      },
+      async loginUsername(username, password) {
+        const u = user(emailOf(username));
+        if (!u || u.password !== password) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        if (!u.active) throw new Error('บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อแอดมิน');
+        localStorage.setItem(sessKey, u.email); me = u; authState = 'in'; emit();
+      },
+      async logout() { localStorage.removeItem(sessKey); me = null; authState = 'out'; emit(); },
+      async createAccount({ username, password }) { return emailOf(username); },
+      async setPassword(email, password) { const u = user(email); if (u) { u.password = password; save(); } },
+      async changeOwnPassword(password) { const u = user(me.email); u.password = password; u.mustChangePassword = false; save(); me = u; emit(); },
+      async upload(files) { return files; },          // เก็บ dataURL ในเบราว์เซอร์
+      async fileUrl(ref) { return ref; },
+      reset() { localStorage.removeItem(KEY); localStorage.removeItem(sessKey); location.reload(); }
+    };
+  }
+
+  // ───── โหมดจริง: Firebase ─────
+  function makeCloud() {
+    firebase.initializeApp(CFG.firebase);
+    const auth = firebase.auth(), fs = firebase.firestore();
+    try { fs.settings({ ignoreUndefinedProperties: true }); } catch (e) { /* ตั้งไว้แล้ว */ }
+    fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate' };
+    const strip = o => JSON.parse(JSON.stringify(o));
+    let unsubs = [], reqMaps = {};
+    const stopAll = () => { unsubs.forEach(u => { try { u(); } catch (e) { /* ข้าม */ } }); unsubs = []; reqMaps = {}; };
+    const mergeReq = () => {
+      const m = new Map();
+      Object.values(reqMaps).forEach(mp => mp.forEach((v, k) => m.set(k, v)));
+      db = { ...db, requests: [...m.values()].sort((a, b) => a.startAt.localeCompare(b.startAt)) };
+      emit();
+    };
+    function listenReq(name, q) {
+      reqMaps[name] = new Map();
+      unsubs.push(q.onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); reqMaps[name] = mp; mergeReq(); }, e => console.error('requests', name, e)));
+    }
+    function startData() {
+      stopAll();
+      const col = n => fs.collection(n);
+      unsubs.push(fs.collection('config').doc('settings').onSnapshot(s => { db = { ...db, settings: { ...defaultSettings(), ...(s.data() || {}) } }; emit(); }));
+      ['vehicles', 'drivers'].forEach(n => unsubs.push(col(n).onSnapshot(s => { db = { ...db, [n]: s.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0)) }; emit(); }, e => console.error(n, e))));
+      unsubs.push(col('places').orderBy('count', 'desc').limit(400).onSnapshot(s => { db = { ...db, places: s.docs.map(d => d.data()) }; emit(); }, e => console.error('places', e)));
+      if (isBack(me)) listenReq('all', col('requests'));
+      else {
+        listenReq('window', col('requests').where('endAt', '>=', new Date(Date.now() - 45 * DAY).toISOString()));
+        listenReq('mine', col('requests').where('requester.email', '==', me.email));
+      }
+      if (isAdmin(me)) {
+        unsubs.push(col('users').onSnapshot(s => { db = { ...db, users: s.docs.map(d => d.data()) }; if (me) me = db.users.find(u => u.email === me.email) || me; emit(); }));
+      }
+      if (isBack(me)) unsubs.push(col('vehiclePrivate').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); db = { ...db, vprivate: o }; emit(); }));
+      if (isBack(me)) unsubs.push(col('ratings').onSnapshot(s => { db = { ...db, ratings: s.docs.map(d => d.data()) }; emit(); }));
+    }
+    async function loadMe(fu) {
+      const email = String(fu.email || '').toLowerCase();
+      const ref = fs.collection('users').doc(email);
+      let snap = await ref.get().catch(() => null);
+      let u = snap && snap.exists ? snap.data() : null;
+      const isGoogle = (fu.providerData || []).some(p => p.providerId === 'google.com');
+      if (!u) {
+        const okDomain = isGoogle && DOMAINS.some(d => email.endsWith('@' + d));
+        if (!okDomain) throw new Error('บัญชีนี้ยังไม่ได้รับอนุญาตให้ใช้งาน (ใช้ได้เฉพาะอีเมล @' + DOMAINS[0] + ' หรืออีเมลที่แอดมินเพิ่มไว้)');
+        u = { email, name: fu.displayName || '', dept: '', phone: '', position: 'ครู', roles: BOOT.includes(email) ? ['teacher', 'admin', 'superadmin'] : ['teacher'], active: true, provider: 'google', needsProfile: true, createdAt: nowISO(), photoURL: fu.photoURL || '' };
+        await ref.set(u);
+      }
+      if (!u.active) throw new Error('บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อแอดมิน');
+      // ติดตามโปรไฟล์ตัวเอง (สิทธิ์เปลี่ยนแล้วมีผลทันที)
+      unsubs.push(ref.onSnapshot(s => { if (s.exists) { const was = JSON.stringify(me && me.roles); me = s.data(); if (was !== JSON.stringify(me.roles)) startData(); emit(); } }));
+      return u;
+    }
+    async function callScript(action, payload) {
+      if (!CFG.appsScriptUrl) throw new Error('ยังไม่ได้ตั้งค่าที่เก็บไฟล์ (Apps Script) กรุณาติดต่อแอดมิน');
+      if (!auth.currentUser) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+      const idToken = await auth.currentUser.getIdToken();
+      let res;
+      try { res = await fetch(CFG.appsScriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, idToken, ...payload }) }); }
+      catch (e) { throw new Error('เชื่อมต่อ Apps Script ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); }
+      const data = await res.json().catch(() => ({ ok: false, error: 'Apps Script ตอบกลับผิดรูปแบบ' }));
+      if (!data.ok) throw new Error(data.error || 'Apps Script ตอบกลับผิดพลาด');
+      return data;
+    }
+    const fileCache = new Map();
+    return {
+      async start() {
+        auth.onAuthStateChanged(async fu => {
+          stopAll();
+          if (!fu) { me = null; authState = 'out'; db = emptyDb(); emit(); return; }
+          try { me = await loadMe(fu); authError = ''; authState = 'in'; startData(); emit(); }
+          catch (e) { authError = e.message; me = null; authState = 'out'; await auth.signOut(); emit(); }
+        });
+      },
+      async put(col, id, data) {
+        if (col === 'settings') return fs.collection('config').doc('settings').set(strip(data));
+        return fs.collection(colName[col]).doc(id).set(strip(data));
+      },
+      async del(col, id) { return fs.collection(colName[col]).doc(id).delete(); },
+      async nextId(d) {
+        const y = beYear(d || new Date());
+        const ref = fs.collection('counters').doc(String(y));
+        const n = await fs.runTransaction(async tx => { const s = await tx.get(ref); const v = ((s.exists && s.data().n) || 0) + 1; tx.set(ref, { n: v }); return v; });
+        return `VR-${y}-${String(n).padStart(4, '0')}`;
+      },
+      async loginGoogle() {
+        authError = '';
+        const p = new firebase.auth.GoogleAuthProvider();
+        p.setCustomParameters({ prompt: 'select_account' });
+        await auth.signInWithPopup(p);
+      },
+      async loginUsername(username, password) {
+        authError = '';
+        try { await auth.signInWithEmailAndPassword(emailOf(username), password); }
+        catch (e) { throw new Error(/wrong-password|user-not-found|invalid-credential|invalid-login/.test(e.code || e.message) ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' : /too-many/.test(e.code || '') ? 'ลองผิดหลายครั้งเกินไป กรุณารอสักครู่' : e.message); }
+      },
+      async logout() { await auth.signOut(); },
+      // สร้างบัญชี username ด้วยแอปสำรอง (ไม่ทำให้แอดมินหลุดจากระบบ)
+      async createAccount({ username, password }) {
+        const email = emailOf(username);
+        const sec = firebase.apps.find(a => a.name === 'creator') || firebase.initializeApp(CFG.firebase, 'creator');
+        try { await sec.auth().createUserWithEmailAndPassword(email, password); }
+        catch (e) { if (!/email-already-in-use/.test(e.code || '')) throw new Error(/weak-password/.test(e.code || '') ? 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร' : e.message); throw new Error('ชื่อผู้ใช้นี้ถูกใช้แล้ว'); }
+        finally { await sec.auth().signOut().catch(() => {}); }
+        return email;
+      },
+      async setPassword(email, password) { await callScript('setpassword', { email, password }); },
+      async changeOwnPassword(password) {
+        try { await auth.currentUser.updatePassword(password); }
+        catch (e) { throw new Error(/requires-recent-login/.test(e.code || '') ? 'กรุณาออกจากระบบแล้วเข้าใหม่ก่อนเปลี่ยนรหัสผ่าน' : /weak-password/.test(e.code || '') ? 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร' : e.message); }
+        await fs.collection('users').doc(me.email).set({ mustChangePassword: false }, { merge: true });
+      },
+      async upload(files) {
+        return Promise.all((files || []).map(async f => {
+          const m = typeof f === 'string' && f.match(/^data:([^;]+);base64,(.+)$/);
+          if (!m) return f;
+          const r = await callScript('upload', { mime: m[1], data: m[2] });
+          return 'drive:' + r.id;
+        }));
+      },
+      async fileUrl(ref) {
+        const s = String(ref || '');
+        if (!s.startsWith('drive:')) return s;
+        const id = s.slice(6);
+        if (!fileCache.has(id)) fileCache.set(id, callScript('file', { id }).then(r => {
+          const bin = atob(r.data), bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          return URL.createObjectURL(new Blob([bytes], { type: r.mime }));
+        }).catch(e => { fileCache.delete(id); throw e; }));
+        return fileCache.get(id);
+      },
+      reset() { location.reload(); }
+    };
+  }
+
+  // ═══════════════════════ คำสั่งที่หน้าเว็บเรียกใช้ ═══════════════════════
+  const H = (action, note = '') => ({ at: nowISO(), by: me.email, byName: me.name || me.email, action, note });
+  const needAdmin = () => { if (!isAdmin(me)) throw new Error('เฉพาะแอดมินเท่านั้น'); };
+  const driverEmailsOf = list => (list || []).map(a => (driver(a.driverId) || {}).email).filter(Boolean);
+  const saveReq = r => { r.updatedAt = nowISO(); r.status = rollup(r); r.driverEmails = driverEmailsOf(r.assignments); return A.put('requests', r.id, r).then(() => r); };
+  const cleanReqInput = (x) => ({
+    category: String(x.category || ''), categoryOther: x.category === 'other' ? String(x.categoryOther || '').trim() : '',
+    purpose: String(x.purpose || '').trim(), project: String(x.project || '').trim(),
+    destinations: (x.destinations || []).map(d => ({ id: d.id || uid('pl'), name: d.name, address: d.address || '', province: d.province || '', lat: d.lat ?? null, lng: d.lng ?? null, km: +d.km || 0, mins: +d.mins || 0 })),
+    totalKm: +x.totalKm || 0, totalMins: +x.totalMins || 0,
+    startAt: new Date(x.startAt).toISOString(), endAt: new Date(x.endAt).toISOString(),
+    overnight: !sameDay(x.startAt, x.endAt), lodging: String(x.lodging || '').trim(),
+    teachers: +x.teachers || 0, students: +x.students || 0, others: +x.others || 0, passengerNames: String(x.passengerNames || '').trim(),
+    pickup: String(x.pickup || '').trim(), contactPhone: String(x.contactPhone || '').trim(), note: String(x.note || '').trim(), attachments: x.attachments || []
+  });
+  const checkCat = x => { if (!x.category) throw new Error('กรุณาเลือกหมวดงาน'); if (x.category === 'other' && !x.categoryOther) throw new Error('กรุณาระบุหมวดงาน (อื่น ๆ)'); };
+  async function rememberPlaces(dests) {
+    for (const d of dests) {
+      if (!d.name) continue;
+      const ex = db.places.find(p => p.name === d.name);
+      const p = ex ? { ...ex, count: (ex.count || 0) + 1, km: d.km || ex.km, mins: d.mins || ex.mins, lat: d.lat ?? ex.lat, lng: d.lng ?? ex.lng, address: d.address || ex.address, province: d.province || ex.province }
+        : { id: uid('p'), name: d.name, address: d.address || '', province: d.province || '', lat: d.lat ?? null, lng: d.lng ?? null, km: d.km || 0, mins: d.mins || 0, count: 1 };
+      await A.put('places', p.id, p).catch(e => console.warn('จำสถานที่ไม่สำเร็จ', e));
+    }
+  }
+
+  const api = {
+    LOCAL, ROLES, STATUS, ASSIGN, VSTATE, KINDS, FEATURES, EXPENSE, PAY, RATE_KEYS, DEPTS, DOMAINS, UDOMAIN,
+    get db() { return db; }, get me() { return me; }, get authState() { return authState; }, get authError() { return authError; },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    start() { A = LOCAL ? makeLocal() : makeCloud(); return A.start(); },
+    reset() { A.reset(); },
+    // ค้นหา
+    vehicle, driver, user, request, has, isAdmin, isSuper, isExec, isDriver, isBack, driverOfUser, emailOf, usernameOf, isUsernameEmail,
+    categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
+    vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
+    notifications, markSeen, pendingRatings,
+    myRequests: () => me ? db.requests.filter(r => r.requester && r.requester.email === me.email).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [],
+    // ── เข้าสู่ระบบ ──
+    loginGoogle: email => A.loginGoogle(email),
+    loginUsername: (u, p) => A.loginUsername(u, p),
+    logout: () => A.logout(),
+    changeOwnPassword: p => A.changeOwnPassword(p),
+    async saveProfile(data) {
+      const u = { ...me, name: String(data.name || '').trim(), dept: data.dept || '', phone: String(data.phone || '').trim(), position: String(data.position || '').trim(), needsProfile: false, updatedAt: nowISO() };
+      await A.put('users', u.email, u); me = u; emit();
+    },
+    // ── ไฟล์ ──
+    upload: files => A.upload(files), fileUrl: ref => A.fileUrl(ref),
+    // ── คำขอใช้รถ ──
+    async submitRequest(input) {
+      const x = cleanReqInput(input);
+      checkCat(x);
+      const lead = +db.settings.leadDays || 0;
+      if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ถ้าเร่งด่วน กรุณาติดต่อแอดมิน)`);
+      if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
+      x.attachments = await A.upload(x.attachments);
+      const id = await A.nextId(x.startAt);
+      const r = { id, createdAt: nowISO(), ...x, requester: { email: me.email, name: me.name, dept: me.dept, phone: me.phone }, status: 'pending', emergency: false, createdBy: me.email, history: [H('submit')], decision: null, assignments: [], expenses: [] };
+      await saveReq(r); rememberPlaces(x.destinations);
+      return r;
+    },
+    async updateRequest(id, input) {
+      const r = clone(request(id));
+      if (!r) throw new Error('ไม่พบคำขอ');
+      const admin = isAdmin(me);
+      if (!admin && (r.requester.email !== me.email || !['pending', 'revise'].includes(r.status))) throw new Error('แก้ไขได้เฉพาะคำขอที่ยังรอตรวจสอบหรือถูกส่งกลับให้แก้ไข');
+      const x = cleanReqInput(input);
+      checkCat(x);
+      if (!admin) { const lead = +db.settings.leadDays || 0; if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน`); }
+      x.attachments = await A.upload(x.attachments);
+      const wasRevise = r.status === 'revise';
+      Object.assign(r, x);
+      if (!admin || r.requester.email === me.email) { if (wasRevise) r.status = 'pending'; r.history.push(H(wasRevise ? 'resubmit' : 'edit')); }
+      else r.history.push(H('edit', 'แอดมินแก้ไขข้อมูลคำขอ'));
+      await saveReq(r); rememberPlaces(x.destinations);
+      return r;
+    },
+    async cancelRequest(id, reason) {
+      const r = clone(request(id));
+      if (!r) throw new Error('ไม่พบคำขอ');
+      if (r.requester.email !== me.email && !isAdmin(me)) throw new Error('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
+      if (!['pending', 'revise', 'approved'].includes(r.status) || (r.assignments || []).some(a => a.status !== 'assigned')) throw new Error('ยกเลิกไม่ได้ เพราะรถออกเดินทางแล้ว');
+      r.status = 'cancelled'; r.cancel = { at: nowISO(), by: me.email, reason: String(reason || '').trim() };
+      r.history.push(H('cancel', reason));
+      return saveReq(r);
+    },
+    // แอดมิน: อนุมัติ (มอบหมายรถหลายคัน) / ไม่อนุมัติ / ส่งกลับให้แก้ไข
+    async decide(id, { action, note, assignments, category, categoryOther }) {
+      needAdmin();
+      const r = clone(request(id));
+      if (!r) throw new Error('ไม่พบคำขอ');
+      if (category) { if (category === 'other' && !String(categoryOther || '').trim()) throw new Error('กรุณาระบุหมวดงาน (อื่น ๆ)'); if (category !== r.category || (categoryOther || '') !== (r.categoryOther || '')) { const was = catName(r); r.category = category; r.categoryOther = category === 'other' ? String(categoryOther).trim() : ''; r.history.push(H('edit', `แอดมินเปลี่ยนหมวดงาน: ${was} → ${catName(r)}`)); } }
+      note = String(note || '').trim();
+      if (action === 'approve') {
+        if (!assignments || !assignments.length) throw new Error('กรุณาเลือกรถอย่างน้อย 1 คัน');
+        const old = r.assignments || [];
+        r.assignments = assignments.map(a => {
+          const prev = old.find(o => o.vehicleId === a.vehicleId);
+          return { status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false, ...(prev || {}), vehicleId: a.vehicleId, driverId: a.driverId || '', note: String(a.note || '').trim() };
+        });
+        const was = r.status;
+        r.status = 'approved';
+        r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note };
+        r.history.push(H(['approved', 'ontrip'].includes(was) ? 'reassign' : 'approve', note));
+      } else if (action === 'reject' || action === 'revise') {
+        if (!note) throw new Error(action === 'reject' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' : 'กรุณาระบุสิ่งที่ต้องการให้แก้ไข');
+        r.status = action === 'reject' ? 'rejected' : 'revise';
+        r.assignments = [];
+        r.decision = { by: me.email, byName: me.name, at: nowISO(), action, note };
+        r.history.push(H(action, note));
+      } else throw new Error('คำสั่งไม่ถูกต้อง');
+      return saveReq(r);
+    },
+    // แอดมิน: บันทึกคำขอเองกรณีฉุกเฉิน (ไม่ติดกฎล่วงหน้า) และอนุมัติทันทีได้
+    async createEmergency(input, { requester, assignments, note }) {
+      needAdmin();
+      const x = cleanReqInput(input);
+      checkCat(x);
+      if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
+      x.attachments = await A.upload(x.attachments);
+      const id = await A.nextId(x.startAt);
+      const r = { id, createdAt: nowISO(), ...x, requester: { email: requester.email || '', name: requester.name, dept: requester.dept || '', phone: requester.phone || '' }, status: 'pending', emergency: true, createdBy: me.email, history: [H('emergency', 'บันทึกโดยแอดมิน (กรณีเร่งด่วน)')], decision: null, assignments: [], expenses: [] };
+      if (assignments && assignments.length) {
+        r.assignments = assignments.map(a => ({ vehicleId: a.vehicleId, driverId: a.driverId || '', note: String(a.note || '').trim(), status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false }));
+        r.status = 'approved'; r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note: String(note || '').trim() };
+        r.history.push(H('approve', note));
+      }
+      await saveReq(r); rememberPlaces(x.destinations);
+      return r;
+    },
+    // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
+    async tripStatus(id, idx, status, { odo, at } = {}) {
+      const r = clone(request(id));
+      const a = r && r.assignments[idx];
+      if (!a) throw new Error('ไม่พบงาน');
+      const d = driver(a.driverId);
+      if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('เฉพาะคนขับของงานนี้หรือแอดมิน');
+      if (!['approved', 'ontrip', 'returned'].includes(r.status)) throw new Error('งานนี้ยังไม่ได้รับอนุมัติ');
+      const when = at ? new Date(at).toISOString() : nowISO();
+      const vName = (vehicle(a.vehicleId) || {}).name || '';
+      if (status === 'ontrip') { a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo; r.history.push(H('depart', vName)); }
+      else if (status === 'returned') {
+        if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
+        a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName));
+      } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
+      return saveReq(r);
+    },
+    async setOdo(id, idx, { odoStart, odoEnd }) {
+      const r = clone(request(id)); const a = r && r.assignments[idx];
+      if (!a) throw new Error('ไม่พบงาน');
+      const d = driver(a.driverId);
+      if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('ไม่มีสิทธิ์');
+      a.odoStart = odoStart === '' || odoStart == null ? null : +odoStart; a.odoEnd = odoEnd === '' || odoEnd == null ? null : +odoEnd;
+      if (a.odoStart != null && a.odoEnd != null && a.odoEnd < a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
+      return saveReq(r);
+    },
+    async saveExpense(id, ex) {
+      const r = clone(request(id));
+      if (!r) throw new Error('ไม่พบคำขอ');
+      const mine = (r.assignments || []).some(a => a.vehicleId === ex.vehicleId && (driver(a.driverId) || {}).email === me.email);
+      if (!isAdmin(me) && !mine) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
+      const photos = await A.upload(ex.photos || []);
+      const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), by: me.email, byName: me.name, at: nowISO() };
+      r.expenses = r.expenses || [];
+      const i = r.expenses.findIndex(x => x.id === e.id);
+      if (i >= 0) r.expenses[i] = e; else r.expenses.push(e);
+      return saveReq(r);
+    },
+    async removeExpense(id, exId) {
+      const r = clone(request(id));
+      const e = (r.expenses || []).find(x => x.id === exId);
+      if (!e) return;
+      if (!isAdmin(me) && e.by !== me.email) throw new Error('ไม่มีสิทธิ์ลบ');
+      r.expenses = r.expenses.filter(x => x.id !== exId);
+      return saveReq(r);
+    },
+    async closeRequest(id, note) {
+      needAdmin();
+      const r = clone(request(id));
+      if (!r || r.status !== 'returned') throw new Error('ปิดงานได้เมื่อรถทุกคันกลับถึงแล้ว');
+      r.status = 'closed'; r.closedAt = nowISO(); r.history.push(H('close', note));
+      await A.put('requests', r.id, { ...r, updatedAt: nowISO(), driverEmails: driverEmailsOf(r.assignments) });
+      return r;
+    },
+    async reopenRequest(id) {
+      needAdmin();
+      const r = clone(request(id));
+      r.status = 'returned'; r.history.push(H('reopen'));
+      return saveReq(r);
+    },
+    // ประเมินคนขับ (เก็บแยก ไม่ผูกชื่อผู้ประเมิน)
+    async rate(id, idx, { scores, comment }) {
+      const r = clone(request(id)); const a = r && r.assignments[idx];
+      if (!a || r.requester.email !== me.email) throw new Error('ประเมินได้เฉพาะผู้ขอใช้รถ');
+      if (a.rated) throw new Error('ประเมินงานนี้แล้ว');
+      const rt = { id: uid('rt'), at: nowISO(), driverId: a.driverId, vehicleId: a.vehicleId, scores, comment: String(comment || '').trim() };
+      await A.put('ratings', rt.id, rt);
+      a.rated = true;
+      await A.put('requests', r.id, { ...r, updatedAt: nowISO() });
+    },
+    async skipRating(id, idx) {
+      const r = clone(request(id)); const a = r && r.assignments[idx];
+      if (!a) return; a.ratingSkipped = true;
+      await A.put('requests', r.id, { ...r, updatedAt: nowISO() });
+    },
+    // ── รถ ──
+    async saveVehicle(v) {
+      needAdmin();
+      v = { ...v, id: v.id || uid('v'), seats: +v.seats || 0, no: +v.no || 0, type: KINDS[v.kind] || v.type || '', updatedAt: nowISO() };
+      v.photos = await A.upload(v.photos || []);
+      if (v.order == null) v.order = db.vehicles.length;
+      await A.put('vehicles', v.id, v); return v;
+    },
+    async deleteVehicle(id) {
+      needAdmin();
+      if (db.requests.some(r => blocking(r) && (r.assignments || []).some(a => a.vehicleId === id))) throw new Error('ลบไม่ได้ เพราะรถคันนี้มีงานที่ยังไม่เสร็จ');
+      await A.del('vehicles', id); await A.del('vprivate', id).catch(() => {});
+    },
+    async saveVehiclePrivate(id, data) {
+      needAdmin();
+      const d = clone(data);
+      for (const rp of d.repairs || []) rp.photos = await A.upload(rp.photos || []);
+      d.docs = await A.upload(d.docs || []);
+      d.id = id; d.updatedAt = nowISO();
+      await A.put('vprivate', id, d);
+    },
+    // ── คนขับ ──
+    async saveDriver(d) {
+      needAdmin();
+      d = { ...d, id: d.id || uid('d'), updatedAt: nowISO(), active: d.active !== false };
+      d.photo = (await A.upload(d.photo ? [d.photo] : []))[0] || '';
+      if (d.order == null) d.order = db.drivers.length;
+      await A.put('drivers', d.id, d); return d;
+    },
+    async deleteDriver(id) {
+      needAdmin();
+      if (db.requests.some(r => blocking(r) && (r.assignments || []).some(a => a.driverId === id))) throw new Error('ลบไม่ได้ เพราะคนขับมีงานที่ยังไม่เสร็จ');
+      await A.del('drivers', id);
+    },
+    // ── ผู้ใช้ ──
+    async saveUser(u) {
+      needAdmin();
+      const prev = user(u.email) || {};
+      const roles = u.roles || prev.roles || ['teacher'];
+      if ((roles.includes('admin') || roles.includes('superadmin') || (prev.roles || []).includes('admin')) && !isSuper(me) && JSON.stringify(roles) !== JSON.stringify(prev.roles || [])) throw new Error('เฉพาะผู้ดูแลระบบสูงสุดที่กำหนดสิทธิ์แอดมินได้');
+      if (u.email === me.email && !roles.includes('superadmin') && isSuper(me)) throw new Error('ไม่สามารถถอดสิทธิ์ผู้ดูแลระบบสูงสุดของตัวเองได้');
+      const x = { ...prev, ...u, email: String(u.email).toLowerCase(), roles, updatedAt: nowISO() };
+      if (!x.provider) x.provider = isUsernameEmail(x.email) ? 'username' : 'google';
+      if (x.active == null) x.active = true;
+      if (!LOCAL) delete x.password;
+      await A.put('users', x.email, x);
+      if (x.driverId) { const d = driver(x.driverId); if (d && d.email !== x.email) await A.put('drivers', d.id, { ...d, email: x.email }); }
+      return x;
+    },
+    async createUsernameAccount({ username, password, name, roles, driverId, phone }) {
+      needAdmin();
+      username = String(username || '').trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,30}$/.test(username)) throw new Error('ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - (3–30 ตัว)');
+      if (String(password || '').length < 6) throw new Error('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร');
+      if (user(emailOf(username))) throw new Error('ชื่อผู้ใช้นี้ถูกใช้แล้ว');
+      if ((roles || []).some(r => r === 'admin' || r === 'superadmin') && !isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุดที่สร้างบัญชีแอดมินได้');
+      const email = await A.createAccount({ username, password });
+      const u = { email, name: String(name || '').trim(), dept: roles.includes('driver') ? 'งานยานพาหนะ' : 'ฝ่ายบริหารงานทั่วไป', phone: phone || '', position: roles.includes('driver') ? 'พนักงานขับรถ' : 'เจ้าหน้าที่', roles, active: true, provider: 'username', mustChangePassword: true, driverId: driverId || '', createdAt: nowISO(), createdBy: me.email };
+      if (LOCAL) u.password = password;
+      await A.put('users', email, u);
+      if (driverId) { const d = driver(driverId); if (d) await A.put('drivers', d.id, { ...d, email }); }
+      return u;
+    },
+    async resetPassword(email, password) {
+      needAdmin();
+      if (String(password || '').length < 6) throw new Error('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร');
+      await A.setPassword(email, password);
+      const u = user(email);
+      if (u) await A.put('users', email, { ...u, mustChangePassword: true, ...(LOCAL ? { password } : {}) });
+    },
+    async removeUser(email) {
+      needAdmin();
+      if (email === me.email) throw new Error('ลบบัญชีตัวเองไม่ได้');
+      const u = user(email);
+      if (u && (u.roles || []).includes('superadmin') && !isSuper(me)) throw new Error('ไม่มีสิทธิ์');
+      await A.del('users', email);
+    },
+    // ── ตั้งค่า ──
+    async saveSettings(s) {
+      needAdmin();
+      const x = clone(s);
+      for (const c of x.committee || []) c.photo = (await A.upload(c.photo ? [c.photo] : []))[0] || '';
+      await A.put('settings', 'settings', { ...db.settings, ...x });
+    },
+    async deletePlace(id) { needAdmin(); await A.del('places', id); },
+    // ระบบจริง: นำเข้ารถ 14 คัน + คนขับ 7 คน + สถานที่ยอดนิยม (จากตารางข้อมูลรถของโรงเรียน) เมื่อฐานข้อมูลยังว่าง
+    async importDefaults() {
+      if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
+      const s = seed();
+      for (const d of s.drivers) await A.put('drivers', d.id, { ...d, licenseExpiry: '', email: '' });
+      for (const v of s.vehicles) await A.put('vehicles', v.id, { ...v, photos: v.photos, maint: { active: false, from: '', to: '', note: '' }, note: '' });
+      for (const v of s.vehicles) await A.put('vprivate', v.id, { id: v.id, chassisNo: '', engineNo: '', fuelType: '', fuelCard: '', actExpiry: '', taxExpiry: '', insurance: { company: '', cls: '', policyNo: '', expiry: '', phone: '' }, repairs: [], maintenancePlan: [], accidents: [], docs: [], notes: '' });
+      for (const p of s.places) await A.put('places', p.id, { ...p, count: 0 });
+      if (!db.settings.committee || !db.settings.committee.length || !db.settings.updatedAt) await A.put('settings', 'settings', { ...defaultSettings(), ...db.settings, updatedAt: nowISO() });
+    }
+  };
+  return api;
+})();

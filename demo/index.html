@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เลือกดีไซน์หน้าแรก · ระบบยานพาหนะ ขอรถส่วนกลาง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: "IBM Plex Sans Thai", "Prompt", system-ui, sans-serif; color: #14172e; background: #f6f6fb; line-height: 1.6; }
+a { color: inherit; text-decoration: none; }
+.wrap { width: min(100% - 40px, 1240px); margin: 0 auto; padding: 56px 0 80px; }
+header { display: flex; align-items: center; gap: 18px; }
+header img { height: 72px; }
+h1 { font-family: Prompt, sans-serif; font-weight: 600; font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0; line-height: 1.3; }
+header p { margin: 2px 0 0; color: #63667f; }
+.note { margin: 26px 0 34px; padding: 16px 20px; border-radius: 18px; background: #fff; border: 1px solid #e6e6f0; color: #44475f; font-size: .95rem; }
+.note b { font-family: Prompt, sans-serif; font-weight: 500; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 22px; }
+.card { display: flex; flex-direction: column; border-radius: 28px; background: #fff; border: 1px solid #e6e6f0; overflow: hidden; transition: transform .3s, box-shadow .3s; }
+.card:hover { transform: translateY(-6px); box-shadow: 0 30px 60px -34px rgba(20, 23, 46, .45); }
+.pv { position: relative; height: 210px; overflow: hidden; }
+.pv .sw { position: absolute; inset: 0; }
+.pv .ttl { position: absolute; left: 24px; bottom: 20px; font-family: Prompt, sans-serif; font-weight: 700; font-size: 1.9rem; line-height: 1.15; }
+.pv .ttl small { display: block; font-size: .8rem; font-weight: 500; letter-spacing: .16em; opacity: .7; }
+.pv .no { position: absolute; top: 18px; right: 22px; font-family: Prompt, sans-serif; font-weight: 300; font-size: 3rem; line-height: 1; opacity: .35; }
+.body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.body h2 { margin: 0; font-family: Prompt, sans-serif; font-weight: 600; font-size: 1.2rem; }
+.body p { margin: 0; color: #5d6078; font-size: .92rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { padding: 3px 10px; border-radius: 999px; background: #f1f1f8; font-size: .78rem; color: #44475f; }
+.dots { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
+.dots i { width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, .06); }
+.go { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; font-family: Prompt, sans-serif; font-weight: 500; color: #3b3fbf; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><img src="assets/logo.png" alt="ตราโรงเรียน"><div><h1>ระบบยานพาหนะ ขอรถส่วนกลาง</h1><p>ตัวอย่างดีไซน์หน้าแรก 5 แบบ · ฝ่ายบริหารงานทั่วไป</p></div></header>
+  <div class="note"><b>วิธีดู:</b> กดเลือกแบบที่ต้องการ ใช้แถบ <b>DEMO</b> ด้านล่างของแต่ละหน้าเพื่อสลับแบบ V1–V5 และสลับ <b>ล็อกอินแล้ว / ยังไม่ล็อกอิน</b> เพื่อดูว่าคนที่ยังไม่เข้าสู่ระบบจะเห็นอะไร · ข้อมูลทั้งหมดเป็นข้อมูลตัวอย่าง (รถ 8 คันจากตารางข้อมูลรถของโรงเรียน) · นอกเวลาทำการ ระบบจะจำลองเวลาเป็น 10:30 น. ให้เห็นรถกำลังเดินทาง</div>
+  <div class="grid">
+    <a class="card" href="v1-sky-glass.html">
+      <div class="pv"><div class="sw" style="background:linear-gradient(180deg,#c7e6ff,#f5faff);"></div><span class="no">01</span><div class="ttl" style="color:#0a84d6"><small style="color:#0a1a33">SKY GLASS</small>ฟ้าใส กระจกฝ้า</div></div>
+      <div class="body"><h2>V1 · Sky Glass</h2><p>ฟ้าใสดึงสีจากท้องฟ้าในรูปอาคาร การ์ดกระจกฝ้าลอยบนรูปโรงเรียน มีเมฆเลื่อน และรถตู้กับรถบัสวิ่งผ่านใต้หัวเว็บ</p>
+        <div class="chips"><span>ภาพขยับตามเมาส์</span><span>รถวิ่ง</span><span>กรองรายการตามสถานะ</span></div>
+        <div class="dots"><i style="background:#0a84d6"></i><i style="background:#38bdf8"></i><i style="background:#ff8a3d"></i><i style="background:#f5faff"></i></div><span class="go">เปิดดู →</span></div>
+    </a>
+    <a class="card" href="v2-orange-lab.html">
+      <div class="pv"><div class="sw" style="background:#fffaf6;background-image:linear-gradient(rgba(234,88,12,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(234,88,12,.12) 1px,transparent 1px);background-size:24px 24px"></div><span class="no">02</span><div class="ttl" style="color:#ea580c"><small style="color:#17193a">ORANGE LAB</small>ห้องแล็บสีส้ม</div></div>
+      <div class="body"><h2>V2 · Orange Lab</h2><p>กระดาษกราฟวิทยาศาสตร์ อิเล็กตรอนโคจรรอบตราโรงเรียน มีสูตรลอยไปมา แถบรูปเลื่อนอัตโนมัติ และแกนเวลาการใช้รถแบบ Gantt พร้อมเส้น "ตอนนี้"</p>
+        <div class="chips"><span>อะตอมโคจร</span><span>มาตรวัดรถว่าง</span><span>ตาราง Gantt</span></div>
+        <div class="dots"><i style="background:#ea580c"></i><i style="background:#2b3590"></i><i style="background:#f59e0b"></i><i style="background:#fffaf6"></i></div><span class="go">เปิดดู →</span></div>
+    </a>
+    <a class="card" href="v3-mint-route.html">
+      <div class="pv"><div class="sw" style="background:radial-gradient(400px 200px at 80% 20%,#d3f5ec,transparent),#f2fbf8"></div><span class="no">03</span><div class="ttl" style="color:#0f9d8a"><small style="color:#0c2b2a">MINT ROUTE</small>แผนที่เส้นทาง</div></div>
+      <div class="body"><h2>V3 · Mint Route</h2><p>แผนที่จำลองที่วาดเส้นทางจากโรงเรียนไปปลายทาง ช่องค้นหาพิมพ์ชื่อสถานที่ให้เห็นเอง รายการเดินทางเป็นตั๋วโดยสาร และมีผังลานจอดรถที่ช่องว่างแปลว่ารถออกไปแล้ว</p>
+        <div class="chips"><span>เส้นทางวาดตัวเอง</span><span>การ์ดตั๋วโดยสาร</span><span>ลานจอดรถ</span></div>
+        <div class="dots"><i style="background:#0f9d8a"></i><i style="background:#14b8a6"></i><i style="background:#f59e0b"></i><i style="background:#f2fbf8"></i></div><span class="go">เปิดดู →</span></div>
+    </a>
+    <a class="card" href="v4-aurora-bento.html">
+      <div class="pv"><div class="sw" style="background:radial-gradient(200px 160px at 20% 30%,#c4b5fd,transparent),radial-gradient(220px 160px at 80% 40%,#fdba74,transparent),radial-gradient(240px 160px at 50% 100%,#7dd3fc,transparent),#faf7ff"></div><span class="no">04</span><div class="ttl" style="color:#7c3aed"><small style="color:#1e1b3a">AURORA BENTO</small>ออโรราพาสเทล</div></div>
+      <div class="body"><h2>V4 · Aurora Bento</h2><p>พื้นหลังแสงออโรราไล่สีขยับได้ จัดเนื้อหาเป็นกล่องเบนโตะ การ์ดเอียงสามมิติตามเมาส์ เมนูบนลอยเป็นแคปซูล มีวงแหวนสถานะรถ นับถอยหลังรถคันถัดไป และเลื่อนดูรายการเดินทางได้</p>
+        <div class="chips"><span>การ์ดเอียง 3D</span><span>นับถอยหลัง</span><span>วงแหวนสถานะ</span></div>
+        <div class="dots"><i style="background:#7c3aed"></i><i style="background:#c4b5fd"></i><i style="background:#fdba74"></i><i style="background:#7dd3fc"></i></div><span class="go">เปิดดู →</span></div>
+    </a>
+    <a class="card" href="v5-periodic-fleet.html">
+      <div class="pv"><div class="sw" style="background:radial-gradient(300px 200px at 80% 20%,#fff3d6,transparent),#fbf7ef"></div><span class="no">05</span><div class="ttl" style="color:#c9962b"><small style="color:#24307a">PERIODIC FLEET</small>ตารางธาตุยานพาหนะ</div></div>
+      <div class="body"><h2>V5 · Periodic Fleet</h2><p>โทนครีม ทอง น้ำเงิน ดึงจากตราโรงเรียน รถแต่ละคันเป็นช่องธาตุ (Va, Mb, Bu, Se) ที่บอกสถานะได้และกดดูรายละเอียดได้ ตัวหนังสือมีแสงทองไล่ผ่าน และแถบภาพขยับตามการเลื่อนหน้า</p>
+        <div class="chips"><span>ตารางธาตุกดได้</span><span>ตัวหนังสือแสงทอง</span><span>ดูหรูเป็นทางการ</span></div>
+        <div class="dots"><i style="background:#24307a"></i><i style="background:#c9962b"></i><i style="background:#e8c36a"></i><i style="background:#fbf7ef"></i></div><span class="go">เปิดดู →</span></div>
+    </a>
+  </div>
+</div>
+</body>
+</html>

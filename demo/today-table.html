@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo · ลานจอดรถ + รายการเดินทางวันนี้ (ตาราง 3 แบบ)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-50: #eef0fa; --gold: #c9962b; --gold-2: #e8c36a; --gold-50: #fbf3e1; --cream: #fbf7ef; --ink: #1b1f3b; --ink-2: #3b3f5e; --muted: #6e6a7c; --line: rgba(80, 60, 20, .12);
+  --font-display: "Prompt", system-ui, sans-serif; --font-body: "IBM Plex Sans Thai", "Prompt", system-ui, sans-serif; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--cream); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; line-height: 1.3; }
+p { margin: 0; } a { color: inherit; }
+.i { width: 1.1em; height: 1.1em; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { width: min(100% - 40px, 1240px); margin: 0 auto; }
+.top { padding: 34px 0 20px; } .top h1 { color: var(--navy); font-size: 1.7rem; } .top p { color: var(--muted); margin-top: 4px; }
+.jump { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.jump a { padding: 8px 16px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--navy); font-family: var(--font-display); text-decoration: none; font-size: .9rem; }
+.sec { position: relative; padding: 64px 0 76px; color: #fff; background: radial-gradient(900px 420px at 85% 0%, rgba(232, 195, 106, .16), transparent 70%), linear-gradient(180deg, #24307a 0%, #1f2866 100%); border-top: 3px solid var(--gold); }
+.variant { position: absolute; top: 18px; right: 20px; padding: 6px 14px; border-radius: 999px; background: #fff; color: var(--navy); font-family: var(--font-display); font-weight: 600; font-size: .82rem; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.tag { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(232, 195, 106, .16); border: 1px solid rgba(232, 195, 106, .4); color: var(--gold-2); font-family: var(--font-display); font-size: .76rem; letter-spacing: .12em; font-weight: 600; }
+.tag i { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; color: #4ade80; animation: ping 1.6s infinite; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 currentColor; } 75% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.head h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin-top: 10px; }
+.head p { color: rgba(255, 255, 255, .7); }
+.clock { font-family: var(--font-display); font-weight: 300; font-size: 2.4rem; color: var(--gold-2); line-height: 1; }
+.sub-h { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; margin: 30px 0 14px; }
+.sub-h .i { color: var(--gold-2); }
+.sub-h small { font-size: .78rem; font-weight: 500; color: var(--gold-2); padding: 3px 10px; border-radius: 999px; background: rgba(232, 195, 106, .16); }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; font-family: var(--font-display); font-size: .78rem; font-weight: 500; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.pill.pulse::before { animation: ping 1.5s infinite; }
+.t-done { color: #475569; background: #ecedf1; } .t-live { color: #c2410c; background: #ffe7d4; } .t-ok { color: #1d4ed8; background: #e0e9ff; } .t-wait { color: #6d28d9; background: #ede7fe; }
+.ppl { display: inline-flex; gap: 12px; } .ppl span { display: inline-flex; align-items: center; gap: 5px; } .ppl .i { color: #ea580c; width: 15px; height: 15px; } .ppl span + span .i { color: var(--gold); }
+
+/* ═════ แบบ A: ลานจอดแถวเดียว + ตารางขาวสะอาด ═════ */
+.a-lot { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: center; padding: 18px 20px; border-radius: 24px; background: #fff; color: var(--ink); box-shadow: 0 24px 50px -30px rgba(0, 0, 0, .5); }
+.a-sum h3 { font-size: 1.05rem; color: var(--navy); display: flex; gap: 8px; align-items: center; } .a-sum h3 .i { color: var(--gold); }
+.a-sum .cnts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.a-sum .cnts span { padding: 6px 10px; border-radius: 10px; font-size: .78rem; font-family: var(--font-display); } .a-sum .cnts b { font-size: 1.1rem; margin-right: 4px; }
+.c-free { background: #d9f5e8; color: #047857; } .c-busy { background: #ffe7d4; color: #c2410c; } .c-book { background: #fbefcf; color: #8a5a07; } .c-mt { background: #fde2e2; color: #b91c1c; }
+.a-bays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.a-bay { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; padding: 8px 10px; border-radius: 14px; border: 1px solid var(--line); background: #fdfaf3; font-size: .76rem; position: relative; overflow: hidden; }
+.a-bay::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+.a-bay .ic { grid-row: span 2; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: var(--cb); color: var(--c); }
+.a-bay .ic .i { width: 16px; height: 16px; }
+.a-bay b { font-family: var(--font-display); font-weight: 500; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a-bay small { color: var(--muted); font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a-bay.busy .ic { animation: bob 1.8s ease-in-out infinite; } @keyframes bob { 50% { transform: translateY(-2px); } }
+.a-tbl { border-radius: 24px; background: #fff; color: var(--ink); overflow: hidden; box-shadow: 0 24px 50px -30px rgba(0, 0, 0, .5); }
+.a-tbl table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.a-tbl th { text-align: left; padding: 14px 16px; font-family: var(--font-display); font-weight: 500; font-size: .78rem; color: var(--muted); background: #fdfaf3; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.a-tbl td { padding: 14px 16px; border-bottom: 1px dashed var(--line); vertical-align: top; }
+.a-tbl tr.row { transition: background .2s; position: relative; }
+.a-tbl tr.row:hover { background: #fdfaf3; }
+.a-tbl td:first-child { position: relative; padding-left: 22px; }
+.a-tbl td:first-child::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: var(--c); }
+.a-tbl tr.live { background: linear-gradient(90deg, #fff6ee, #fff 60%); }
+.a-tbl tr.done { opacity: .62; }
+.a-tbl .tm b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; color: var(--navy); }
+.a-tbl .tm small, .a-tbl small { display: block; color: var(--muted); font-size: .78rem; }
+.a-tbl .dst b { font-family: var(--font-display); font-weight: 600; display: block; }
+.a-tbl .prog { margin-top: 8px; height: 5px; border-radius: 5px; background: #ffe2cc; overflow: hidden; width: 80%; } .a-tbl .prog i { display: block; height: 100%; background: linear-gradient(90deg, #ea580c, #fb923c); }
+.a-tbl a { color: var(--navy); text-decoration: none; font-weight: 500; }
+.now-row td { padding: 6px 16px !important; background: #fff3ea; color: #c2410c; font-family: var(--font-display); font-size: .8rem; font-weight: 600; border-bottom: 0 !important; }
+.now-row td::before { display: none; }
+.now-row span { display: inline-flex; align-items: center; gap: 8px; } .now-row span::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #ea580c; color: #ea580c; animation: ping 1.5s infinite; }
+
+/* ═════ แบบ B: ลานจอดแบบมุมบน + กระดานเที่ยวรถแบบสนามบิน ═════ */
+.b-lot { display: grid; grid-template-columns: 1fr 280px; gap: 18px; padding: 18px; border-radius: 26px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14); backdrop-filter: blur(8px); }
+.b-park { padding: 14px; border-radius: 18px; background: #343a66; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; position: relative; }
+.b-park::after { content: ""; position: absolute; left: 14px; right: 14px; top: 50%; border-top: 2px dashed rgba(255, 255, 255, .3); }
+.b-bay { position: relative; z-index: 1; height: 86px; border: 2px solid rgba(255, 255, 255, .45); border-radius: 8px; display: grid; place-items: center; align-content: center; gap: 4px; color: #fff; font-size: .66rem; font-family: var(--font-display); text-align: center; line-height: 1.2; }
+.b-bay:nth-child(-n+7) { border-bottom: 0; border-radius: 8px 8px 0 0; } .b-bay:nth-child(n+8) { border-top: 0; border-radius: 0 0 8px 8px; }
+.b-car { display: grid; place-items: center; width: 38px; height: 46px; border-radius: 10px; background: var(--c); box-shadow: 0 8px 14px -6px rgba(0, 0, 0, .5); }
+.b-car .i { width: 19px; height: 19px; }
+.b-gone { display: grid; place-items: center; width: 38px; height: 46px; border-radius: 10px; border: 2px dashed rgba(255, 255, 255, .45); color: rgba(255, 255, 255, .7); }
+.b-leg { display: grid; gap: 8px; align-content: center; }
+.b-leg div { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .08); font-size: .88rem; }
+.b-leg b { font-family: var(--font-display); font-size: 1.4rem; color: var(--gold-2); }
+.b-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; }
+.b-board { margin-top: 4px; border-radius: 22px; overflow: hidden; border: 1px solid rgba(255, 255, 255, .14); background: rgba(10, 14, 40, .35); }
+.b-board table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.b-board th { text-align: left; padding: 14px 16px; font-family: var(--font-display); font-size: .74rem; letter-spacing: .14em; color: var(--gold-2); background: rgba(0, 0, 0, .25); font-weight: 500; white-space: nowrap; }
+.b-board td { padding: 14px 16px; border-top: 1px solid rgba(255, 255, 255, .08); vertical-align: top; }
+.b-board tr.row { transition: background .2s; } .b-board tr.row:hover { background: rgba(255, 255, 255, .06); }
+.b-board tr.done td { opacity: .5; }
+.b-board .flip { display: inline-flex; gap: 2px; }
+.b-board .flip span { display: inline-grid; place-items: center; width: 22px; height: 32px; border-radius: 5px; background: #0d1233; color: var(--gold-2); font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .08), inset 0 1px 0 rgba(0, 0, 0, .6); position: relative; animation: flip .7s cubic-bezier(.3, 1.3, .5, 1) both; animation-delay: var(--d); }
+.b-board .flip span::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0, 0, 0, .55); }
+.b-board .flip em { font-style: normal; color: var(--gold-2); align-self: center; padding: 0 1px; }
+@keyframes flip { from { transform: rotateX(90deg); } }
+.b-board small { display: block; color: rgba(255, 255, 255, .6); font-size: .76rem; margin-top: 4px; }
+.b-board .dst b { font-family: var(--font-display); font-weight: 600; font-size: 1rem; }
+.b-board a { color: var(--gold-2); text-decoration: none; }
+.b-st { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; font-family: var(--font-display); font-size: .8rem; letter-spacing: .04em; }
+.b-st.live { background: rgba(255, 138, 61, .18); color: #ffb27a; box-shadow: 0 0 18px -4px rgba(255, 138, 61, .7); }
+.b-st.ok { background: rgba(110, 125, 240, .22); color: #c7cdff; } .b-st.wait { background: rgba(232, 195, 106, .18); color: var(--gold-2); } .b-st.done { background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .7); }
+.b-st { white-space: nowrap; } .b-st > span { display: grid; line-height: 1.25; } .b-st em { font-style: normal; font-size: .7rem; opacity: .85; letter-spacing: 0; }
+.b-st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.b-st.live::before { animation: ping 1.5s infinite; }
+.b-board .ppl .i { color: var(--gold-2); }
+
+/* ═════ แบบ C: ลานจอดแนวถนน + แถวการ์ดแยก ═════ */
+.c-road { position: relative; padding: 20px 18px 16px; border-radius: 24px; background: #fff; color: var(--ink); box-shadow: 0 24px 50px -30px rgba(0, 0, 0, .5); }
+.c-road h3 { font-size: 1.05rem; color: var(--navy); display: flex; gap: 8px; align-items: center; } .c-road h3 .i { color: var(--gold); }
+.c-road .cnts { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.c-road .cnts span { padding: 5px 12px; border-radius: 999px; font-size: .78rem; font-family: var(--font-display); }
+.c-road .hd { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.c-lane { position: relative; display: flex; gap: 10px; overflow-x: auto; padding: 16px 14px 34px; border-radius: 18px; background: linear-gradient(#3b3f5e, #3b3f5e) top/100% 70% no-repeat, #e8e2d3; scrollbar-width: thin; }
+.c-lane::after { content: ""; position: absolute; left: 0; right: 0; bottom: 16px; height: 3px; background: repeating-linear-gradient(90deg, #fff 0 22px, transparent 22px 40px); opacity: .9; }
+.c-spot { flex: none; width: 92px; text-align: center; color: #fff; font-family: var(--font-display); font-size: .7rem; position: relative; }
+.c-spot .car { margin: 0 auto 6px; display: grid; place-items: center; width: 54px; height: 66px; border-radius: 14px 14px 10px 10px; background: var(--c); box-shadow: 0 10px 16px -8px rgba(0, 0, 0, .6); position: relative; }
+.c-spot .car::before { content: ""; position: absolute; top: 8px; left: 9px; right: 9px; height: 14px; border-radius: 5px; background: rgba(255, 255, 255, .45); }
+.c-spot .car .i { width: 22px; height: 22px; margin-top: 12px; }
+.c-spot .empty { margin: 0 auto 6px; width: 54px; height: 66px; border-radius: 12px; border: 2px dashed rgba(255, 255, 255, .5); display: grid; place-items: center; color: rgba(255, 255, 255, .75); }
+.c-spot small { display: block; opacity: .75; font-size: .62rem; }
+.c-list { display: grid; gap: 10px; }
+.c-headrow, .c-item { display: grid; grid-template-columns: 110px minmax(0, 2.2fr) minmax(0, 1.2fr) 110px minmax(0, 1.4fr) minmax(0, 1.5fr) 130px; gap: 14px; align-items: center; }
+.c-headrow { padding: 0 18px; font-family: var(--font-display); font-size: .76rem; color: rgba(255, 255, 255, .65); }
+.c-item { padding: 14px 18px; border-radius: 18px; background: #fff; color: var(--ink); position: relative; overflow: hidden; transition: transform .25s, box-shadow .25s; box-shadow: 0 16px 30px -22px rgba(0, 0, 0, .6); }
+.c-item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--c); }
+.c-item:hover { transform: translateX(6px); }
+.c-item.done { opacity: .68; }
+.c-item .tm { display: grid; place-items: center; padding: 8px 4px; border-radius: 14px; background: var(--cb); color: var(--c); font-family: var(--font-display); line-height: 1.2; text-align: center; }
+.c-item .tm b { font-size: 1.2rem; font-weight: 600; } .c-item .tm small { font-size: .72rem; opacity: .85; }
+.c-item .dst b { font-family: var(--font-display); font-weight: 600; display: block; color: var(--navy); }
+.c-item small { display: block; color: var(--muted); font-size: .78rem; line-height: 1.4; }
+.c-item .bar { margin-top: 6px; height: 4px; border-radius: 4px; background: #ffe2cc; overflow: hidden; width: 70%; } .c-item .bar i { display: block; height: 100%; background: #ea580c; }
+.c-item a { color: var(--navy); text-decoration: none; font-weight: 500; }
+.c-item .vv { font-size: .86rem; line-height: 1.45; }
+@media (max-width: 1000px) {
+  .a-lot, .b-lot { grid-template-columns: 1fr; } .a-bays { grid-template-columns: repeat(4, 1fr); } .b-park { grid-template-columns: repeat(5, 1fr); }
+  .a-tbl, .b-board { overflow-x: auto; } .a-tbl table, .b-board table { min-width: 900px; }
+  .c-headrow { display: none; } .c-item { grid-template-columns: 90px 1fr; } .c-item > :nth-child(n+3) { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap top">
+  <h1>ลานจอดรถ + รายการเดินทางวันนี้ · แบบตาราง 3 แบบ</h1>
+  <p>ลานจอดรถย้ายขึ้นไปไว้ด้านบน ต่อด้วยตารางรายการเดินทาง (ไม่แสดงกลุ่มสาระ/ฝ่ายงาน) · ข้อมูลตัวอย่าง</p>
+  <div class="jump"><a href="#A">แบบ A · ตารางขาวสะอาด</a><a href="#B">แบบ B · กระดานเที่ยวรถ (แบบสนามบิน)</a><a href="#C">แบบ C · แถวการ์ดแยก + ลานจอดแนวถนน</a></div>
+</div>
+<section class="sec" id="A"><span class="variant">แบบ A · ตารางขาวสะอาด</span><div class="wrap" id="vA"></div></section>
+<section class="sec" id="B"><span class="variant">แบบ B · กระดานเที่ยวรถ</span><div class="wrap" id="vB"></div></section>
+<section class="sec" id="C"><span class="variant">แบบ C · แถวการ์ดแยก</span><div class="wrap" id="vC"></div></section>
+<script>
+(() => {
+  const P = {
+    van: '<path d="M3 17V7.5A2.5 2.5 0 0 1 5.5 5H15l5.5 6.2V17h-1.6"/><path d="M3 11.5h17.5"/><path d="M9.5 5v6.5"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/><path d="M9 17.5h6"/>',
+    bus: '<path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>',
+    car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+    truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+    route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    teacher: '<circle cx="12" cy="6.5" r="3.5"/><path d="M5 21v-3a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v3"/>', student: '<path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
+    wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
+  };
+  const icon = n => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
+  const real = new Date(), base = new Date(real); if (real.getHours() < 7 || real.getHours() > 16) base.setHours(10, 30, 0, 0); else base.setMinutes(real.getMinutes() < 30 ? 0 : 30, 0, 0);
+  const now = (real.getHours() < 7 || real.getHours() > 16) ? new Date(base) : real;
+  const at = h => new Date(base.getTime() + h * 36e5);
+  const tm = d => d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  const when = d => same(d, now) ? tm(d) : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + ' ' + tm(d);
+  const V = [['รถตู้ 01', '1นฌ 8758 กทม.', 'van'], ['รถตู้ 02', '1นซ 1976 กทม.', 'van'], ['รถตู้ 03', 'ฮล 4536 กทม.', 'van'], ['รถตู้ 04', 'ฮจ 1618 กทม.', 'van'], ['รถตู้ 05', 'ย 0567 ปทุมธานี', 'van'], ['รถกระบะ 06', 'ย 0566 ปทุมธานี', 'truck'], ['รถโดยสาร 6 ล้อ', '40-0686 ปทุมธานี', 'bus'], ['รถบัสโดยสาร', '40-0889 ปทุมธานี', 'bus'], ['รถกระบะ 09', '1ฒศ 4050 กทม.', 'truck'], ['รถเก๋ง', '3ขว 9163 กทม.', 'car'], ['รถกระเช้า', '83-9417 ปทุมธานี', 'truck'], ['รถขนขยะ', '82-8443 ปทุมธานี', 'truck'], ['รถขนน้ำ', 'ไม่มีเลขทะเบียน', 'truck'], ['รถกอล์ฟไฟฟ้า', 'ไม่มีเลขทะเบียน', 'car']];
+  // สถานะรถ: free ว่าง · busy กำลังเดินทาง · book มีคิววันนี้ · mt ซ่อม
+  const VS = ['free', 'busy', 'book', 'free', 'mt', 'free', 'book', 'busy', 'free', 'book', 'free', 'free', 'free', 'free'];
+  const VN = { free: 'พร้อมให้บริการ', busy: 'กำลังเดินทาง', book: 'มีคิววันนี้', mt: 'ซ่อมบำรุง' };
+  const VC = { free: ['#059669', '#d9f5e8', '#10b981'], busy: ['#ea580c', '#ffe7d4', '#f97316'], book: ['#b7791f', '#fbefcf', '#e0a526'], mt: ['#dc2626', '#fde2e2', '#ef4444'] };
+  const cnt = k => VS.filter(x => x === k).length;
+  const T = [
+    { s: at(-4.5), e: at(-1.5), st: 'done', dest: 'ท่าอากาศยานสุวรรณภูมิ', pl: 'บางพลี สมุทรปราการ · 52 กม.', pur: 'รับวิทยากรค่ายโอลิมปิกวิชาการ', req: 'ครูกนกวรรณ ศรีสุข', t: 1, n: 0, v: ['รถตู้ 01 · 1นฌ 8758 กทม.'], d: [['นายสวง เพไร', '081-448-5831']] },
+    { s: at(-1.5), e: at(5), st: 'live', dest: 'มหาวิทยาลัยเกษตรศาสตร์ บางเขน', pl: 'จตุจักร กรุงเทพฯ · 34 กม.', pur: 'ทัศนศึกษางานเกษตรแฟร์ ม.4', req: 'ครูธนพล วงศ์ใหญ่', t: 4, n: 38, v: ['รถบัสโดยสาร · 40-0889 ปทุมธานี', 'รถตู้ 02 · 1นซ 1976 กทม.'], d: [['นายบุญทัน กองไธสง', '080-601-3159'], ['นายสวง เพไร', '081-448-5831']] },
+    { s: at(-1), e: at(2.5), st: 'live', dest: 'สพม.ปทุมธานี', pl: 'เมืองปทุมธานี ปทุมธานี · 18 กม.', pur: 'ประชุมผู้บริหารสถานศึกษา', req: 'ครูวิไลพร มณีรัตน์', t: 3, n: 0, v: ['รถตู้ 02 · 1นซ 1976 กทม.'], d: [['นายพัลลภ สุนทร', '062-451-3747']] },
+    { s: at(1.5), e: at(5), st: 'ok', dest: 'อุทยานวิทยาศาสตร์ประเทศไทย (สวทช.)', pl: 'คลองหลวง ปทุมธานี · 21 กม.', pur: 'นำเสนอโครงงานวิทยาศาสตร์', req: 'ครูอรรถพล แก้วประเสริฐ', t: 2, n: 10, v: ['รถตู้ 03 · ฮล 4536 กทม.'], d: [['นายมานะชัย จันทร์บำรุง', '085-385-3492']] },
+    { s: at(2.5), e: at(6), st: 'ok', dest: 'กระทรวงศึกษาธิการ', pl: 'ดุสิต กรุงเทพฯ · 42 กม.', pur: 'ยื่นเอกสารโครงการห้องเรียนพิเศษ', req: 'ครูสุภาวดี ทองคำ', t: 2, n: 0, v: ['รถเก๋ง · 3ขว 9163 กทม.'], d: [['นายนัดระพงษ์ ยืนบั่ง', '099-205-4081']] },
+    { s: at(3.5), e: at(51.5), st: 'ok', dest: 'อุทยานแห่งชาติเขาใหญ่', pl: 'ปากช่อง นครราชสีมา · 165 กม. · ค้างคืน 3 วัน', pur: 'ค่ายวิทยาศาสตร์ธรรมชาติ ม.5', req: 'ครูปิยะนุช ใจดี', t: 3, n: 22, v: ['รถโดยสาร 6 ล้อ · 40-0686 ปทุมธานี'], d: [['นายไชยวัฒน์ กุณฑล', '093-565-6662']] },
+    { s: at(5), e: at(8), st: 'wait', dest: 'มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต', pl: 'คลองหลวง ปทุมธานี · 12 กม.', pur: 'แข่งขันหุ่นยนต์ระดับภาค', req: 'ครูณัฐวุฒิ พรหมมา', t: 2, n: 6, v: [], d: [] }
+  ];
+  const SN = { done: ['กลับถึงแล้ว', 't-done', '#94a3b8', '#eef0f4'], live: ['กำลังเดินทาง', 't-live', '#ea580c', '#fff1e6'], ok: ['อนุมัติแล้ว', 't-ok', '#3b47b8', '#eef0fa'], wait: ['รอจัดรถ', 't-wait', '#7c3aed', '#f3efff'] };
+  const prog = t => t.st === 'live' ? Math.max(0, Math.min(1, (now - t.s) / (t.e - t.s))) : 0;
+  const vt = t => t.v.length ? t.v.join('<br>') : '<span style="color:#7c3aed">รอแอดมินจัดรถ</span>';
+  const dt = t => t.d.length ? t.d.map(d => `${d[0]}<small><a href="tel:${d[1]}">${d[1]}</a></small>`).join('') : '—';
+  const ppl = t => `<span class="ppl"><span>${icon('teacher')}${t.t}</span><span>${icon('student')}${t.n}</span></span>`;
+  const headHTML = () => `<div class="head"><div><span class="tag"><i></i>LIVE ROUTE · เรียลไทม์</span><h2>เส้นทางการเดินทางวันนี้</h2><p>${now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div><span class="clock num" data-clock></span></div>`;
+  let nowPlaced;
+  const nowRow = (t, cols) => { if (!nowPlaced && t.s > now) { nowPlaced = true; return `<tr class="now-row"><td colspan="${cols}"><span>ตอนนี้ ${tm(now)} น.</span></td></tr>`; } return ''; };
+
+  // แบบ A
+  nowPlaced = false;
+  document.getElementById('vA').innerHTML = headHTML() + `
+    <div class="a-lot"><div class="a-sum"><h3>${icon('grid')} ลานจอดรถตอนนี้</h3><div class="cnts"><span class="c-free"><b>${cnt('free')}</b>ว่าง</span><span class="c-busy"><b>${cnt('busy')}</b>เดินทาง</span><span class="c-book"><b>${cnt('book')}</b>มีคิว</span><span class="c-mt"><b>${cnt('mt')}</b>ซ่อม</span></div></div>
+      <div class="a-bays">${V.map((v, i) => { const c = VC[VS[i]]; return `<div class="a-bay ${VS[i]}" style="--c:${c[0]};--cb:${c[1]}"><span class="ic">${icon(v[2])}</span><b>${v[0]}</b><small>${VN[VS[i]]}</small></div>`; }).join('')}</div></div>
+    <h3 class="sub-h">${icon('route')} รายการเดินทางวันนี้ <small>${T.length} รายการ</small></h3>
+    <div class="a-tbl"><table><thead><tr><th>เวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>ผู้เดินทาง</th><th>รถ</th><th>คนขับ</th><th>สถานะ</th></tr></thead><tbody>
+      ${T.map(t => nowRow(t, 7) + `<tr class="row ${t.st}" style="--c:${SN[t.st][2]}"><td class="tm"><b class="num">${tm(t.s)}</b><small>ถึง ${when(t.e)}</small></td>
+        <td class="dst"><b>${t.dest}</b><small>${t.pl}</small><small>${t.pur}</small>${t.st === 'live' ? `<div class="prog"><i style="width:${prog(t) * 100}%"></i></div>` : ''}</td>
+        <td>${t.req}</td><td>${ppl(t)}</td><td>${vt(t)}</td><td>${dt(t)}</td><td><span class="pill ${SN[t.st][1]} ${t.st === 'live' ? 'pulse' : ''}">${SN[t.st][0]}</span></td></tr>`).join('')}
+      ${nowPlaced ? '' : `<tr class="now-row"><td colspan="7"><span>ตอนนี้ ${tm(now)} น.</span></td></tr>`}</tbody></table></div>`;
+
+  // แบบ B
+  const flip = (d, k) => tm(d).split('').map((ch, i) => ch === ':' ? '<em>:</em>' : `<span style="--d:${k * .08 + i * .05}s">${ch}</span>`).join('');
+  const BS = { done: ['done', 'ARRIVED', 'กลับแล้ว'], live: ['live', 'ON ROUTE', 'กำลังเดินทาง'], ok: ['ok', 'SCHEDULED', 'อนุมัติแล้ว'], wait: ['wait', 'PENDING', 'รอจัดรถ'] };
+  document.getElementById('vB').innerHTML = headHTML() + `
+    <div class="b-lot"><div class="b-park">${V.map((v, i) => VS[i] === 'busy' ? `<div class="b-bay"><span class="b-gone">${icon('route')}</span>${v[0]}</div>` : `<div class="b-bay"><span class="b-car" style="--c:${VC[VS[i]][2]}">${icon(VS[i] === 'mt' ? 'wrench' : v[2])}</span>${v[0]}</div>`).join('')}</div>
+      <div class="b-leg"><div><span><i style="background:#10b981"></i>ว่าง</span><b>${cnt('free')}</b></div><div><span><i style="background:#f97316"></i>กำลังเดินทาง</span><b>${cnt('busy')}</b></div><div><span><i style="background:#e0a526"></i>มีคิววันนี้</span><b>${cnt('book')}</b></div><div><span><i style="background:#ef4444"></i>ซ่อมบำรุง</span><b>${cnt('mt')}</b></div></div></div>
+    <h3 class="sub-h">${icon('route')} กระดานเที่ยวรถวันนี้ <small>${T.length} เที่ยว</small></h3>
+    <div class="b-board"><table><thead><tr><th>ออก</th><th>กลับ</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>ผู้เดินทาง</th><th>รถ</th><th>คนขับ</th><th>สถานะ</th></tr></thead><tbody>
+      ${T.map((t, k) => `<tr class="row ${t.st}"><td><span class="flip">${flip(t.s, k)}</span></td><td><span class="flip">${flip(t.e, k)}</span>${same(t.s, t.e) ? '' : `<small>${t.e.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</small>`}</td>
+        <td class="dst"><b>${t.dest}</b><small>${t.pl}</small><small>${t.pur}</small></td><td>${t.req}</td><td>${ppl(t)}</td><td>${vt(t)}</td><td>${dt(t)}</td><td><span class="b-st ${BS[t.st][0]}"><span>${BS[t.st][1]}<em>${BS[t.st][2]}</em></span></span></td></tr>`).join('')}</tbody></table></div>`;
+
+  // แบบ C
+  document.getElementById('vC').innerHTML = headHTML() + `
+    <div class="c-road"><div class="hd"><h3>${icon('grid')} ลานจอดรถตอนนี้</h3><div class="cnts"><span class="c-free">ว่าง ${cnt('free')}</span><span class="c-busy">กำลังเดินทาง ${cnt('busy')}</span><span class="c-book">มีคิว ${cnt('book')}</span><span class="c-mt">ซ่อม ${cnt('mt')}</span></div></div>
+      <div class="c-lane">${V.map((v, i) => `<div class="c-spot">${VS[i] === 'busy' ? `<span class="empty">${icon('route')}</span>` : `<span class="car" style="--c:${VC[VS[i]][2]}">${icon(VS[i] === 'mt' ? 'wrench' : v[2])}</span>`}${v[0]}<small>${VN[VS[i]]}</small></div>`).join('')}</div></div>
+    <h3 class="sub-h">${icon('route')} รายการเดินทางวันนี้ <small>${T.length} รายการ</small></h3>
+    <div class="c-list"><div class="c-headrow"><span>เวลา</span><span>ปลายทาง / ภารกิจ</span><span>ผู้ขอใช้รถ</span><span>ผู้เดินทาง</span><span>รถ</span><span>คนขับ</span><span>สถานะ</span></div>
+      ${T.map(t => `<div class="c-item ${t.st}" style="--c:${SN[t.st][2]};--cb:${SN[t.st][3]}"><div class="tm"><b class="num">${tm(t.s)}</b><small>ถึง ${when(t.e)}</small></div>
+        <div class="dst"><b>${t.dest}</b><small>${t.pl}</small><small>${t.pur}</small>${t.st === 'live' ? `<div class="bar"><i style="width:${prog(t) * 100}%"></i></div>` : ''}</div>
+        <div>${t.req}</div><div>${ppl(t)}</div><div class="vv">${vt(t)}</div><div class="vv">${dt(t)}</div><div><span class="pill ${SN[t.st][1]} ${t.st === 'live' ? 'pulse' : ''}">${SN[t.st][0]}</span></div></div>`).join('')}</div>`;
+
+  const tick = () => document.querySelectorAll('[data-clock]').forEach(el => { el.textContent = (real.getHours() < 7 || real.getHours() > 16 ? new Date(base.getTime() + (Date.now() - real)) : new Date()).toLocaleTimeString('th-TH', { hour12: false }); });
+  tick(); setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>

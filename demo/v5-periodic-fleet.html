@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V5 Periodic Fleet · ระบบยานพาหนะ ขอรถส่วนกลาง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ═════════ V5 · PERIODIC FLEET — ครีม ทอง น้ำเงิน ตารางธาตุยานพาหนะ ═════════ */
+:root {
+  --accent: #24307a; --accent-2: #c9962b; --gold: #c9962b; --gold-2: #e8c36a; --ink: #1b1f3b; --ink-2: #3b3f5e; --muted: #6e6a7c;
+  --bg: #fbf7ef; --line: rgba(80, 60, 20, .12); --nav-surface: rgba(251, 247, 239, .85);
+  --footer-bg: #1b1f3b; --footer-ink: rgba(255, 245, 225, .7);
+}
+body { background: var(--bg); }
+.hex { position: absolute; inset: 0; pointer-events: none; opacity: .55; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0 56 16v32L28 64 0 48V16zM28 64v33' fill='none' stroke='%23c9962b' stroke-opacity='.18' stroke-width='1'/%3E%3C/svg%3E"); mask-image: radial-gradient(ellipse at 70% 40%, #000 20%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse at 70% 40%, #000 20%, transparent 70%); }
+
+/* ───── HERO ───── */
+.hero { position: relative; padding: calc(var(--nav-h) + 56px) 0 90px; overflow: hidden; background: radial-gradient(800px 500px at 80% 20%, #fff3d6, transparent 70%), var(--bg); }
+.hero-grid { position: relative; display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center; }
+.eyebrow { display: flex; align-items: center; gap: 14px; font-family: var(--font-display); font-weight: 500; color: var(--gold); letter-spacing: .1em; font-size: .98rem; }
+.eyebrow::before { content: ""; width: 54px; height: 1px; background: var(--gold); }
+.hero h1 { margin-top: 20px; font-size: clamp(2.1rem, 8.6vw, 4.1rem); font-weight: 700; line-height: 1.12; color: var(--accent); }
+.hero h1 span { display: block; padding: .06em 0; white-space: nowrap; }
+@media (min-width: 1061px) { .hero h1 { font-size: clamp(2.6rem, 4.3vw, 4.1rem); } }
+.shimmer { background: linear-gradient(100deg, #a8781c 0%, #c9962b 30%, #f6dc93 45%, #c9962b 60%, #a8781c 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shim 4.5s ease-in-out infinite; }
+@keyframes shim { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.lead { margin-top: 22px; font-family: var(--font-display); font-weight: 500; font-size: clamp(1.1rem, 1.6vw, 1.32rem); color: var(--ink); }
+.sub { margin-top: 10px; color: var(--muted); max-width: 540px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.cta .btn-primary { background: var(--accent); box-shadow: 0 16px 30px -14px rgba(36, 48, 122, .7); }
+.cta .btn-gold { background: linear-gradient(135deg, #e8c36a, #c9962b); color: #2a1f05; box-shadow: 0 16px 30px -14px rgba(201, 150, 43, .8); }
+.sig { display: flex; align-items: center; gap: 14px; margin-top: 34px; color: var(--muted); font-size: .88rem; }
+.sig img { height: 54px; }
+.sig b { display: block; color: var(--ink); font-family: var(--font-display); font-weight: 500; }
+
+/* ตารางธาตุ */
+.ptable { position: relative; padding: 26px; border-radius: 34px; background: rgba(255, 255, 255, .78); border: 1px solid var(--line); box-shadow: 0 50px 90px -50px rgba(60, 40, 10, .45); backdrop-filter: blur(8px); }
+.pt-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+.pt-head b { font-family: var(--font-display); font-weight: 600; font-size: .82rem; letter-spacing: .2em; color: var(--accent); }
+.pt-head small { color: var(--muted); font-size: .8rem; }
+.elements { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; perspective: 900px; }
+.el { position: relative; aspect-ratio: 1 / 1.08; padding: 12px 12px 14px; border-radius: 16px; background: linear-gradient(160deg, #fff, var(--eb, #f6f1e6)); border: 1.5px solid var(--ec, #e6dcc6); cursor: pointer; display: flex; flex-direction: column; transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s, border-color .3s; animation: flip .9s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--d, 0s); text-align: left; font: inherit; color: inherit; }
+@keyframes flip { from { transform: rotateY(90deg); opacity: 0; } }
+.el:hover, .el.sel { transform: translateY(-6px) scale(1.03); box-shadow: 0 24px 40px -20px var(--ec, #c9962b); }
+.el.sel { border-width: 2.5px; }
+.el .no { font-family: var(--font-display); font-size: .78rem; color: var(--muted); }
+.el .seat { position: absolute; top: 12px; right: 12px; font-size: .7rem; color: var(--muted); font-family: var(--font-display); }
+.el .sym { margin: auto 0 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(1.7rem, 3vw, 2.5rem); line-height: 1; color: var(--es, var(--accent)); }
+.el .nm { font-family: var(--font-display); font-size: .8rem; font-weight: 500; margin-top: 4px; }
+.el .pl { font-size: .68rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.el::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 6px; height: 3px; border-radius: 3px; background: var(--ec, transparent); opacity: .8; }
+.el.k-ontrip .sym { animation: glowtxt 2s ease-in-out infinite; }
+@keyframes glowtxt { 50% { text-shadow: 0 0 18px rgba(234, 88, 12, .55); } }
+.k-free { --ec: #34d399; --eb: #ecfdf5; --es: #047857; }
+.k-booked { --ec: #fbbf24; --eb: #fffbeb; --es: #a15c07; }
+.k-ontrip { --ec: #fb923c; --eb: #fff4ec; --es: #c2410c; }
+.k-maint { --ec: #f87171; --eb: #fef2f2; --es: #b91c1c; }
+.pt-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.detail { margin-top: 16px; display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; padding: 16px 18px; border-radius: 20px; background: #1b1f3b; color: #fff; min-height: 96px; }
+.detail .big { display: grid; place-items: center; width: 70px; height: 70px; border-radius: 16px; background: linear-gradient(135deg, #e8c36a, #c9962b); color: #2a1f05; font-family: var(--font-display); font-weight: 700; font-size: 1.8rem; }
+.detail strong { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+.detail p { color: rgba(255, 255, 255, .72); font-size: .86rem; line-height: 1.55; }
+.detail .pill { margin-left: 6px; vertical-align: 2px; }
+.molecule { position: absolute; pointer-events: none; opacity: .5; animation: rot 50s linear infinite; }
+.molecule.m1 { top: 120px; right: 3%; width: 150px; }
+.molecule.m2 { bottom: 40px; left: 44%; width: 100px; animation-direction: reverse; animation-duration: 40s; }
+@keyframes rot { to { transform: rotate(360deg); } }
+
+/* ───── มินิเมนูแบบเอดิทอเรียล ───── */
+.menu3 { padding: 30px 0 80px; }
+.m3 { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.m3 a { position: relative; padding: 34px 30px 32px; border-right: 1px solid var(--line); transition: background .35s; overflow: hidden; }
+.m3 a:last-child { border-right: 0; }
+.m3 a::after { content: ""; position: absolute; left: 30px; right: 30px; bottom: 0; height: 3px; background: linear-gradient(90deg, var(--gold), var(--accent)); transform: scaleX(0); transform-origin: left; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
+.m3 a:hover { background: rgba(255, 255, 255, .7); }
+.m3 a:hover::after { transform: scaleX(1); }
+.m3 .n { font-family: var(--font-display); font-weight: 300; font-size: 3.6rem; line-height: 1; color: var(--gold); }
+.m3 .ic { position: absolute; top: 34px; right: 30px; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); color: var(--accent); transition: background .3s, color .3s, transform .4s; }
+.m3 a:hover .ic { background: var(--accent); color: #fff; transform: rotate(-12deg); }
+.m3 h3 { margin-top: 18px; font-size: 1.35rem; font-weight: 600; color: var(--accent); }
+.m3 p { margin-top: 6px; color: var(--muted); font-size: .94rem; }
+
+/* ───── แถบภาพ ───── */
+.band { position: relative; height: 440px; overflow: hidden; }
+.band img { position: absolute; left: 0; top: -15%; width: 100%; height: 130%; object-fit: cover; object-position: 50% 45%; will-change: transform; }
+.band::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(27, 31, 59, .92) 0%, rgba(27, 31, 59, .6) 45%, rgba(27, 31, 59, .1) 100%); }
+.band .container { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; justify-content: center; color: #fff; }
+.band h2 { font-size: clamp(1.7rem, 3.2vw, 2.5rem); font-weight: 600; max-width: 620px; line-height: 1.35; }
+.band h2 em { font-style: normal; color: var(--gold-2); }
+.band-stats { display: flex; gap: 34px; margin-top: 28px; flex-wrap: wrap; }
+.band-stats div b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 2.4rem; line-height: 1; color: var(--gold-2); }
+.band-stats div small { color: rgba(255, 255, 255, .75); font-size: .86rem; }
+
+/* ───── แดชบอร์ด ───── */
+.dash { padding: 100px 0 120px; }
+.dhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
+.dhead .eyebrow { font-size: .88rem; }
+.dhead h2 { margin-top: 12px; font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 600; color: var(--accent); }
+.dhead p { color: var(--muted); }
+.clock { text-align: right; }
+.clock b { font-family: var(--font-display); font-weight: 300; font-size: 3rem; line-height: 1; color: var(--accent); letter-spacing: .02em; }
+.clock small { display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--muted); font-size: .82rem; margin-top: 6px; }
+.clock small i { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; color: #22c55e; animation: ping 1.5s infinite; }
+.sumrow { display: grid; grid-template-columns: repeat(6, 1fr); border-radius: 26px; background: #fff; border: 1px solid var(--line); }
+.sumrow div { padding: 22px 20px; border-right: 1px solid var(--line); text-align: center; }
+.sumrow div:last-child { border-right: 0; }
+.sumrow b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 2.3rem; line-height: 1.1; color: var(--gold); }
+.sumrow small { color: var(--muted); font-size: .84rem; }
+.minis { display: flex; gap: 8px; flex-wrap: wrap; margin: 22px 0 8px; }
+.mini { display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 14px; background: #fff; border: 1px solid var(--line); font-size: .82rem; }
+.mini .s { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--eb); color: var(--es); border: 1.5px solid var(--ec); font-family: var(--font-display); font-weight: 600; font-size: .9rem; }
+.mini b { font-family: var(--font-display); font-weight: 500; }
+.rx-list { display: grid; gap: 14px; margin-top: 16px; }
+.rx { display: grid; grid-template-columns: 128px 1fr 210px; border-radius: 26px; background: #fff; border: 1px solid var(--line); overflow: hidden; transition: transform .3s, box-shadow .3s; }
+.rx:hover { transform: translateY(-3px); box-shadow: 0 30px 50px -36px rgba(60, 40, 10, .55); }
+.rx.st-done { opacity: .72; }
+.rx-time { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; background: var(--accent); color: #fff; padding: 16px 10px; text-align: center; }
+.rx.st-ontrip .rx-time { background: linear-gradient(160deg, #c2410c, #ea580c); }
+.rx.st-done .rx-time { background: #8b8a9b; }
+.rx.st-pending .rx-time { background: #6d28d9; }
+.rx-time b { font-family: var(--font-display); font-weight: 600; font-size: 1.55rem; line-height: 1; }
+.rx-time span { font-size: .78rem; opacity: .8; }
+.rx-time .ar { width: 1px; height: 16px; background: rgba(255, 255, 255, .5); }
+.rx-body { padding: 18px 22px; }
+.eq { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--font-display); }
+.eq .from { color: var(--muted); font-size: .88rem; }
+.eq .arrow { position: relative; width: 64px; height: 2px; background: linear-gradient(90deg, var(--gold), var(--accent)); }
+.eq .arrow::after { content: ""; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left: 7px solid var(--accent); }
+.eq .arrow small { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: .68rem; color: var(--gold); white-space: nowrap; }
+.eq h4 { font-size: 1.12rem; font-weight: 600; color: var(--ink); }
+.rx-body .pp { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: .86rem; color: var(--ink-2); }
+.facts span { display: inline-flex; align-items: center; gap: 6px; }
+.facts .i { width: 15px; height: 15px; color: var(--gold); }
+.night { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 3px 10px; border-radius: 999px; background: #eef0ff; color: #3730a3; font-size: .76rem; }
+.night .i { width: 13px; height: 13px; }
+.prog { margin-top: 12px; height: 4px; border-radius: 4px; background: #f3e6cc; overflow: hidden; }
+.prog i { display: block; height: 100%; background: linear-gradient(90deg, #c9962b, #ea580c); }
+.rx-side { padding: 18px; border-left: 1px dashed var(--line); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; justify-content: center; background: #fdfaf3; }
+.rx-side .elm { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+.rx-side .elm .s { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 12px; background: var(--eb, #f6f1e6); border: 1.5px solid var(--ec, #e6dcc6); color: var(--es, var(--accent)); font-family: var(--font-display); font-weight: 600; font-size: 1.2rem; position: relative; }
+.rx-side .elm .s small { position: absolute; top: 2px; left: 5px; font-size: .55rem; color: var(--muted); font-weight: 400; }
+.rx-side .elm b { font-family: var(--font-display); font-weight: 500; font-size: .9rem; display: block; }
+.rx-side .elm span { font-size: .76rem; color: var(--muted); }
+
+@media (max-width: 1060px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .m3 { grid-template-columns: 1fr; }
+  .m3 a { border-right: 0; border-bottom: 1px solid var(--line); }
+  .sumrow { grid-template-columns: repeat(3, 1fr); }
+  .sumrow div:nth-child(3) { border-right: 0; }
+  .sumrow div:nth-child(n+4) { border-top: 1px solid var(--line); }
+  .rx { grid-template-columns: 110px 1fr; }
+  .rx-side { grid-column: span 2; border-left: 0; border-top: 1px dashed var(--line); flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+}
+@media (max-width: 640px) {
+  .elements { gap: 8px; }
+  .el { padding: 8px; border-radius: 12px; }
+  .el .pl, .el .seat { display: none; }
+  .ptable { padding: 16px; border-radius: 24px; }
+  .sumrow { grid-template-columns: repeat(2, 1fr); }
+  .sumrow div { border-right: 0 !important; border-top: 1px solid var(--line); }
+  .rx { grid-template-columns: 1fr; }
+  .rx-time { flex-direction: row; justify-content: flex-start; padding: 12px 18px; }
+  .rx-time .ar { width: 16px; height: 1px; }
+  .rx-side { grid-column: auto; }
+  .band { height: 520px; }
+}
+</style>
+</head>
+<body id="top">
+<div id="nav-slot"></div>
+
+<section class="hero">
+  <div class="hex"></div>
+  <svg class="molecule m1" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="#c9962b" stroke-width="1.4"><path d="M50 10 84.6 30v40L50 90 15.4 70V30z"/><path d="M50 22 74 36v28L50 78 26 64V36z" stroke-dasharray="3 4"/></g><g fill="#c9962b"><circle cx="50" cy="10" r="4"/><circle cx="84.6" cy="30" r="4"/><circle cx="84.6" cy="70" r="4"/><circle cx="50" cy="90" r="4"/><circle cx="15.4" cy="70" r="4"/><circle cx="15.4" cy="30" r="4"/></g></svg>
+  <svg class="molecule m2" viewBox="0 0 100 100" aria-hidden="true"><g stroke="#24307a" stroke-width="2" fill="none"><path d="M20 50h60M50 20v60"/></g><g fill="#24307a"><circle cx="50" cy="50" r="9"/><circle cx="20" cy="50" r="5"/><circle cx="80" cy="50" r="5"/><circle cx="50" cy="20" r="5"/><circle cx="50" cy="80" r="5"/></g></svg>
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow reveal">ฝ่ายบริหารงานทั่วไป</div>
+      <h1 class="reveal" style="--d:.08s"><span>ระบบยานพาหนะ</span><span class="shimmer">ขอรถส่วนกลาง</span></h1>
+      <p class="lead reveal" style="--d:.16s">บริการรถตู้ รถบัส ให้แก่คุณครูและบุคลากรทุกท่านในโรงเรียน</p>
+      <p class="sub reveal" style="--d:.22s">ระบบขอใช้ยานพาหนะ สำหรับทุกภารกิจในโรงเรียน ตรวจสอบตารางรถว่าง ติดตามสถานะเรียลไทม์ และประเมินคนขับได้ในที่เดียว</p>
+      <div class="cta reveal" style="--d:.3s" id="cta"></div>
+      <div class="sig reveal" style="--d:.38s"><img src="assets/logo.png" alt=""><div><b>โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ปทุมธานี</b>Princess Chulabhorn Science High School Pathum Thani</div></div>
+    </div>
+    <div class="ptable reveal" style="--d:.15s">
+      <div class="pt-head"><b>PERIODIC TABLE OF FLEET</b><small id="pt-sub"></small></div>
+      <div class="elements" id="elements"></div>
+      <div class="pt-legend" id="legend"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </div>
+</section>
+
+<section class="menu3">
+  <div class="container"><div class="m3" id="m3"></div></div>
+</section>
+
+<section class="band" id="band">
+  <img src="assets/fleet.jpg" alt="รถบัสและรถตู้ของโรงเรียนในโรงจอดรถ" id="bandImg">
+  <div class="container">
+    <h2 class="reveal">ทุกภารกิจนอกโรงเรียน <em>ปลอดภัย ตรงเวลา</em><br>และตรวจสอบได้ทุกขั้นตอน</h2>
+    <div class="band-stats reveal" style="--d:.1s">
+      <div><b class="num" data-count="5">0</b><small>รถตู้โดยสาร</small></div>
+      <div><b class="num" data-count="2">0</b><small>รถบัส / รถโดยสาร</small></div>
+      <div><b class="num" data-count="1">0</b><small>รถเก๋ง</small></div>
+      <div><b class="num" data-count="4.8" data-dec="1">0</b><small>คะแนนคนขับเฉลี่ย</small></div>
+    </div>
+  </div>
+</section>
+
+<section class="dash" id="dashboard">
+  <div class="container">
+    <div class="dhead reveal">
+      <div><div class="eyebrow">สรุปวันนี้ · REAL-TIME</div><h2>ตารางการใช้รถประจำวัน</h2><p data-date></p></div>
+      <div class="clock"><b class="num" data-clock="s"></b><small><i></i>ระบบอัปเดตอัตโนมัติ</small></div>
+    </div>
+    <div data-gate>
+      <div>
+        <div class="sumrow reveal" id="sumrow"></div>
+        <div class="minis" id="minis"></div>
+        <div class="rx-list" id="rx"></div>
+        <div style="display:flex;justify-content:center;margin-top:30px"><a class="btn btn-ghost" href="#" data-demo id="calbtn"></a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="footer-slot"></div>
+
+<script src="shared.js"></script>
+<script>
+(() => {
+  const { icon, esc, pill, fmtTime, fmtWhen, kindIcon } = PCS;
+  const $ = s => document.querySelector(s);
+  $('#cta').innerHTML = `<a class="btn btn-primary" href="#" data-demo>${icon('filePlus')}ขอใช้รถ</a><a class="btn btn-gold" href="#dashboard">${icon('calendar')}ตารางรถว่าง</a>`;
+  $('#calbtn').innerHTML = `${icon('calendar')} ดูปฏิทินการใช้รถทั้งหมด`;
+  $('#m3').innerHTML = [
+    { t: 'ขอใช้รถ', d: 'กรอกแบบฟอร์ม แนบบันทึกข้อความที่ผู้อำนวยการลงนาม ระบบ AI ช่วยตรวจก่อนส่งแอดมิน', ic: 'filePlus', demo: 1 },
+    { t: 'การขอใช้รถของฉัน', d: 'ติดตามสถานะ ดูคนขับและรถที่ได้รับมอบหมาย พิมพ์ใบขออนุญาตใช้รถ', ic: 'clipboard', demo: 1 },
+    { t: 'ตารางรถว่าง', d: 'ดูรถว่างแบบเรียลไทม์ และรายการขอใช้รถทั้งหมดของแต่ละวัน', ic: 'calendar', href: '#dashboard' }
+  ].map((m, i) => `<a class="reveal" style="--d:${i * .1}s" href="${m.href || '#'}" ${m.demo ? 'data-demo' : ''}><span class="n">0${i + 1}</span><span class="ic">${icon(m.ic)}</span><h3>${m.t}</h3><p>${m.d}</p></a>`).join('');
+
+  let sel = 'V8';
+  function detail() {
+    const v = PCS.fleet().find(x => x.id === sel);
+    $('#detail').innerHTML = `<span class="big">${v.sym}</span><div>
+      <strong>${esc(v.name)} · ${esc(v.plate)}${PCS.loggedIn ? pill(v.state) : ''}</strong>
+      <p>${esc(v.brand)} · ${esc(v.type)} · ${v.seats} ที่นั่ง · รหัสรถ ${v.no}<br>${PCS.loggedIn ? `ผู้ดูแล ${esc(v.keeper.name)} · ${v.keeper.phone} · ${esc(v.state.note)}` : 'เข้าสู่ระบบเพื่อดูสถานะและข้อมูลผู้ดูแลรถ'}</p></div>`;
+  }
+  function table(first) {
+    const f = PCS.fleet();
+    $('#pt-sub').textContent = PCS.loggedIn ? `${f.filter(v => v.state.key === 'free').length} จาก ${f.length} คันว่างตอนนี้` : `${f.length} คันพร้อมให้บริการ`;
+    $('#elements').innerHTML = f.map((v, i) => `
+      <button class="el ${PCS.loggedIn ? 'k-' + v.state.key : ''} ${v.id === sel ? 'sel' : ''}" data-v="${v.id}" style="--d:${first ? .3 + i * .08 : 0}s;${first ? '' : 'animation:none'}" aria-label="${esc(v.name)}">
+        <span class="no">${v.no}</span><span class="seat">${v.seats}</span>
+        <span class="sym">${v.sym}</span><span class="nm">${esc(v.name)}</span><span class="pl">${esc(v.plate)}</span>
+      </button>`).join('');
+    $('#legend').innerHTML = PCS.loggedIn
+      ? ['free', 'booked', 'ontrip', 'maint'].map(k => `<span class="pill tone-${PCS.V_STATUS[k].tone}">${PCS.V_STATUS[k].label} ${f.filter(v => v.state.key === k).length}</span>`).join('')
+      : `<span class="pill tone-done">Va รถตู้</span><span class="pill tone-done">Mb รถโดยสาร 6 ล้อ</span><span class="pill tone-done">Bu รถบัส</span><span class="pill tone-done">Se รถเก๋ง</span>`;
+    detail();
+  }
+  $('#elements').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; sel = b.dataset.v; $('#elements').querySelectorAll('.el').forEach(x => x.classList.toggle('sel', x === b)); detail(); });
+
+  function dash(first) {
+    const s = PCS.summary(), f = PCS.fleet(), list = PCS.trips();
+    $('#sumrow').innerHTML = [[s.trips, 'การเดินทางวันนี้'], [s.busy, 'กำลังเดินทาง'], [s.free, 'รถว่างตอนนี้'], [s.students, 'นักเรียนเดินทาง'], [s.teachers, 'ครูเดินทาง'], [s.km, 'กิโลเมตรรวม']]
+      .map(([v, l]) => `<div><b class="num" ${first ? `data-count="${v}"` : ''}>${first ? 0 : v}</b><small>${l}</small></div>`).join('');
+    $('#minis').innerHTML = f.map(v => `<span class="mini k-${v.state.key}"><span class="s">${v.sym}</span><span><b>${esc(v.name)}</b> · ${v.state.label}</span></span>`).join('');
+    $('#rx').innerHTML = list.map((t, i) => {
+      const v = t.vehicle;
+      return `
+      <article class="rx st-${t.status} ${first ? 'reveal' : ''}" style="--d:${i * .05}s">
+        <div class="rx-time"><b class="num">${fmtTime(t.start)}</b><span class="ar"></span><span class="num">${fmtWhen(t.end)}</span></div>
+        <div class="rx-body">
+          <div class="eq"><span class="from">โรงเรียน</span><span class="arrow"><small>${t.km} กม.</small></span><h4>${esc(t.dest)}</h4></div>
+          <p class="pp">${esc(t.place)} · ${esc(t.purpose)}</p>
+          <div class="facts">
+            <span>${icon('user')}${esc(t.requester)} · ${esc(t.dept)}</span>
+            <span>${icon('teacher')}ครู ${t.teachers} คน</span><span>${icon('student')}นักเรียน ${t.students} คน</span>
+            <span>${icon('wheel')}${t.driver ? `${esc(t.driver.name)} · ${t.driver.phone}` : 'รอมอบหมายคนขับ'}</span>
+          </div>
+          ${t.overnight ? `<span class="night">${icon('moon')} ค้างคืน ${t.overnight}</span>` : ''}
+          ${t.status === 'ontrip' ? `<div class="prog"><i style="width:${t.progress * 100}%"></i></div>` : ''}
+        </div>
+        <div class="rx-side">
+          ${pill(t.meta)}
+          <div class="elm ${v ? 'k-' + t.status.replace('approved', 'booked').replace('done', 'free') : ''}">
+            <span class="s"><small>${v ? v.no : '?'}</small>${v ? v.sym : '?'}</span>
+            <div><b>${v ? esc(v.name) : 'รอจัดรถ'}</b><span>${v ? esc(v.plate) : 'แอดมินกำลังพิจารณา'}</span></div>
+          </div>
+        </div>
+      </article>`;
+    }).join('');
+    if (first) PCS.bindAll();
+  }
+
+  // พารัลแลกซ์แถบภาพ
+  const band = $('#band'), img = $('#bandImg');
+  addEventListener('scroll', () => { const r = band.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight) img.style.transform = `translateY(${(r.top / innerHeight) * -60}px)`; }, { passive: true });
+
+  table(true); dash(true);
+  PCS.mount({ version: 5 });
+  PCS.onTick(() => { table(false); dash(false); });
+})();
+</script>
+</body>
+</html>

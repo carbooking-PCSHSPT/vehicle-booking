@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V4 Aurora Bento · ระบบยานพาหนะ ขอรถส่วนกลาง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ═════════ V4 · AURORA BENTO — แสงออโรราพาสเทล กล่องเบนโตะ ═════════ */
+:root {
+  --accent: #7c3aed; --accent-2: #f97316; --ink: #1e1b3a; --ink-2: #3b3760; --muted: #6b6889;
+  --bg: #faf7ff; --line: rgba(60, 40, 120, .1); --surface: #fff; --footer-bg: #1e1b3a;
+  --tile: rgba(255, 255, 255, .62);
+}
+.aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--bg); }
+.aurora span { position: absolute; border-radius: 50%; filter: blur(80px); opacity: .7; animation: au 26s ease-in-out infinite alternate; }
+.aurora .a1 { width: 620px; height: 620px; background: #c4b5fd; top: -160px; left: -120px; }
+.aurora .a2 { width: 540px; height: 540px; background: #fdba74; top: 10%; right: -160px; animation-delay: -6s; opacity: .55; }
+.aurora .a3 { width: 600px; height: 600px; background: #7dd3fc; bottom: -200px; left: 25%; animation-delay: -12s; opacity: .5; }
+.aurora .a4 { width: 420px; height: 420px; background: #f9a8d4; top: 45%; left: -100px; animation-delay: -18s; opacity: .45; }
+@keyframes au { 33% { transform: translate(120px, 60px) scale(1.1); } 66% { transform: translate(-60px, 120px) scale(.92); } 100% { transform: translate(80px, -40px) scale(1.05); } }
+.grain { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .35; background-image: radial-gradient(rgba(30, 27, 58, .08) 1px, transparent 1px); background-size: 4px 4px; }
+
+/* แถบเมนูแบบลอย */
+.nav { height: calc(var(--nav-h) + 6px); padding-top: 12px; background: none !important; box-shadow: none !important; backdrop-filter: none !important; }
+.nav-inner { height: 64px; padding: 0 10px 0 16px; border-radius: 999px; background: rgba(255, 255, 255, .62); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); border: 1px solid rgba(255, 255, 255, .9); box-shadow: 0 18px 40px -26px rgba(60, 40, 120, .45); transition: box-shadow .3s, background .3s; }
+.nav.scrolled .nav-inner { background: rgba(255, 255, 255, .85); box-shadow: 0 22px 50px -26px rgba(60, 40, 120, .55); }
+.brand img { height: 42px; }
+.menu-link.active { background: var(--ink); color: #fff; }
+.menu-link.active::after { display: none; }
+
+/* ───── กล่องเบนโตะ ───── */
+.tile { position: relative; border-radius: 30px; background: var(--tile); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5); border: 1px solid rgba(255, 255, 255, .9); box-shadow: 0 24px 50px -34px rgba(60, 40, 120, .5); overflow: hidden; transition: transform .25s ease-out, box-shadow .3s; transform-style: preserve-3d; --mx: 50%; --my: 50%; }
+.tile::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(380px circle at var(--mx) var(--my), rgba(255, 255, 255, .75), transparent 45%); opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 1; }
+.tile:hover::before { opacity: 1; }
+.tile:hover { box-shadow: 0 36px 70px -34px rgba(60, 40, 120, .6); }
+.tile > * { position: relative; z-index: 2; }
+
+.hero { padding: calc(var(--nav-h) + 30px) 0 40px; }
+.bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(170px, auto); gap: 16px; grid-template-areas: "head head photo photo" "head head clock free" "m1 m2 m3 team"; }
+.t-head { grid-area: head; padding: 40px; display: flex; flex-direction: column; justify-content: center; }
+.t-photo { grid-area: photo; padding: 0; min-height: 260px; }
+.t-clock { grid-area: clock; padding: 24px; }
+.t-free { grid-area: free; padding: 24px; }
+.t-team { grid-area: team; padding: 0; }
+.eyebrow { display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(124, 58, 237, .1); color: var(--accent); font-family: var(--font-display); font-weight: 500; font-size: .88rem; }
+.eyebrow .i { width: 16px; height: 16px; }
+.t-head h1 { margin-top: 20px; font-size: clamp(2.4rem, 4.8vw, 4.3rem); font-weight: 700; line-height: 1.12; }
+.t-head h1 span { display: block; padding: .05em 0; }
+.t-head h1 .g { background: linear-gradient(90deg, #7c3aed, #db2777, #f97316, #7c3aed); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: hue 10s linear infinite; }
+@keyframes hue { to { background-position: 300% 0; } }
+.lead { margin-top: 18px; font-family: var(--font-display); font-weight: 500; font-size: clamp(1.05rem, 1.5vw, 1.25rem); }
+.sub { margin-top: 8px; color: var(--muted); font-size: .98rem; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+.cta .btn-primary { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+.cta .btn-ghost { background: rgba(255, 255, 255, .7); }
+
+.ph { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: kb 24s ease-in-out infinite alternate; }
+@keyframes kb { from { transform: scale(1.05); } to { transform: scale(1.18) translate(-2%, 1%); } }
+.ph-cap { position: absolute !important; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: rgba(255, 255, 255, .85); backdrop-filter: blur(8px); font-family: var(--font-display); font-size: .82rem; }
+.ph-cap .i { color: var(--accent); }
+
+.t-clock .lbl, .t-free .lbl { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; font-family: var(--font-display); }
+.t-clock .lbl .i, .t-free .lbl .i { color: var(--accent); }
+.big { display: block; margin-top: 10px; font-family: var(--font-display); font-weight: 600; font-size: 2.8rem; line-height: 1; letter-spacing: .01em; }
+.t-clock .sec { font-size: 1.1rem; color: var(--accent); margin-left: 4px; }
+.t-clock .date { display: block; margin-top: 10px; color: var(--ink-2); font-size: .88rem; }
+.dots8 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 14px; }
+.dots8 i { height: 22px; border-radius: 8px; background: rgba(124, 58, 237, .12); display: grid; place-items: center; }
+.dots8 i.free { background: linear-gradient(135deg, #34d399, #10b981); }
+.dots8 i.ontrip { background: linear-gradient(135deg, #fb923c, #f97316); }
+.dots8 i.booked { background: linear-gradient(135deg, #fcd34d, #f59e0b); }
+.dots8 i.maint { background: repeating-linear-gradient(135deg, #fecaca 0 5px, #fee2e2 5px 10px); }
+.big em { font-style: normal; font-size: 1rem; color: var(--muted); font-weight: 400; }
+
+.mtile { padding: 24px; display: flex; flex-direction: column; color: var(--ink); min-height: 200px; }
+.mtile.v { background: linear-gradient(150deg, #7c3aed, #a855f7 60%, #c084fc); color: #fff; border-color: rgba(255, 255, 255, .3); }
+.mtile.p { background: linear-gradient(150deg, #fff1e6, #ffd9bf); }
+.mtile.s { background: linear-gradient(150deg, #e0f2fe, #c7e7ff); }
+.mtile .mi { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 17px; background: rgba(255, 255, 255, .25); }
+.mtile.p .mi { background: #fff; color: #ea580c; } .mtile.s .mi { background: #fff; color: #0284c7; }
+.mtile .mi .i { width: 26px; height: 26px; }
+.mtile h3 { margin-top: auto; padding-top: 18px; font-size: 1.22rem; font-weight: 600; }
+.mtile p { font-size: .88rem; opacity: .8; margin-top: 4px; line-height: 1.5; }
+.mtile .arr { position: absolute; top: 20px; right: 20px; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: rgba(255, 255, 255, .9); color: var(--ink); transition: transform .4s cubic-bezier(.3, 1.6, .5, 1); }
+.mtile:hover .arr { transform: rotate(-45deg) scale(1.1); }
+
+/* ───── แดชบอร์ดเบนโตะ ───── */
+.dash { padding: 60px 0 120px; }
+.dhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 22px; }
+.dhead h2 { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 600; margin-top: 10px; }
+.dhead p { color: var(--muted); }
+.livechip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: #fff; color: #db2777; font-family: var(--font-display); font-weight: 600; font-size: .78rem; letter-spacing: .12em; }
+.livechip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: ping 1.5s infinite; }
+.dbento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; grid-template-areas: "k1 k2 donut donut" "k3 k4 donut donut" "next next fleet fleet" "trips trips trips trips"; }
+.k { padding: 22px; min-height: 150px; display: flex; flex-direction: column; }
+.k .ki { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--kb); color: var(--kc); }
+.k b { margin-top: auto; padding-top: 14px; font-family: var(--font-display); font-weight: 600; font-size: 2.4rem; line-height: 1; }
+.k b em { font-style: normal; font-size: .9rem; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.k span.kl { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+.t-donut { grid-area: donut; padding: 26px; display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; }
+.donut { position: relative; width: 240px; height: 240px; }
+.donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.donut circle { fill: none; stroke-width: 26; transition: stroke-dasharray 1.4s cubic-bezier(.2, .8, .2, 1); }
+.donut .ctr { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; text-align: center; }
+.donut .ctr b { font-family: var(--font-display); font-weight: 600; font-size: 3.2rem; line-height: 1; }
+.donut .ctr small { color: var(--muted); }
+.dl h3 { font-size: 1.2rem; font-weight: 600; }
+.dl p { color: var(--muted); font-size: .88rem; margin-top: 2px; }
+.dl ul { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.dl li { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .7); font-size: .92rem; }
+.dl li i { width: 14px; height: 14px; border-radius: 5px; }
+.dl li b { font-family: var(--font-display); font-weight: 600; }
+.t-next { grid-area: next; padding: 30px; display: flex; flex-direction: column; justify-content: center; background: linear-gradient(140deg, rgba(30, 27, 58, .94), rgba(76, 29, 149, .92)); color: #fff; border-color: rgba(255, 255, 255, .15); }
+.t-next .lbl { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: .85rem; color: #c4b5fd; }
+.t-next .cd { display: flex; gap: 10px; margin-top: 14px; }
+.t-next .cd div { min-width: 92px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, .1); text-align: center; }
+.t-next .cd b { display: block; font-family: var(--font-display); font-size: 2.6rem; font-weight: 600; line-height: 1.1; }
+.t-next .cd small { color: rgba(255, 255, 255, .6); font-size: .74rem; }
+.t-next h4 { margin-top: 16px; font-size: 1.2rem; font-weight: 600; }
+.t-next p { color: rgba(255, 255, 255, .72); font-size: .9rem; margin-top: 2px; }
+.t-next .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.t-next .tags span { display: inline-flex; gap: 6px; align-items: center; padding: 5px 11px; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: .8rem; }
+.t-next .tags .i { width: 14px; height: 14px; color: #c4b5fd; }
+.t-fleet { grid-area: fleet; padding: 24px; }
+.t-fleet h3, .t-trips h3 { font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.t-fleet h3 .i, .t-trips h3 .i { color: var(--accent); }
+.fchips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 14px; }
+.fchip { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: center; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, .72); transition: transform .2s; }
+.fchip:hover { transform: scale(1.03); }
+.fchip .fi { grid-row: span 2; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--fb); color: var(--fc); }
+.fchip b { font-family: var(--font-display); font-weight: 500; font-size: .9rem; }
+.fchip small { color: var(--muted); font-size: .76rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-trips { grid-area: trips; padding: 24px; }
+.tr-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tr-nav { display: flex; gap: 8px; }
+.tr-nav button { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line); background: #fff; cursor: pointer; transition: transform .2s; }
+.tr-nav button:hover { transform: scale(1.08); color: var(--accent); }
+.tr-nav button:first-child .i { transform: rotate(180deg); }
+.carousel { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(330px, 1fr); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 16px 2px 6px; scrollbar-width: none; }
+.carousel::-webkit-scrollbar { display: none; }
+.tcard { scroll-snap-align: start; padding: 20px; border-radius: 24px; background: #fff; border: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; transition: transform .3s, box-shadow .3s; }
+.tcard:hover { transform: translateY(-4px); box-shadow: 0 24px 44px -30px rgba(60, 40, 120, .55); }
+.tcard.st-ontrip { background: linear-gradient(160deg, #fff, #fff4ec); border-color: #fed7aa; }
+.tcard.st-done { opacity: .72; }
+.tc-top { display: flex; justify-content: space-between; align-items: center; }
+.tc-time { font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; }
+.tc-time small { color: var(--muted); font-weight: 400; font-size: .85rem; margin-left: 4px; }
+.tcard h4 { font-size: 1.05rem; font-weight: 600; line-height: 1.4; }
+.tcard .pl { color: var(--muted); font-size: .84rem; }
+.tc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.tc-grid div { padding: 8px 10px; border-radius: 12px; background: #f7f5ff; font-size: .82rem; line-height: 1.4; }
+.tc-grid div small { display: block; color: var(--muted); font-size: .7rem; }
+.tc-grid .full { grid-column: span 2; }
+.night { display: inline-flex; gap: 5px; align-items: center; align-self: flex-start; padding: 3px 10px; border-radius: 999px; background: #eef0ff; color: #4338ca; font-size: .76rem; }
+.night .i { width: 13px; height: 13px; }
+.pbar { height: 6px; border-radius: 6px; background: #ffe4d0; overflow: hidden; }
+.pbar i { display: block; height: 100%; background: linear-gradient(90deg, #f97316, #fb923c); border-radius: inherit; }
+
+@media (max-width: 1060px) {
+  .bento { grid-template-columns: repeat(2, 1fr); grid-template-areas: "head head" "photo photo" "clock free" "m1 m2" "m3 team"; }
+  .dbento { grid-template-columns: repeat(2, 1fr); grid-template-areas: "k1 k2" "k3 k4" "donut donut" "next next" "fleet fleet" "trips trips"; }
+  .nav-inner { border-radius: 24px; }
+}
+@media (max-width: 640px) {
+  .bento { grid-template-columns: 1fr; grid-template-areas: "head" "photo" "clock" "free" "m1" "m2" "m3" "team"; }
+  .t-head { padding: 28px 22px; }
+  .t-donut { grid-template-columns: 1fr; justify-items: center; }
+  .donut { width: 200px; height: 200px; }
+  .fchips { grid-template-columns: 1fr; }
+  .carousel { grid-auto-columns: 86%; }
+  .t-team { min-height: 240px; }
+  .nav { padding-top: 8px; }
+}
+</style>
+</head>
+<body id="top">
+<div class="aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span><span class="a4"></span></div>
+<div class="grain" aria-hidden="true"></div>
+<div id="nav-slot"></div>
+
+<section class="hero">
+  <div class="container bento">
+    <div class="tile t-head reveal" data-tilt="3">
+      <span class="eyebrow"><span id="ic-sp"></span>ฝ่ายบริหารงานทั่วไป</span>
+      <h1><span>ระบบยานพาหนะ</span><span class="g">ขอรถส่วนกลาง</span></h1>
+      <p class="lead">บริการรถตู้ รถบัส ให้แก่คุณครูและบุคลากรทุกท่านในโรงเรียน</p>
+      <p class="sub">ระบบขอใช้ยานพาหนะ สำหรับทุกภารกิจในโรงเรียน ตรวจสอบตารางรถว่าง ติดตามสถานะเรียลไทม์ และประเมินคนขับได้ในที่เดียว</p>
+      <div class="cta" id="cta"></div>
+    </div>
+    <div class="tile t-photo reveal" style="--d:.08s" data-tilt="4">
+      <img class="ph" src="assets/school.jpg" alt="อาคารห้องสมุดและแหล่งเรียนรู้" style="object-position:60% 55%">
+      <span class="ph-cap" id="cap1"></span>
+    </div>
+    <div class="tile t-clock reveal" style="--d:.14s" data-tilt="8">
+      <span class="lbl" id="lbl-clock"></span>
+      <span class="big num"><span data-clock></span><span class="sec num" id="sec"></span></span>
+      <span class="date" data-date></span>
+    </div>
+    <div class="tile t-free reveal" style="--d:.2s" data-tilt="8" id="tfree"></div>
+    <div id="mtiles" style="display:contents"></div>
+    <div class="tile t-team reveal" style="--d:.38s" data-tilt="6">
+      <img class="ph" src="assets/bus-team.jpg" alt="ทีมงานยานพาหนะกับรถบัสโรงเรียน" style="object-position:50% 62%">
+      <span class="ph-cap" id="cap2"></span>
+    </div>
+  </div>
+</section>
+
+<section class="dash" id="dashboard">
+  <div class="container">
+    <div class="dhead reveal">
+      <div><span class="livechip"><i></i>TODAY · เรียลไทม์</span><h2>แดชบอร์ดการใช้รถวันนี้</h2><p data-date></p></div>
+      <a class="btn btn-ghost btn-sm" href="#" data-demo id="calbtn"></a>
+    </div>
+    <div data-gate>
+      <div class="dbento" id="dbento"></div>
+    </div>
+  </div>
+</section>
+
+<div id="footer-slot"></div>
+
+<script src="shared.js"></script>
+<script>
+(() => {
+  const { icon, esc, pill, fmtTime, fmtWhen, kindIcon } = PCS;
+  const $ = s => document.querySelector(s);
+  $('#ic-sp').outerHTML = icon('sparkles');
+  $('#cta').innerHTML = `<a class="btn btn-primary" href="#" data-demo>${icon('filePlus')}ขอใช้รถเลย</a><a class="btn btn-ghost" href="#dashboard">${icon('activity')}ดูแดชบอร์ด</a>`;
+  $('#cap1').innerHTML = `${icon('pin')} อาคารห้องสมุดและแหล่งเรียนรู้`;
+  $('#cap2').innerHTML = `${icon('wheel')} ทีมงานยานพาหนะ`;
+  $('#lbl-clock').innerHTML = `${icon('clock')} เวลาตอนนี้`;
+  $('#calbtn').innerHTML = `${icon('calendar')} ปฏิทินการใช้รถ`;
+  setInterval(() => { $('#sec').textContent = ':' + String(PCS.now().getSeconds()).padStart(2, '0'); }, 1000);
+
+  const M = [
+    { k: 'v', area: 'm1', ic: 'filePlus', t: 'ขอใช้รถ', d: 'กรอกฟอร์ม แนบบันทึกข้อความ ขอล่วงหน้า 2 วัน', demo: 1 },
+    { k: 'p', area: 'm2', ic: 'clipboard', t: 'การขอใช้รถของฉัน', d: 'ติดตามสถานะ พิมพ์ใบขออนุญาต', demo: 1 },
+    { k: 's', area: 'm3', ic: 'calendar', t: 'ตารางรถว่าง', d: 'รถว่างวันนี้ และปฏิทินล่วงหน้า', href: '#dashboard' }
+  ];
+  $('#mtiles').innerHTML = M.map((m, i) => `
+    <a class="tile mtile ${m.k} reveal" style="grid-area:${m.area};--d:${.26 + i * .06}s" data-tilt="10" href="${m.href || '#'}" ${m.demo ? 'data-demo' : ''}>
+      <span class="mi">${icon(m.ic)}</span><span class="arr">${icon('arrowUR')}</span>
+      <h3>${m.t}</h3><p>${m.d}</p>
+    </a>`).join('');
+
+  function heroFree() {
+    const s = PCS.summary(), f = PCS.fleet();
+    $('#tfree').innerHTML = PCS.loggedIn
+      ? `<span class="lbl">${icon('van')} รถว่างตอนนี้</span><span class="big num">${s.free}<em> / ${s.total} คัน</em></span><div class="dots8">${f.map(v => `<i class="${v.state.key}" title="${esc(v.name)} · ${v.state.label}"></i>`).join('')}</div>`
+      : `<span class="lbl">${icon('van')} รถส่วนกลาง</span><span class="big num">${s.total}<em> คัน</em></span><div class="dots8">${f.map(() => '<i></i>').join('')}</div>`;
+  }
+
+  const COLORS = { free: '#10b981', booked: '#f59e0b', ontrip: '#f97316', maint: '#f87171' };
+  let nextTrip = null;
+  function render(first) {
+    const s = PCS.summary(), f = PCS.fleet(), list = PCS.trips();
+    nextTrip = s.next;
+    const K = [
+      { a: 'k1', ic: 'route', l: 'การเดินทางวันนี้', v: s.trips, u: 'รายการ', kb: '#ede9fe', kc: '#7c3aed' },
+      { a: 'k2', ic: 'activity', l: 'กำลังเดินทาง', v: s.busy, u: 'คัน', kb: '#ffedd5', kc: '#ea580c' },
+      { a: 'k3', ic: 'student', l: 'นักเรียนเดินทาง', v: s.students, u: 'คน', kb: '#e0f2fe', kc: '#0284c7' },
+      { a: 'k4', ic: 'teacher', l: 'ครูเดินทาง', v: s.teachers, u: 'คน', kb: '#fce7f3', kc: '#db2777' }
+    ];
+    const R = 95, C = 2 * Math.PI * R;
+    let acc = 0;
+    const segs = ['free', 'booked', 'ontrip', 'maint'].map(k => { const n = f.filter(v => v.state.key === k).length; const len = n / f.length * C; const seg = { k, n, len, off: acc }; acc += len; return seg; });
+    $('#dbento').innerHTML = K.map(k => `
+      <div class="tile k ${first ? 'reveal' : ''}" style="grid-area:${k.a};--kb:${k.kb};--kc:${k.kc}" data-tilt="8">
+        <span class="ki">${icon(k.ic)}</span>
+        <b class="num"><span ${first ? `data-count="${k.v}"` : ''}>${first ? 0 : k.v}</span><em>${k.u}</em></b><span class="kl">${k.l}</span>
+      </div>`).join('') + `
+      <div class="tile t-donut ${first ? 'reveal' : ''}">
+        <div class="donut"><svg viewBox="0 0 240 240">
+          <circle cx="120" cy="120" r="${R}" stroke="rgba(124,58,237,.08)"/>
+          ${segs.map(g => `<circle class="seg" cx="120" cy="120" r="${R}" stroke="${COLORS[g.k]}" stroke-dasharray="${first ? `0 ${C}` : `${Math.max(0, g.len - 4)} ${C}`}" data-len="${Math.max(0, g.len - 4)}" stroke-dashoffset="${-g.off}" stroke-linecap="round"/>`).join('')}
+        </svg><div class="ctr"><b class="num">${s.free}</b><small>คันว่างจาก ${s.total}</small></div></div>
+        <div class="dl"><h3>สถานะรถทั้งหมด</h3><p>อัปเดตอัตโนมัติเมื่อคนขับกดสถานะ</p>
+          <ul>${segs.map(g => `<li><i style="background:${COLORS[g.k]}"></i>${PCS.V_STATUS[g.k].label}<b class="num">${g.n} คัน</b></li>`).join('')}</ul></div>
+      </div>
+      <div class="tile t-next ${first ? 'reveal' : ''}" id="tnext"></div>
+      <div class="tile t-fleet ${first ? 'reveal' : ''}">
+        <h3>${icon('van')} รถแต่ละคัน</h3>
+        <div class="fchips">${f.map(v => { const c = COLORS[v.state.key]; return `<div class="fchip" style="--fb:${c}22;--fc:${c}"><span class="fi">${icon(kindIcon(v.kind))}</span><b>${esc(v.name)} · ${esc(v.plate.split(' ').slice(0, 2).join(' '))}</b><small>${v.state.label} · ${esc(v.state.note)}</small></div>`; }).join('')}</div>
+      </div>
+      <div class="tile t-trips ${first ? 'reveal' : ''}">
+        <div class="tr-head"><h3>${icon('route')} รายการเดินทางวันนี้ · ${list.length} รายการ</h3><div class="tr-nav"><button data-sc="-1" aria-label="ก่อนหน้า">${icon('arrow')}</button><button data-sc="1" aria-label="ถัดไป">${icon('arrow')}</button></div></div>
+        <div class="carousel" id="car">${list.map(t => `
+          <article class="tcard st-${t.status}">
+            <div class="tc-top"><span class="tc-time num">${fmtTime(t.start)}<small>– ${fmtWhen(t.end)}</small></span>${pill(t.meta)}</div>
+            <h4>${esc(t.dest)}</h4>
+            <span class="pl">${icon('pin')} ${esc(t.place)} · ${t.km} กม.</span>
+            ${t.overnight ? `<span class="night">${icon('moon')} ค้างคืน ${t.overnight}</span>` : ''}
+            ${t.status === 'ontrip' ? `<div class="pbar"><i style="width:${t.progress * 100}%"></i></div>` : ''}
+            <div class="tc-grid">
+              <div class="full"><small>ภารกิจ</small>${esc(t.purpose)}</div>
+              <div class="full"><small>ผู้ขอใช้รถ</small>${esc(t.requester)} · ${esc(t.dept)}</div>
+              <div><small>ครู</small>${t.teachers} คน</div><div><small>นักเรียน</small>${t.students} คน</div>
+              <div><small>รถ</small>${t.vehicle ? `${esc(t.vehicle.name)}<br>${esc(t.vehicle.plate)}` : 'รอจัดรถ'}</div>
+              <div><small>คนขับ</small>${t.driver ? `${esc(t.driver.name)}<br>${t.driver.phone}` : '—'}</div>
+            </div>
+          </article>`).join('')}</div>
+      </div>`;
+    renderNext();
+    if (first) {
+      setTimeout(() => document.querySelectorAll('.donut .seg').forEach(c => c.setAttribute('stroke-dasharray', `${c.dataset.len} ${C}`)), 500);
+      PCS.bindAll();
+    }
+  }
+  function renderNext() {
+    const el = document.getElementById('tnext'); if (!el) return;
+    const t = nextTrip;
+    if (!t) { el.innerHTML = `<span class="lbl">${icon('check')} ไม่มีรถออกเดินทางเพิ่มวันนี้</span>`; return; }
+    const ms = Math.max(0, t.start - PCS.now()), h = Math.floor(ms / 3600e3), m = Math.floor(ms / 60e3) % 60, sec = Math.floor(ms / 1e3) % 60;
+    el.innerHTML = `
+      <span class="lbl">${icon('clock')} ออกเดินทางคันถัดไป · ${fmtTime(t.start)} น.</span>
+      <div class="cd"><div><b class="num">${String(h).padStart(2, '0')}</b><small>ชั่วโมง</small></div><div><b class="num">${String(m).padStart(2, '0')}</b><small>นาที</small></div><div><b class="num">${String(sec).padStart(2, '0')}</b><small>วินาที</small></div></div>
+      <h4>${esc(t.dest)}</h4><p>${esc(t.purpose)}</p>
+      <div class="tags"><span>${icon(kindIcon(t.vehicle.kind))}${esc(t.vehicle.name)} · ${esc(t.vehicle.plate)}</span><span>${icon('wheel')}${esc(t.driver.name)}</span><span>${icon('users')}ครู ${t.teachers} · นักเรียน ${t.students}</span></div>`;
+  }
+  setInterval(renderNext, 1000);
+  document.addEventListener('click', e => { const b = e.target.closest('[data-sc]'); if (b) $('#car').scrollBy({ left: +b.dataset.sc * 360, behavior: 'smooth' }); });
+
+  heroFree(); render(true);
+  PCS.mount({ version: 4 });
+  PCS.onTick(() => { heroFree(); render(false); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# ไฟล์ระบบ / โปรแกรมแก้โค้ด
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+node_modules/
+*.log

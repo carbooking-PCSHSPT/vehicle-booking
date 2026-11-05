@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo · ปฏิทินการใช้รถ (มุมมองรายเดือน/รายสัปดาห์ 3 แบบ)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-50: #eef0fa; --navy-100: #dde1f3; --gold: #c9962b; --gold-2: #e8c36a; --gold-50: #fbf3e1; --cream: #fbf7ef; --sand: #f6f0e3; --ink: #1b1f3b; --ink-2: #3b3f5e; --muted: #6e6a7c; --line: rgba(80, 60, 20, .12); --line2: rgba(80, 60, 20, .07);
+  --font-display: "Prompt", system-ui, sans-serif; --font-body: "IBM Plex Sans Thai", "Prompt", system-ui, sans-serif;
+  --s-done: #94a3b8; --s-live: #ea580c; --s-ok: #3b47b8; --s-wait: #8b5cf6; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--cream); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { font-family: var(--font-display); margin: 0; line-height: 1.3; }
+p { margin: 0; }
+.i { width: 1.1em; height: 1.1em; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { width: min(100% - 40px, 1240px); margin: 0 auto; }
+.top { padding: 34px 0 6px; } .top h1 { color: var(--navy); font-size: 1.7rem; } .top p { color: var(--muted); margin-top: 4px; }
+.jump { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.jump a { padding: 8px 16px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--navy); font-family: var(--font-display); text-decoration: none; font-size: .9rem; }
+.sec { padding: 46px 0 40px; border-top: 3px solid var(--gold); margin-top: 34px; }
+.sec-h { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.sec-h h2 { color: var(--navy); font-size: 1.4rem; }
+.sec-h p { color: var(--muted); font-size: .9rem; }
+.badge { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--navy); color: #fff; font-family: var(--font-display); font-size: .8rem; margin-bottom: 6px; }
+.seg { display: inline-flex; padding: 4px; border-radius: 999px; background: var(--sand); gap: 2px; }
+.seg button { border: 0; background: none; padding: 8px 18px; border-radius: 999px; cursor: pointer; font-family: var(--font-display); font-size: .88rem; color: var(--ink-2); }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .4); font-weight: 500; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 18px 40px -28px rgba(60, 40, 10, .35); }
+.mhead { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line2); }
+.mhead b { font-family: var(--font-display); font-size: 1.1rem; color: var(--navy); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .78rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 50%; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-family: var(--font-display); font-size: .74rem; white-space: nowrap; }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.p-done { color: #475569; background: #ecedf1; } .p-live { color: #c2410c; background: #ffe7d4; } .p-ok { color: #1d4ed8; background: #e0e9ff; } .p-wait { color: #6d28d9; background: #ede7fe; }
+.dow { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-family: var(--font-display); font-size: .78rem; color: var(--muted); padding: 10px 0 6px; }
+.dow .we, .we-c { color: #b45309; }
+
+/* ═════ แบบ A: จุดสี + แผงรายละเอียดด้านข้าง / สัปดาห์แบบตารางเวลา ═════ */
+.a-split { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.a-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 0 14px 14px; }
+.a-day { position: relative; min-height: 86px; padding: 8px 10px; border-radius: 14px; border: 1px solid transparent; background: #fdfbf6; cursor: pointer; text-align: left; font: inherit; color: inherit; display: flex; flex-direction: column; gap: 6px; transition: .2s; }
+.a-day:hover { border-color: var(--gold); background: #fff; }
+.a-day.out { opacity: .35; }
+.a-day.sel { border-color: var(--navy); background: var(--navy-50); box-shadow: 0 0 0 3px rgba(36, 48, 122, .12); }
+.a-day .d { font-family: var(--font-display); font-weight: 600; font-size: .95rem; }
+.a-day.today .d { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -3px 0 0 -4px; border-radius: 50%; background: var(--gold); color: #fff; }
+.a-day .n { font-family: var(--font-display); font-size: .74rem; color: var(--navy); }
+.a-day .dots { display: flex; gap: 3px; flex-wrap: wrap; margin-top: auto; }
+.a-day .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.a-panel { padding: 18px; position: sticky; top: 14px; }
+.a-panel h3 { color: var(--navy); font-size: 1.05rem; }
+.a-panel .sub { color: var(--muted); font-size: .84rem; margin-top: 2px; }
+.a-list { display: grid; gap: 8px; margin-top: 14px; max-height: 520px; overflow: auto; }
+.a-item { display: grid; grid-template-columns: 62px 1fr; gap: 12px; padding: 10px 12px; border-radius: 14px; background: #fdfbf6; border-left: 4px solid var(--c); }
+.a-item .t b { display: block; font-family: var(--font-display); font-size: 1rem; color: var(--navy); }
+.a-item .t small { color: var(--muted); font-size: .72rem; }
+.a-item h4 { font-size: .92rem; }
+.a-item small { display: block; color: var(--muted); font-size: .76rem; line-height: 1.4; }
+.empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: .9rem; }
+/* สัปดาห์แบบตารางเวลา */
+.tg { display: grid; grid-template-columns: 56px repeat(7, minmax(0, 1fr)); }
+.tg-h { position: sticky; top: 0; z-index: 2; background: #fff; text-align: center; padding: 10px 4px; border-bottom: 1px solid var(--line); font-family: var(--font-display); font-size: .78rem; color: var(--muted); }
+.tg-h b { display: block; font-size: 1.15rem; color: var(--ink); }
+.tg-h.today b { display: grid; place-items: center; width: 32px; height: 32px; margin: 2px auto 0; border-radius: 50%; background: var(--gold); color: #fff; }
+.tg-times { position: relative; }
+.tg-times span { position: absolute; right: 8px; transform: translateY(-50%); font-size: .7rem; color: var(--muted); font-family: var(--font-display); }
+.tg-col { position: relative; border-left: 1px solid var(--line2); background-image: linear-gradient(var(--line2) 1px, transparent 1px); background-size: 100% var(--hh); }
+.tg-col.today { background-color: #fffaf0; }
+.tg-ev { position: absolute; border-radius: 10px; padding: 5px 7px; font-size: .72rem; line-height: 1.3; color: #fff; overflow: hidden; background: var(--c); box-shadow: 0 6px 14px -8px rgba(0, 0, 0, .5); border: 1px solid rgba(255, 255, 255, .6); cursor: default; }
+.tg-ev b { display: block; font-family: var(--font-display); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-ev small { display: block; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tg-ev.wait { background: repeating-linear-gradient(135deg, #8b5cf6 0 8px, #7c4ef0 8px 16px); }
+.tg-ev.done { background: #a3acc0; }
+.tg-now { position: absolute; left: 0; right: 0; height: 2px; background: #ea580c; z-index: 1; } .tg-now::before { content: ""; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ea580c; }
+
+/* ═════ แบบ B: แผนที่ความร้อน (จำนวนรถที่ใช้) / สัปดาห์แบบตารางรถ ═════ */
+.b-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 0 14px 14px; }
+.b-day { position: relative; min-height: 92px; padding: 9px 10px; border-radius: 14px; background: rgba(36, 48, 122, var(--a)); color: var(--fg); cursor: pointer; border: 1px solid var(--line2); font: inherit; text-align: left; display: flex; flex-direction: column; transition: transform .15s; }
+.b-day:hover { transform: scale(1.03); }
+.b-day.out { opacity: .3; }
+.b-day.sel { outline: 3px solid var(--gold); outline-offset: 1px; }
+.b-day .d { font-family: var(--font-display); font-weight: 600; font-size: .92rem; }
+.b-day.today .d::after { content: " · วันนี้"; font-size: .7rem; font-weight: 500; color: var(--gold-2); }
+.b-day .big { margin-top: auto; font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; line-height: 1; }
+.b-day .big em { font-style: normal; font-size: .72rem; font-weight: 400; margin-left: 2px; }
+.b-day .sm { font-size: .7rem; opacity: .8; }
+.b-day .sbar { display: flex; height: 4px; border-radius: 4px; overflow: hidden; margin-top: 6px; background: rgba(255, 255, 255, .25); }
+.b-day .sbar i { background: var(--c); }
+.b-scale { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: var(--muted); }
+.b-scale .g { width: 140px; height: 10px; border-radius: 10px; background: linear-gradient(90deg, rgba(36, 48, 122, .06), rgba(36, 48, 122, 1)); }
+.b-detail { margin-top: 14px; padding: 16px 18px; }
+.b-rows { display: grid; gap: 6px; margin-top: 10px; }
+.b-row { display: grid; grid-template-columns: 110px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: #fdfbf6; font-size: .86rem; border-left: 4px solid var(--c); }
+.b-row b { font-family: var(--font-display); font-weight: 500; }
+/* ตารางรถรายสัปดาห์ */
+.rs { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .82rem; table-layout: fixed; min-width: 900px; } .rs th:first-child { width: 170px; }
+.rs th { position: sticky; top: 0; background: #fdfaf3; font-family: var(--font-display); font-weight: 500; color: var(--muted); padding: 10px 6px; font-size: .76rem; text-align: center; border-bottom: 1px solid var(--line); }
+.rs th b { display: block; font-size: 1.05rem; color: var(--ink); }
+.rs th.today { background: var(--gold); color: #fff; } .rs th.today b { color: #fff; }
+.rs td { padding: 5px; border-bottom: 1px dashed var(--line); vertical-align: top; height: 58px; }
+.rs td.vn { text-align: left; min-width: 150px; padding: 8px 12px; } .rs td.vn b { display: block; font-family: var(--font-display); font-weight: 500; } .rs td.vn small { color: var(--muted); font-size: .72rem; }
+.rs td.today { background: #fffaf0; }
+.rs .blk { display: block; margin-bottom: 4px; padding: 5px 8px; border-radius: 9px; background: var(--cb); color: var(--c); border-left: 3px solid var(--c); line-height: 1.3; }
+.rs .blk b { font-family: var(--font-display); font-weight: 600; }
+.rs .blk small { display: block; color: var(--ink-2); font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs .free { color: #cbd5c0; font-size: .74rem; display: block; text-align: center; padding-top: 14px; }
+
+/* ═════ แบบ C: ปฏิทินเล็ก + รายการตามวัน / สัปดาห์แบบแถบเวลาแนวนอน ═════ */
+.c-split { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 18px; align-items: start; }
+.c-mini { padding: 14px; position: sticky; top: 14px; }
+.c-mini .mg { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.c-mini button { position: relative; aspect-ratio: 1; border: 0; border-radius: 12px; background: none; font-family: var(--font-display); font-size: .86rem; cursor: pointer; color: var(--ink); }
+.c-mini button:hover { background: var(--sand); }
+.c-mini button.out { opacity: .3; }
+.c-mini button.today { color: var(--gold); font-weight: 700; }
+.c-mini button.has::after { content: attr(data-n); position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); min-width: 16px; height: 14px; padding: 0 4px; border-radius: 8px; background: var(--navy); color: #fff; font-size: .58rem; line-height: 14px; }
+.c-mini button.sel { background: var(--navy); color: #fff; } .c-mini button.sel::after { background: var(--gold-2); color: var(--ink); }
+.c-sum { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.c-sum div { padding: 10px 12px; border-radius: 12px; background: var(--navy-50); } .c-sum small { display: block; color: var(--muted); font-size: .72rem; } .c-sum b { font-family: var(--font-display); color: var(--navy); font-size: 1.2rem; }
+.c-agenda { position: relative; padding: 8px 0; max-height: 640px; overflow: auto; }
+.c-dayh { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 10px; padding: 12px 20px 8px; background: linear-gradient(#fff 70%, rgba(255, 255, 255, 0)); }
+.c-dayh b { font-family: var(--font-display); font-size: 1.6rem; color: var(--navy); line-height: 1; }
+.c-dayh span { font-family: var(--font-display); color: var(--ink-2); }
+.c-dayh small { color: var(--muted); margin-left: auto; font-size: .8rem; }
+.c-dayh.today b { color: var(--gold); }
+.c-ag { display: grid; grid-template-columns: 110px minmax(0, 1.6fr) minmax(0, 1.1fr) auto; gap: 14px; align-items: center; margin: 0 20px 6px; padding: 10px 14px; border-radius: 14px; background: #fdfbf6; font-size: .86rem; position: relative; }
+.c-ag::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 4px; background: var(--c); }
+.c-ag .t { font-family: var(--font-display); font-weight: 600; color: var(--navy); }
+.c-ag .t small { display: block; font-weight: 400; color: var(--muted); font-size: .72rem; }
+.c-ag b { font-family: var(--font-display); font-weight: 500; } .c-ag small { display: block; color: var(--muted); font-size: .76rem; }
+.c-ag.sel { outline: 2px solid var(--gold); }
+/* สัปดาห์แบบแถบเวลาแนวนอน */
+.hw { padding: 14px 16px 8px; overflow-x: auto; }
+.hw-in { min-width: 880px; }
+.hw-axis, .hw-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; }
+.hw-scale { position: relative; height: 24px; } .hw-scale span { position: absolute; transform: translateX(-50%); font-size: .72rem; color: var(--muted); font-family: var(--font-display); }
+.hw-row { border-top: 1px dashed var(--line); }
+.hw-row.today { background: #fffaf0; }
+.hw-name { font-family: var(--font-display); padding: 8px 0; } .hw-name b { display: block; font-size: 1rem; } .hw-name small { color: var(--muted); font-size: .74rem; }
+.hw-row.today .hw-name b { color: var(--gold); }
+.hw-lane { position: relative; background-image: linear-gradient(90deg, var(--line2) 1px, transparent 1px); background-size: calc(100% / 14) 100%; }
+.hw-bar { position: absolute; height: 26px; border-radius: 8px; padding: 0 8px; display: flex; align-items: center; gap: 6px; font-size: .72rem; color: #fff; background: var(--c); white-space: nowrap; overflow: hidden; font-family: var(--font-display); box-shadow: 0 6px 12px -8px rgba(0, 0, 0, .5); }
+.hw-bar.wait { background: repeating-linear-gradient(135deg, #8b5cf6 0 8px, #7c4ef0 8px 16px); } .hw-bar.done { background: #a3acc0; }
+@media (max-width: 1000px) { .a-split, .c-split { grid-template-columns: 1fr; } .a-panel, .c-mini { position: static; } .b-row, .c-ag { grid-template-columns: 90px 1fr; } .b-row > :nth-child(n+3), .c-ag > :nth-child(n+3) { grid-column: 2; } .tg-wrap { overflow-x: auto; } .tg { min-width: 760px; } }
+</style>
+</head>
+<body>
+<div class="wrap top">
+  <h1>ปฏิทินการใช้รถ · มุมมองรายเดือน / รายสัปดาห์ 3 แบบ</h1>
+  <p>เน้นดูง่าย เห็นภาพรวม ไม่รก · ทุกแบบสลับ "เดือน / สัปดาห์" ได้ และกดเลือกวันเพื่อดูรายละเอียด · ข้อมูลตัวอย่าง</p>
+  <div class="jump"><a href="#A">แบบ A · จุดสี + แผงรายละเอียด</a><a href="#B">แบบ B · แผนที่ความหนาแน่น + ตารางรถ</a><a href="#C">แบบ C · ปฏิทินเล็ก + รายการตามวัน</a></div>
+</div>
+
+<section class="sec" id="A"><div class="wrap">
+  <div class="sec-h"><div><span class="badge">แบบ A</span><h2>จุดสีบอกจำนวนงาน + แผงรายละเอียดด้านข้าง</h2><p>เดือน: แต่ละวันมีแค่ตัวเลขกับจุดสีตามสถานะ กดวันแล้วรายละเอียดขึ้นด้านขวา · สัปดาห์: ตารางเวลาแบบ Google Calendar เห็นช่วงเวลาชัด</p></div><div class="seg" data-v="A"><button class="on" data-m="month">เดือน</button><button data-m="week">สัปดาห์</button></div></div>
+  <div id="outA"></div>
+</div></section>
+
+<section class="sec" id="B"><div class="wrap">
+  <div class="sec-h"><div><span class="badge">แบบ B</span><h2>แผนที่ความหนาแน่น (จำนวนรถที่ใช้) + ตารางรถรายสัปดาห์</h2><p>เดือน: สียิ่งเข้ม = วันนั้นใช้รถมาก เห็นทันทีว่าวันไหนรถเหลือน้อย · สัปดาห์: แถว = รถแต่ละคัน รู้เลยว่าคันไหนว่างวันไหน</p></div><div class="seg" data-v="B"><button class="on" data-m="month">เดือน</button><button data-m="week">สัปดาห์</button></div></div>
+  <div id="outB"></div>
+</div></section>
+
+<section class="sec" id="C"><div class="wrap">
+  <div class="sec-h"><div><span class="badge">แบบ C</span><h2>ปฏิทินเล็ก + รายการเรียงตามวัน</h2><p>เดือน: ปฏิทินเล็กบอกจำนวนงาน ด้านขวาเป็นรายการเรียงวัน อ่านง่ายเหมือนสมุดนัด · สัปดาห์: แถว = วัน แกนนอน = เวลา</p></div><div class="seg" data-v="C"><button class="on" data-m="month">เดือน</button><button data-m="week">สัปดาห์</button></div></div>
+  <div id="outC"></div>
+</div></section>
+
+<script>
+(() => {
+  // ───── ข้อมูลตัวอย่างทั้งเดือน ─────
+  let seed = 7; const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pick = a => a[Math.floor(R() * a.length)];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const now = new Date(); if (now.getHours() < 7 || now.getHours() > 16) now.setHours(10, 30, 0, 0);
+  const VEH = ['รถตู้ 01', 'รถตู้ 02', 'รถตู้ 03', 'รถตู้ 04', 'รถโดยสาร 6 ล้อ', 'รถบัสโดยสาร', 'รถเก๋ง'];
+  const PL = ['ท่าอากาศยานสุวรรณภูมิ', 'มหาวิทยาลัยเกษตรศาสตร์ บางเขน', 'สพม.ปทุมธานี', 'อุทยานวิทยาศาสตร์ฯ (สวทช.)', 'กระทรวงศึกษาธิการ', 'มหาวิทยาลัยธรรมศาสตร์ รังสิต', 'มหาวิทยาลัยมหิดล ศาลายา', 'สสวท.', 'ศูนย์ประชุมสิริกิติ์', 'อุทยานแห่งชาติเขาใหญ่'];
+  const REQ = ['ครูกนกวรรณ', 'ครูธนพล', 'ครูวิไลพร', 'ครูอรรถพล', 'ครูสุภาวดี', 'ครูปิยะนุช', 'ครูณัฐวุฒิ', 'ครูสมใจ'];
+  const PUR = ['ประชุมเชิงปฏิบัติการ', 'นำนักเรียนแข่งขัน', 'ทัศนศึกษา', 'อบรมพัฒนาครู', 'ยื่นเอกสาร', 'รับ-ส่งวิทยากร'];
+  const first = new Date(today.getFullYear(), today.getMonth(), 1), last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const EV = [];
+  for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    const k = R() < .2 ? 0 : 1 + Math.floor(R() * (UIsame(d, today) ? 4 : 3.2));
+    const used = new Set();
+    for (let j = 0; j < k; j++) {
+      const s = new Date(d); s.setHours(6 + Math.floor(R() * 7), R() < .5 ? 0 : 30, 0, 0);
+      const e = new Date(s.getTime() + (2 + Math.floor(R() * 6)) * 36e5);
+      let v = pick(VEH); while (used.has(v) && used.size < VEH.length) v = pick(VEH); used.add(v);
+      const st = e < now ? 'done' : s <= now ? 'live' : (R() < .25 ? 'wait' : 'ok');
+      EV.push({ s, e, v: st === 'wait' ? '' : v, dest: pick(PL), req: pick(REQ), pur: pick(PUR), st, t: 1 + Math.floor(R() * 3), n: R() < .5 ? Math.floor(R() * 30) : 0 });
+    }
+  }
+  function UIsame(a, b) { return a.toDateString() === b.toDateString(); }
+  const tm = d => d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const on = d => EV.filter(e => UIsame(e.s, d)).sort((a, b) => a.s - b.s);
+  const SC = { done: '#94a3b8', live: '#ea580c', ok: '#3b47b8', wait: '#8b5cf6' }, SB = { done: '#eef0f4', live: '#fff1e6', ok: '#eef0fa', wait: '#f3efff' };
+  const SN = { done: 'กลับแล้ว', live: 'กำลังเดินทาง', ok: 'อนุมัติแล้ว', wait: 'รอจัดรถ' };
+  const pill = st => `<span class="pill p-${st}">${SN[st]}</span>`;
+  const monthCells = () => { const s = new Date(first); s.setDate(s.getDate() - s.getDay()); const out = []; for (let i = 0; i < 42; i++) { const d = new Date(s); d.setDate(s.getDate() + i); out.push(d); } return out[35].getMonth() !== first.getMonth() ? out.slice(0, 35) : out; };
+  const weekDays = () => { const s = new Date(today); s.setDate(s.getDate() - s.getDay()); return Array.from({ length: 7 }, (_, i) => { const d = new Date(s); d.setDate(s.getDate() + i); return d; }); };
+  const dowHTML = `<div class="dow">${['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((d, i) => `<span class="${i === 0 || i === 6 ? 'we' : ''}">${d}</span>`).join('')}</div>`;
+  const monthName = first.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+  const dayLong = d => d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' });
+  const legend = `<div class="legend"><span><i style="background:${SC.done}"></i>กลับแล้ว</span><span><i style="background:${SC.live}"></i>กำลังเดินทาง</span><span><i style="background:${SC.ok}"></i>อนุมัติแล้ว</span><span><i style="background:${SC.wait}"></i>รอจัดรถ</span></div>`;
+  const state = { A: { m: 'month', sel: new Date(today) }, B: { m: 'month', sel: new Date(today) }, C: { m: 'month', sel: new Date(today) } };
+
+  // ───── แบบ A ─────
+  function A() {
+    const s = state.A, out = document.getElementById('outA');
+    if (s.m === 'month') {
+      const list = on(s.sel);
+      out.innerHTML = `<div class="a-split"><div class="card"><div class="mhead"><b>${monthName}</b>${legend}</div>${dowHTML}<div class="a-grid">${monthCells().map(d => { const ev = on(d); return `<button class="a-day ${d.getMonth() !== first.getMonth() ? 'out' : ''} ${UIsame(d, today) ? 'today' : ''} ${UIsame(d, s.sel) ? 'sel' : ''}" data-d="${+d}"><span class="d">${d.getDate()}</span>${ev.length ? `<span class="n">${ev.length} งาน · ${new Set(ev.map(e => e.v).filter(Boolean)).size} คัน</span><span class="dots">${ev.map(e => `<i style="--c:${SC[e.st]}"></i>`).join('')}</span>` : ''}</button>`; }).join('')}</div></div>
+        <aside class="card a-panel"><h3>${dayLong(s.sel)}</h3><p class="sub">${list.length ? `${list.length} รายการ · ใช้รถ ${new Set(list.map(e => e.v).filter(Boolean)).size} คัน` : 'ไม่มีการใช้รถ'}</p>
+          <div class="a-list">${list.map(e => `<div class="a-item" style="--c:${SC[e.st]}"><div class="t"><b class="num">${tm(e.s)}</b><small>ถึง ${tm(e.e)}</small></div><div><h4>${e.dest}</h4><small>${e.v || 'รอจัดรถ'} · ${e.req}</small><small>${e.pur} · ครู ${e.t} นร. ${e.n}</small><div style="margin-top:4px">${pill(e.st)}</div></div></div>`).join('') || '<p class="empty">วันนี้ไม่มีรายการ</p>'}</div></aside></div>`;
+    } else {
+      const H0 = 6, H1 = 20, HH = 44, days = weekDays();
+      const col = d => { const ev = on(d); const lanes = []; ev.forEach(e => { let l = lanes.findIndex(end => end <= e.s); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = e.e; e._l = l; }); const n = Math.max(1, lanes.length);
+        return `<div class="tg-col ${UIsame(d, today) ? 'today' : ''}" style="--hh:${HH}px;height:${(H1 - H0) * HH}px">${ev.map(e => { const top = ((e.s.getHours() + e.s.getMinutes() / 60) - H0) * HH, h = Math.max(30, ((e.e - e.s) / 36e5) * HH); return `<div class="tg-ev ${e.st}" style="--c:${SC[e.st]};top:${top}px;height:${h - 3}px;left:calc(${e._l / n * 100}% + 3px);width:calc(${100 / n}% - 6px)" title="${tm(e.s)}–${tm(e.e)} ${e.dest} · ${e.v || 'รอจัดรถ'} · ${e.req}"><b>${tm(e.s)} ${e.dest}</b><small>${e.v || 'รอจัดรถ'}</small></div>`; }).join('')}${UIsame(d, today) ? `<div class="tg-now" style="top:${((now.getHours() + now.getMinutes() / 60) - H0) * HH}px"></div>` : ''}</div>`; };
+      out.innerHTML = `<div class="card tg-wrap" style="overflow:hidden"><div class="mhead"><b>สัปดาห์ ${days[0].toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</b>${legend}</div>
+        <div style="max-height:620px;overflow:auto"><div class="tg"><div class="tg-h"></div>${days.map(d => `<div class="tg-h ${UIsame(d, today) ? 'today' : ''}">${d.toLocaleDateString('th-TH', { weekday: 'short' })}<b>${d.getDate()}</b></div>`).join('')}
+          <div class="tg-times" style="height:${(H1 - H0) * HH}px">${Array.from({ length: H1 - H0 }, (_, i) => `<span style="top:${i * HH}px;${i ? '' : 'transform:none'}">${String(H0 + i).padStart(2, '0')}:00</span>`).join('')}</div>${days.map(col).join('')}</div></div></div>`;
+    }
+  }
+
+  // ───── แบบ B ─────
+  function B() {
+    const s = state.B, out = document.getElementById('outB');
+    if (s.m === 'month') {
+      const maxV = 7, list = on(s.sel);
+      out.innerHTML = `<div class="card"><div class="mhead"><b>${monthName}</b><div class="b-scale">รถว่างมาก <span class="g"></span> ใช้รถเกือบหมด</div></div>${dowHTML}
+        <div class="b-grid">${monthCells().map(d => { const ev = on(d), v = new Set(ev.map(e => e.v).filter(Boolean)).size, a = ev.length ? .1 + .85 * v / maxV : 0; const cnt = k => ev.filter(e => e.st === k).length;
+          return `<button class="b-day ${d.getMonth() !== first.getMonth() ? 'out' : ''} ${UIsame(d, today) ? 'today' : ''} ${UIsame(d, s.sel) ? 'sel' : ''}" data-d="${+d}" style="--a:${a};--fg:${a > .45 ? '#fff' : 'var(--ink)'}"><span class="d">${d.getDate()}</span>${ev.length ? `<span class="big num">${v}<em>คัน</em></span><span class="sm">${ev.length} งาน · ว่าง ${maxV - v} คัน</span><span class="sbar">${['done', 'live', 'ok', 'wait'].map(k => cnt(k) ? `<i style="--c:${SC[k]};flex:${cnt(k)}"></i>` : '').join('')}</span>` : ''}</button>`; }).join('')}</div></div>
+        <div class="card b-detail"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="color:var(--navy)">${dayLong(s.sel)}</h3>${legend}</div>
+          <div class="b-rows">${list.map(e => `<div class="b-row" style="--c:${SC[e.st]}"><b class="num">${tm(e.s)}–${tm(e.e)}</b><div><b>${e.dest}</b><small style="display:block;color:var(--muted)">${e.pur}</small></div><span>${e.v || '<span style="color:#7c3aed">รอจัดรถ</span>'}</span><span>${e.req}</span>${pill(e.st)}</div>`).join('') || '<p class="empty">ไม่มีการใช้รถ</p>'}</div></div>`;
+    } else {
+      const days = weekDays();
+      out.innerHTML = `<div class="card" style="overflow:auto"><div class="mhead"><b>สัปดาห์ ${days[0].toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</b>${legend}</div>
+        <table class="rs"><thead><tr><th style="text-align:left;padding-left:12px">รถ</th>${days.map(d => `<th class="${UIsame(d, today) ? 'today' : ''}">${d.toLocaleDateString('th-TH', { weekday: 'short' })}<b>${d.getDate()}</b></th>`).join('')}</tr></thead>
+        <tbody>${[...VEH, ''].map(v => `<tr><td class="vn">${v ? `<b>${v}</b><small>${EV.filter(e => e.v === v && days.some(d => UIsame(d, e.s))).length} งานสัปดาห์นี้</small>` : '<b style="color:#7c3aed">รอจัดรถ</b><small>คำขอที่แอดมินยังไม่จัดรถ</small>'}</td>${days.map(d => { const ev = on(d).filter(e => e.v === v); return `<td class="${UIsame(d, today) ? 'today' : ''}">${ev.map(e => `<span class="blk" style="--c:${SC[e.st]};--cb:${SB[e.st]}" title="${e.dest} · ${e.req}"><b class="num">${tm(e.s)}–${tm(e.e)}</b><small>${e.dest}</small></span>`).join('') || (v ? '<span class="free">ว่าง</span>' : '')}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+    }
+  }
+
+  // ───── แบบ C ─────
+  function C() {
+    const s = state.C, out = document.getElementById('outC');
+    if (s.m === 'month') {
+      const days = monthCells().filter(d => d.getMonth() === first.getMonth() && on(d).length);
+      const all = EV.length, vehDays = days.length;
+      out.innerHTML = `<div class="c-split"><aside class="card c-mini"><div class="mhead" style="padding:4px 4px 10px;border:0"><b>${monthName}</b></div>${dowHTML}
+          <div class="mg">${monthCells().map(d => { const n = on(d).length; return `<button class="${d.getMonth() !== first.getMonth() ? 'out' : ''} ${UIsame(d, today) ? 'today' : ''} ${n ? 'has' : ''} ${UIsame(d, s.sel) ? 'sel' : ''}" data-d="${+d}" data-n="${n}">${d.getDate()}</button>`; }).join('')}</div>
+          <div class="c-sum"><div><small>การเดินทางเดือนนี้</small><b>${all}</b></div><div><small>วันที่มีการใช้รถ</small><b>${vehDays}</b></div></div>
+          <div style="margin-top:12px">${legend}</div></aside>
+        <div class="card c-agenda" id="agenda">${days.map(d => { const ev = on(d); return `<div data-day="${+d}"><div class="c-dayh ${UIsame(d, today) ? 'today' : ''}"><b class="num">${d.getDate()}</b><span>${d.toLocaleDateString('th-TH', { weekday: 'long' })}${UIsame(d, today) ? ' · วันนี้' : ''}</span><small>${ev.length} งาน · ${new Set(ev.map(e => e.v).filter(Boolean)).size} คัน</small></div>
+          ${ev.map(e => `<div class="c-ag" style="--c:${SC[e.st]}"><span class="t num">${tm(e.s)}<small>ถึง ${tm(e.e)}</small></span><div><b>${e.dest}</b><small>${e.pur} · ${e.req}</small></div><span>${e.v || '<span style="color:#7c3aed">รอจัดรถ</span>'}</span>${pill(e.st)}</div>`).join('')}</div>`; }).join('')}</div></div>`;
+      const ag = document.getElementById('agenda'), target = ag.querySelector(`[data-day="${+s.sel}"]`) || ag.querySelector(`[data-day]`);
+      if (target) ag.scrollTop = target.offsetTop - 8;
+    } else {
+      const days = weekDays(), H0 = 6, H1 = 20, pos = d => Math.max(0, Math.min(100, ((d.getHours() + d.getMinutes() / 60) - H0) / (H1 - H0) * 100));
+      out.innerHTML = `<div class="card"><div class="mhead"><b>สัปดาห์ ${days[0].toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</b>${legend}</div>
+        <div class="hw"><div class="hw-in"><div class="hw-axis"><div></div><div class="hw-scale">${Array.from({ length: 8 }, (_, i) => H0 + i * 2).map(h => `<span style="left:${(h - H0) / (H1 - H0) * 100}%">${String(h).padStart(2, '0')}:00</span>`).join('')}</div></div>
+          ${days.map(d => { const ev = on(d); const lanes = []; ev.forEach(e => { let l = lanes.findIndex(end => end <= e.s); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = e.e; e._l = l; }); const n = Math.max(1, lanes.length);
+            return `<div class="hw-row ${UIsame(d, today) ? 'today' : ''}"><div class="hw-name"><b>${d.toLocaleDateString('th-TH', { weekday: 'short' })} ${d.getDate()}</b><small>${ev.length ? ev.length + ' งาน' : 'ว่าง'}</small></div><div class="hw-lane" style="height:${n * 32 + 10}px">${ev.map(e => `<div class="hw-bar ${e.st}" style="--c:${SC[e.st]};left:${pos(e.s)}%;width:${Math.max(4, pos(e.e) - pos(e.s))}%;top:${6 + e._l * 32}px" title="${e.dest} · ${e.req}">${tm(e.s)} ${e.dest} · ${e.v || 'รอจัดรถ'}</div>`).join('')}</div></div>`; }).join('')}</div></div></div>`;
+    }
+  }
+  const R3 = { A, B, C };
+  document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; const v = seg.dataset.v; state[v].m = b.dataset.m; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); R3[v](); }));
+  ['A', 'B', 'C'].forEach(v => document.getElementById('out' + v).addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (!b) return; state[v].sel = new Date(+b.dataset.d); R3[v](); }));
+  A(); B(); C();
+})();
+</script>
+</body>
+</html>

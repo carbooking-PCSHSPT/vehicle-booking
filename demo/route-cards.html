@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo · เส้นทางการเดินทางวันนี้ (การ์ดเลื่อน 3 แบบ)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #24307a; --navy-900: #1b1f3b; --gold: #c9962b; --gold-2: #e8c36a; --cream: #fbf7ef; --ink: #1b1f3b; --muted: #6e6a7c;
+  --font-display: "Prompt", system-ui, sans-serif; --font-body: "IBM Plex Sans Thai", "Prompt", system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--cream); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { font-family: var(--font-display); margin: 0; line-height: 1.3; }
+p { margin: 0; }
+.i { width: 1.1em; height: 1.1em; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { width: min(100% - 40px, 1240px); margin: 0 auto; }
+.top { padding: 34px 0 20px; }
+.top h1 { color: var(--navy); font-size: 1.7rem; }
+.top p { color: var(--muted); margin-top: 4px; }
+.jump { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.jump a { padding: 8px 16px; border-radius: 999px; background: #fff; border: 1px solid rgba(80, 60, 20, .12); color: var(--navy); font-family: var(--font-display); text-decoration: none; font-size: .9rem; }
+
+/* ส่วนพื้นน้ำเงินแบบเดียวกับหน้าแรก */
+.sec { position: relative; padding: 70px 0 80px; color: #fff; background: radial-gradient(900px 420px at 85% 0%, rgba(232, 195, 106, .16), transparent 70%), linear-gradient(180deg, #24307a 0%, #1f2866 100%); border-top: 3px solid var(--gold); overflow: hidden; }
+.sec + .sec { margin-top: 0; }
+.tag { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(232, 195, 106, .16); border: 1px solid rgba(232, 195, 106, .4); color: var(--gold-2); font-family: var(--font-display); font-size: .76rem; letter-spacing: .12em; font-weight: 600; }
+.tag i { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: ping 1.6s infinite; color: #4ade80; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 currentColor; } 75% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.sec-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 26px; }
+.sec-head h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin-top: 10px; }
+.sec-head h2 small { font-size: .5em; color: var(--gold-2); font-weight: 500; margin-left: 8px; }
+.sec-head p { color: rgba(255, 255, 255, .7); }
+.variant { position: absolute; top: 18px; right: 20px; padding: 6px 14px; border-radius: 999px; background: #fff; color: var(--navy); font-family: var(--font-display); font-weight: 600; font-size: .82rem; }
+.navs { display: flex; gap: 8px; align-items: center; }
+.navs button { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08); color: #fff; cursor: pointer; transition: .2s; }
+.navs button:hover { background: #fff; color: var(--navy); transform: scale(1.06); }
+.navs .count { font-family: var(--font-display); font-size: .86rem; color: rgba(255, 255, 255, .75); margin-right: 6px; }
+.rail { display: grid; grid-auto-flow: column; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px 4px 26px; scrollbar-width: none; cursor: grab; scroll-behavior: smooth; }
+.rail::-webkit-scrollbar { display: none; }
+.rail.drag { cursor: grabbing; scroll-snap-type: none; scroll-behavior: auto; }
+.rail > * { scroll-snap-align: start; }
+.dots { display: flex; justify-content: center; gap: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .3); transition: .3s; }
+.dots i.on { width: 26px; background: var(--gold-2); }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; font-family: var(--font-display); font-size: .78rem; font-weight: 500; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.pulse::before { animation: ping 1.5s infinite; }
+
+/* ═════════ แบบ A · ตั๋วโดยสารสีสถานะ ═════════ */
+.a-card { width: 330px; border-radius: 26px; background: #fff; color: var(--ink); overflow: hidden; box-shadow: 0 26px 50px -24px rgba(0, 0, 0, .55); transition: transform .35s cubic-bezier(.2, .8, .2, 1); position: relative; }
+.a-card:hover { transform: translateY(-8px); }
+.a-top { position: relative; padding: 18px 20px 20px; color: #fff; background: linear-gradient(135deg, var(--c1), var(--c2)); overflow: hidden; }
+.a-top::after { content: ""; position: absolute; right: -40px; top: -50px; width: 170px; height: 170px; border-radius: 50%; background: rgba(255, 255, 255, .12); }
+.a-top::before { content: ""; position: absolute; right: 40px; bottom: -70px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255, 255, 255, .08); }
+.a-row { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; }
+.a-id { font-family: var(--font-display); font-size: .74rem; letter-spacing: .12em; opacity: .85; }
+.a-top .pill { background: rgba(255, 255, 255, .22); color: #fff; backdrop-filter: blur(6px); }
+.a-times { position: relative; z-index: 1; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-top: 16px; }
+.a-times b { font-family: var(--font-display); font-size: 1.9rem; font-weight: 600; line-height: 1; }
+.a-times small { display: block; font-size: .72rem; opacity: .8; }
+.a-line { position: relative; height: 30px; }
+.a-line::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed rgba(255, 255, 255, .55); }
+.a-line .fill { position: absolute; left: 0; top: calc(50% - 1.5px); height: 3px; border-radius: 3px; background: #fff; }
+.a-line .v { position: absolute; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--c2); box-shadow: 0 6px 14px -4px rgba(0, 0, 0, .35); }
+.a-line .v .i { width: 17px; height: 17px; }
+.a-perf { position: relative; height: 0; border-top: 2px dashed #e9e2d3; margin: 0 18px; }
+.a-perf::before, .a-perf::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: #222a69; }
+.a-perf::before { left: -30px; } .a-perf::after { right: -30px; }
+.a-body { padding: 16px 20px 20px; }
+.a-body h3 { font-size: 1.12rem; color: var(--navy); }
+.a-body .pl { color: var(--muted); font-size: .84rem; margin-top: 2px; display: flex; gap: 5px; align-items: center; }
+.a-body .pl .i { color: var(--gold); }
+.a-purpose { margin-top: 10px; padding: 9px 12px; border-radius: 12px; background: #fbf3e1; font-size: .86rem; border-left: 3px solid var(--gold); }
+.a-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.a-grid div { padding: 8px 10px; border-radius: 12px; background: #f6f4fb; font-size: .82rem; line-height: 1.4; }
+.a-grid small { display: block; color: var(--muted); font-size: .68rem; }
+.a-grid .full { grid-column: span 2; }
+.a-grid a { color: var(--navy); font-weight: 500; text-decoration: none; }
+.a-ppl { display: flex; gap: 8px; margin-top: 10px; }
+.a-ppl span { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: #eef0fa; font-size: .82rem; }
+.a-ppl b { font-family: var(--font-display); font-size: 1.15rem; color: var(--navy); }
+.a-ppl .i { color: var(--navy); }
+.night { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; background: #eef0ff; color: #3730a3; font-size: .74rem; margin-top: 8px; }
+
+/* ═════════ แบบ B · การ์ดไล่สีออโรรา ═════════ */
+.b-card { width: 320px; min-height: 430px; border-radius: 30px; padding: 22px; position: relative; overflow: hidden; color: #fff; background: linear-gradient(155deg, var(--c1) 0%, var(--c2) 55%, var(--c3) 100%); box-shadow: 0 30px 60px -26px var(--sh); transition: transform .35s cubic-bezier(.2, .8, .2, 1); display: flex; flex-direction: column; }
+.b-card:hover { transform: translateY(-8px) rotate(-.6deg); }
+.b-card::before { content: ""; position: absolute; width: 260px; height: 260px; right: -90px; top: -90px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 255, 255, .35), transparent); }
+.b-card::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, .14) 1px, transparent 1.2px); background-size: 14px 14px; mask-image: linear-gradient(200deg, #000, transparent 55%); -webkit-mask-image: linear-gradient(200deg, #000, transparent 55%); }
+.b-card > * { position: relative; z-index: 1; }
+.b-head { display: flex; justify-content: space-between; align-items: flex-start; }
+.b-time b { font-family: var(--font-display); font-weight: 600; font-size: 2.4rem; line-height: 1; display: block; }
+.b-time small { opacity: .85; font-size: .82rem; }
+.b-ring { position: relative; width: 64px; height: 64px; flex: none; }
+.b-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.b-ring circle { fill: none; stroke-width: 6; }
+.b-ring .t { stroke: rgba(255, 255, 255, .25); }
+.b-ring .p { stroke: #fff; stroke-linecap: round; transition: stroke-dashoffset 1s; }
+.b-ring span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-size: .78rem; font-weight: 600; text-align: center; line-height: 1.1; }
+.b-ring .ic { display: grid; place-items: center; }
+.b-ring .ic .i { width: 26px; height: 26px; }
+.b-card .pill { margin-top: 14px; align-self: flex-start; background: rgba(255, 255, 255, .2); color: #fff; backdrop-filter: blur(6px); }
+.b-card h3 { margin-top: 12px; font-size: 1.28rem; }
+.b-card .pl { opacity: .85; font-size: .86rem; margin-top: 2px; }
+.b-purpose { margin-top: 10px; font-size: .9rem; opacity: .95; }
+.b-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 16px; }
+.b-chips span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 12px; background: rgba(255, 255, 255, .16); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, .22); font-size: .8rem; }
+.b-chips span b { font-family: var(--font-display); }
+.b-chips .full { width: 100%; align-items: flex-start; }
+.b-chips em { font-style: normal; display: block; line-height: 1.5; } .b-chips .i { margin-top: 2px; } .b-chips a { white-space: nowrap; text-decoration: none; font-weight: 600; }
+.b-chips a { color: #fff; }
+
+/* ═════════ แบบ C · แกนเวลา + การ์ดห้อย ═════════ */
+.c-axis { position: relative; height: 60px; margin: 0 4px 6px; }
+.c-axis .bar { position: absolute; left: 0; right: 0; top: 30px; height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .14); }
+.c-axis .past { position: absolute; left: 0; top: 30px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--gold-2)); }
+.c-axis .tick { position: absolute; top: 0; transform: translateX(-50%); font-family: var(--font-display); font-size: .72rem; color: rgba(255, 255, 255, .6); }
+.c-axis .tick::after { content: ""; position: absolute; left: 50%; top: 22px; width: 1px; height: 22px; background: rgba(255, 255, 255, .2); }
+.c-axis .now { position: absolute; top: 18px; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; background: #ff8a3d; color: #fff; font-family: var(--font-display); font-size: .72rem; font-weight: 600; box-shadow: 0 0 0 6px rgba(255, 138, 61, .25); white-space: nowrap; }
+.c-axis .ev { position: absolute; top: 27px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; border: 3px solid var(--c); cursor: pointer; }
+.c-card { width: 300px; position: relative; padding-top: 22px; }
+.c-pin { position: absolute; top: 0; left: 28px; width: 2px; height: 22px; background: linear-gradient(var(--c), rgba(255, 255, 255, .2)); }
+.c-pin::before { content: ""; position: absolute; top: -5px; left: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 4px rgba(255, 255, 255, .15); }
+.c-box { border-radius: 22px; background: #fff; color: var(--ink); overflow: hidden; box-shadow: 0 24px 46px -24px rgba(0, 0, 0, .6); transition: transform .3s; }
+.c-card:hover .c-box { transform: translateY(-6px); }
+.c-top { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 16px 16px 12px; align-items: center; }
+.c-ic { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--c), var(--c2)); box-shadow: 0 10px 20px -10px var(--c); }
+.c-ic .i { width: 26px; height: 26px; }
+.c-top b { font-family: var(--font-display); font-size: 1.25rem; color: var(--navy); display: block; line-height: 1.2; }
+.c-top small { color: var(--muted); font-size: .78rem; }
+.c-count { margin: 0 16px; padding: 9px 12px; border-radius: 12px; font-family: var(--font-display); font-size: .84rem; display: flex; align-items: center; gap: 8px; background: var(--soft); color: var(--c); }
+.c-count .i { width: 16px; height: 16px; }
+.c-mid { padding: 12px 16px; }
+.c-mid h3 { font-size: 1.04rem; }
+.c-mid .pl { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+.c-route { margin-top: 10px; height: 46px; border-radius: 12px; background: #f6f1e4; position: relative; overflow: hidden; }
+.c-route svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.c-route path { fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 6 6; animation: flow 1.4s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -12; } }
+.c-foot { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px dashed #ece4d2; }
+.c-foot div { padding: 10px 12px; font-size: .78rem; line-height: 1.35; border-right: 1px dashed #ece4d2; }
+.c-foot div:last-child { border-right: 0; }
+.c-foot small { display: block; color: var(--muted); font-size: .66rem; }
+.c-foot b { font-family: var(--font-display); font-weight: 500; }
+.c-more { padding: 10px 16px 14px; font-size: .8rem; color: var(--muted); display: grid; gap: 3px; background: #fdfaf3; }
+.c-more span { display: flex; gap: 6px; align-items: flex-start; } .c-more .i { width: 14px; height: 14px; color: var(--gold); margin-top: 2px; }
+.c-more a { color: var(--navy); }
+@media (max-width: 640px) { .a-card, .b-card, .c-card { width: 82vw; } .variant { position: static; display: inline-block; margin-bottom: 10px; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap top">
+  <h1>เส้นทางการเดินทางวันนี้ · การ์ดเลื่อนซ้าย-ขวา 3 แบบ</h1>
+  <p>เลื่อนได้ 3 วิธี: กดปุ่มลูกศร ลากด้วยเมาส์ หรือปัดบนมือถือ · ข้อมูลในหน้านี้เป็นข้อมูลตัวอย่าง</p>
+  <div class="jump"><a href="#A">แบบ A · ตั๋วโดยสารสีสถานะ</a><a href="#B">แบบ B · การ์ดไล่สีออโรรา</a><a href="#C">แบบ C · แกนเวลา + การ์ดห้อย</a></div>
+</div>
+
+<section class="sec" id="A"><span class="variant">แบบ A · ตั๋วโดยสารสีสถานะ</span><div class="wrap">
+  <div class="sec-head"><div><span class="tag"><i></i>LIVE ROUTE · เรียลไทม์</span><h2>เส้นทางการเดินทางวันนี้<small class="cnt"></small></h2><p class="dt"></p></div><div class="navs"><span class="count"></span><button data-go="-1" aria-label="ก่อนหน้า"></button><button data-go="1" aria-label="ถัดไป"></button></div></div>
+  <div class="rail" id="railA"></div><div class="dots"></div>
+</div></section>
+
+<section class="sec" id="B"><span class="variant">แบบ B · การ์ดไล่สีออโรรา</span><div class="wrap">
+  <div class="sec-head"><div><span class="tag"><i></i>LIVE ROUTE · เรียลไทม์</span><h2>เส้นทางการเดินทางวันนี้<small class="cnt"></small></h2><p class="dt"></p></div><div class="navs"><span class="count"></span><button data-go="-1" aria-label="ก่อนหน้า"></button><button data-go="1" aria-label="ถัดไป"></button></div></div>
+  <div class="rail" id="railB"></div><div class="dots"></div>
+</div></section>
+
+<section class="sec" id="C"><span class="variant">แบบ C · แกนเวลา + การ์ดห้อย</span><div class="wrap">
+  <div class="sec-head"><div><span class="tag"><i></i>LIVE ROUTE · เรียลไทม์</span><h2>เส้นทางการเดินทางวันนี้<small class="cnt"></small></h2><p class="dt"></p></div><div class="navs"><span class="count"></span><button data-go="-1" aria-label="ก่อนหน้า"></button><button data-go="1" aria-label="ถัดไป"></button></div></div>
+  <div class="c-axis" id="axis"></div>
+  <div class="rail" id="railC"></div><div class="dots"></div>
+</div></section>
+
+<script>
+(() => {
+  const P = {
+    van: '<path d="M3 17V7.5A2.5 2.5 0 0 1 5.5 5H15l5.5 6.2V17h-1.6"/><path d="M3 11.5h17.5"/><path d="M9.5 5v6.5"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/><path d="M9 17.5h6"/>',
+    bus: '<path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>',
+    car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+    pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    teacher: '<circle cx="12" cy="6.5" r="3.5"/><path d="M5 21v-3a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v3"/>',
+    student: '<path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
+    wheel: '<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 14.2V21.5"/><path d="M9.9 11.4 2.8 9.6"/><path d="m14.1 11.4 7.1-1.8"/>',
+    moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>', check: '<path d="M20 6 9 17l-5-5"/>', clock: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7v5l3.2 2"/>',
+    l: '<path d="m15 6-6 6 6 6"/>', r: '<path d="m9 6 6 6-6 6"/>', flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'
+  };
+  const icon = n => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
+  // เวลาจำลอง: นอกเวลาทำการยึด 10:30 น.
+  const real = new Date(), hr = real.getHours();
+  const base = new Date(real); if (hr < 7 || hr > 16) base.setHours(10, 30, 0, 0); else base.setMinutes(real.getMinutes() < 30 ? 0 : 30, 0, 0);
+  const now = (hr < 7 || hr > 16) ? new Date(base) : real;
+  const at = h => new Date(base.getTime() + h * 36e5);
+  const T = [
+    { id: 'VR-2569-0099', s: at(-4.5), e: at(-1.5), st: 'done', dest: 'ท่าอากาศยานสุวรรณภูมิ', pl: 'บางพลี สมุทรปราการ', km: 144, pur: 'รับวิทยากรค่ายโอลิมปิกวิชาการ', req: 'ครูกนกวรรณ ศรีสุข', dept: 'กลุ่มสาระวิทยาศาสตร์ฯ', t: 1, n: 0, v: [['รถตู้ 01', '1นฌ 8758 กทม.', 'van']], d: [['นายสวง เพไร', '081-448-5831']] },
+    { id: 'VR-2569-0101', s: at(-1.5), e: at(5), st: 'live', dest: 'มหาวิทยาลัยเกษตรศาสตร์ บางเขน', pl: 'จตุจักร กรุงเทพฯ', km: 88, pur: 'ทัศนศึกษางานเกษตรแฟร์ ม.4', req: 'ครูธนพล วงศ์ใหญ่', dept: 'กลุ่มสาระวิทยาศาสตร์ฯ', t: 5, n: 40, v: [['รถบัสโดยสาร', '40-0889 ปทุมธานี', 'bus'], ['รถตู้ 02', '1นซ 1976 กทม.', 'van']], d: [['นายบุญทัน กองไธสง', '080-601-3159'], ['นายสวง เพไร', '081-448-5831']] },
+    { id: 'VR-2569-0098', s: at(-1), e: at(2.5), st: 'live', dest: 'สพม.ปทุมธานี', pl: 'เมืองปทุมธานี ปทุมธานี', km: 48, pur: 'ประชุมผู้บริหารสถานศึกษา', req: 'ครูวิไลพร มณีรัตน์', dept: 'ฝ่ายบริหารงานวิชาการ', t: 3, n: 0, v: [['รถตู้ 03', 'ฮล 4536 กทม.', 'van']], d: [['นายพัลลภ สุนทร', '062-451-3747']] },
+    { id: 'VR-2569-0102', s: at(1.5), e: at(5), st: 'ok', dest: 'อุทยานวิทยาศาสตร์ประเทศไทย (สวทช.)', pl: 'คลองหลวง ปทุมธานี', km: 62, pur: 'นำเสนอโครงงานวิทยาศาสตร์', req: 'ครูอรรถพล แก้วประเสริฐ', dept: 'กลุ่มสาระคณิตศาสตร์', t: 2, n: 10, v: [['รถตู้ 04', 'ฮจ 1618 กทม.', 'van']], d: [['นายมานะชัย จันทร์บำรุง', '085-385-3492']] },
+    { id: 'VR-2569-0103', s: at(2.5), e: at(6), st: 'ok', dest: 'กระทรวงศึกษาธิการ', pl: 'ดุสิต กรุงเทพฯ', km: 104, pur: 'ยื่นเอกสารโครงการห้องเรียนพิเศษ', req: 'ครูสุภาวดี ทองคำ', dept: 'ฝ่ายบริหารงานทั่วไป', t: 2, n: 0, v: [['รถเก๋ง', '3ขว 9163 กทม.', 'car']], d: [['นายนัดระพงษ์ ยืนบั่ง', '099-205-4081']] },
+    { id: 'VR-2569-0104', s: at(3.5), e: at(51.5), st: 'ok', dest: 'อุทยานแห่งชาติเขาใหญ่', pl: 'ปากช่อง นครราชสีมา', km: 330, pur: 'ค่ายวิทยาศาสตร์ธรรมชาติ ม.5', req: 'ครูปิยะนุช ใจดี', dept: 'กลุ่มสาระวิทยาศาสตร์ฯ', t: 3, n: 22, v: [['รถโดยสาร 6 ล้อ', '40-0686 ปทุมธานี', 'bus']], d: [['นายไชยวัฒน์ กุณฑล', '093-565-6662']], night: '3 วัน 2 คืน' },
+    { id: 'VR-2569-0113', s: at(5), e: at(8), st: 'wait', dest: 'มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต', pl: 'คลองหลวง ปทุมธานี', km: 24, pur: 'แข่งขันหุ่นยนต์ระดับภาค', req: 'ครูณัฐวุฒิ พรหมมา', dept: 'กลุ่มสาระการงานอาชีพ', t: 2, n: 6, v: [], d: [] }
+  ];
+  const ST = {
+    done: { l: 'กลับถึงแล้ว', a: ['#8e93ad', '#5f6587'], b: ['#9aa3c7', '#6b739b', '#4b5278'], sh: 'rgba(30,35,80,.6)', c: '#94a3b8', c2: '#64748b', soft: '#eef0f4' },
+    live: { l: 'กำลังเดินทาง', a: ['#ff9a4d', '#ea4f1f'], b: ['#ffb36b', '#f26a3c', '#c2366b'], sh: 'rgba(234,88,12,.7)', c: '#ea580c', c2: '#f59e0b', soft: '#fff1e6', pulse: 1 },
+    ok: { l: 'อนุมัติแล้ว', a: ['#4f5fd0', '#24307a'], b: ['#6d7cf0', '#3b47b8', '#24307a'], sh: 'rgba(36,48,122,.7)', c: '#3b47b8', c2: '#6d7cf0', soft: '#eef0fa' },
+    wait: { l: 'รอแอดมินจัดรถ', a: ['#e8c36a', '#b9861f'], b: ['#f5d98c', '#d9a43b', '#a9741a'], sh: 'rgba(201,150,43,.7)', c: '#c9962b', c2: '#e8c36a', soft: '#fbf3e1' }
+  };
+  const tm = d => d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  const when = d => same(d, now) ? tm(d) : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) + ' ' + tm(d);
+  const prog = t => t.st === 'done' ? 1 : t.st === 'live' ? Math.max(0, Math.min(1, (now - t.s) / (t.e - t.s))) : 0;
+  const dur = ms => { const m = Math.max(0, Math.round(ms / 6e4)), h = Math.floor(m / 60); return h ? `${h} ชม. ${m % 60} นาที` : `${m} นาที`; };
+  const countdown = t => t.st === 'live' ? `เหลืออีก ${dur(t.e - now)} ถึงโรงเรียน` : t.st === 'done' ? 'กลับถึงโรงเรียนเรียบร้อย' : `ออกในอีก ${dur(t.s - now)}`;
+  const vtxt = t => t.v.length ? t.v.map(v => `${v[0]} · ${v[1]}`).join('<br>') : 'รอแอดมินจัดรถ';
+  const dtxt = t => t.d.length ? t.d.map(d => `${d[0]} · <a href="tel:${d[1]}">${d[1]}</a>`).join('<br>') : '—';
+  const kind = t => (t.v[0] || [, , 'van'])[2];
+
+  // แบบ A
+  document.getElementById('railA').innerHTML = T.map(t => { const s = ST[t.st], p = prog(t); return `
+    <article class="a-card" style="--c1:${s.a[0]};--c2:${s.a[1]}">
+      <div class="a-top"><div class="a-row"><span class="a-id">${t.id}</span><span class="pill ${s.pulse ? 'pulse' : ''}">${s.l}</span></div>
+        <div class="a-times"><div><b class="num">${tm(t.s)}</b><small>ออกจากโรงเรียน</small></div>
+          <div class="a-line"><span class="fill" style="width:${p * 100}%"></span><span class="v" style="left:${p * 100}%">${icon(kind(t))}</span></div>
+          <div style="text-align:right"><b class="num">${tm(t.e)}</b><small>${same(t.s, t.e) ? 'กลับถึง' : when(t.e).split(' ').slice(0, 2).join(' ')}</small></div></div></div>
+      <div class="a-perf"></div>
+      <div class="a-body"><h3>${t.dest}</h3><p class="pl">${icon('pin')} ${t.pl} · ${t.km} กม. ไป-กลับ</p>
+        ${t.night ? `<span class="night">${icon('moon')} ค้างคืน ${t.night}</span>` : ''}
+        <div class="a-purpose">${t.pur}</div>
+        <div class="a-ppl"><span>${icon('teacher')} ครู <b>${t.t}</b></span><span>${icon('student')} นักเรียน <b>${t.n}</b></span></div>
+        <div class="a-grid"><div class="full"><small>ผู้ขอใช้รถ</small>${t.req} · ${t.dept}</div><div class="full"><small>รถ</small>${vtxt(t)}</div><div class="full"><small>คนขับ</small>${dtxt(t)}</div></div>
+      </div>
+    </article>`; }).join('');
+
+  // แบบ B
+  document.getElementById('railB').innerHTML = T.map(t => { const s = ST[t.st], p = prog(t), C = 2 * Math.PI * 27; return `
+    <article class="b-card" style="--c1:${s.b[0]};--c2:${s.b[1]};--c3:${s.b[2]};--sh:${s.sh}">
+      <div class="b-head"><div class="b-time"><b class="num">${tm(t.s)}</b><small>ถึง ${when(t.e)} น.</small></div>
+        <div class="b-ring"><svg viewBox="0 0 64 64"><circle class="t" cx="32" cy="32" r="27"/><circle class="p" cx="32" cy="32" r="27" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - p)}"/></svg><span>${t.st === 'live' ? Math.round(p * 100) + '%' : `<span class="ic">${icon(t.st === 'done' ? 'check' : t.st === 'wait' ? 'clock' : kind(t))}</span>`}</span></div></div>
+      <span class="pill ${s.pulse ? 'pulse' : ''}">${s.l} · ${countdown(t)}</span>
+      <h3>${t.dest}</h3><p class="pl">${t.pl} · ${t.km} กม. ไป-กลับ${t.night ? ` · ค้างคืน ${t.night}` : ''}</p>
+      <p class="b-purpose">${icon('flag')} ${t.pur}</p>
+      <div class="b-chips">
+        <span>${icon('teacher')} ครู <b>${t.t}</b></span><span>${icon('student')} นักเรียน <b>${t.n}</b></span>
+        <span class="full">${icon('user')}<em>${t.req} · ${t.dept}</em></span>
+        <span class="full">${icon(kind(t))}<em>${vtxt(t)}</em></span>
+        <span class="full">${icon('wheel')}<em>${dtxt(t)}</em></span>
+      </div>
+    </article>`; }).join('');
+
+  // แบบ C
+  const H0 = 6, H1 = 20, dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  const pos = d => Math.max(0, Math.min(100, ((d - dayStart) / 36e5 - H0) / (H1 - H0) * 100));
+  document.getElementById('axis').innerHTML = `<div class="bar"></div><div class="past" style="width:${pos(now)}%"></div>${Array.from({ length: 8 }, (_, i) => H0 + i * 2).map(h => `<span class="tick" style="left:${(h - H0) / (H1 - H0) * 100}%">${String(h).padStart(2, '0')}:00</span>`).join('')}${T.map((t, i) => `<span class="ev" data-i="${i}" title="${tm(t.s)} ${t.dest}" style="left:${pos(t.s)}%;--c:${ST[t.st].c}"></span>`).join('')}<span class="now" style="left:${pos(now)}%">ตอนนี้ ${tm(now)}</span>`;
+  const squig = i => { const y = [30, 16, 34, 20, 28, 12, 24][i % 7]; return `M10 ${y} C 60 ${46 - y}, 120 ${y}, 170 ${42 - y} S 260 ${y + 4}, 290 ${18 + (i % 3) * 6}`; };
+  document.getElementById('railC').innerHTML = T.map((t, i) => { const s = ST[t.st]; return `
+    <article class="c-card" style="--c:${s.c};--c2:${s.c2};--soft:${s.soft}">
+      <span class="c-pin"></span>
+      <div class="c-box">
+        <div class="c-top"><span class="c-ic">${icon(kind(t))}</span><div><b class="num">${tm(t.s)} – ${when(t.e)}</b><small>${t.id} · <span class="pill ${s.pulse ? 'pulse' : ''}" style="padding:1px 8px;background:${s.soft};color:${s.c}">${s.l}</span></small></div></div>
+        <div class="c-count">${icon('clock')} ${countdown(t)}</div>
+        <div class="c-mid"><h3>${t.dest}</h3><p class="pl">${t.pl} · ${t.km} กม.${t.night ? ` · ค้างคืน ${t.night}` : ''}</p>
+          <div class="c-route"><svg viewBox="0 0 300 46" preserveAspectRatio="none"><path d="${squig(i)}"/></svg></div></div>
+        <div class="c-foot"><div><small>ครู</small><b>${t.t} คน</b></div><div><small>นักเรียน</small><b>${t.n} คน</b></div><div><small>รถ</small><b>${t.v.length || '—'} คัน</b></div></div>
+        <div class="c-more"><span>${icon('flag')}${t.pur}</span><span>${icon('user')}${t.req}</span><span>${icon(kind(t))}${vtxt(t)}</span><span>${icon('wheel')}${dtxt(t)}</span></div>
+      </div>
+    </article>`; }).join('');
+
+  // ปุ่ม/ลาก/จุดบอกตำแหน่ง ของทุกแบบ
+  const dateTxt = now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.querySelectorAll('.sec').forEach(sec => {
+    const rail = sec.querySelector('.rail'), dots = sec.querySelector('.dots'), cnt = sec.querySelector('.count');
+    sec.querySelector('.dt').textContent = dateTxt;
+    sec.querySelector('.cnt').textContent = `${T.length} รายการ`;
+    const [bp, bn] = sec.querySelectorAll('.navs button'); bp.innerHTML = icon('l'); bn.innerHTML = icon('r');
+    const items = [...rail.children];
+    dots.innerHTML = items.map(() => '<i></i>').join('');
+    const step = () => (items[0].getBoundingClientRect().width + 18);
+    sec.querySelector('.navs').addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) rail.scrollBy({ left: +b.dataset.go * step(), behavior: 'smooth' }); });
+    const upd = () => { const i = Math.round(rail.scrollLeft / step()); dots.querySelectorAll('i').forEach((d, k) => d.classList.toggle('on', k === i)); cnt.textContent = `${Math.min(items.length, i + 1)} / ${items.length}`; };
+    rail.addEventListener('scroll', upd, { passive: true });
+    let down = false, sx = 0, sl = 0, moved = false;
+    rail.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') return; down = true; moved = false; sx = e.clientX; sl = rail.scrollLeft; rail.classList.add('drag'); });
+    addEventListener('pointermove', e => { if (!down) return; const dx = e.clientX - sx; if (Math.abs(dx) > 4) moved = true; rail.scrollLeft = sl - dx; });
+    addEventListener('pointerup', () => { if (!down) return; down = false; rail.classList.remove('drag'); const i = Math.round(rail.scrollLeft / step()); rail.scrollTo({ left: i * step(), behavior: 'smooth' }); });
+    rail.addEventListener('click', e => { if (moved) { e.preventDefault(); e.stopPropagation(); } }, true);
+    // เริ่มที่การ์ดที่กำลังเดินทาง
+    const first = T.findIndex(t => t.st === 'live');
+    setTimeout(() => { rail.style.scrollBehavior = 'auto'; rail.scrollLeft = Math.max(0, first) * step(); rail.style.scrollBehavior = ''; upd(); }, 50);
+  });
+  document.getElementById('axis').addEventListener('click', e => { const ev = e.target.closest('.ev'); if (!ev) return; const rail = document.getElementById('railC'); rail.scrollTo({ left: +ev.dataset.i * (rail.children[0].getBoundingClientRect().width + 18), behavior: 'smooth' }); });
+})();
+</script>
+</body>
+</html>
