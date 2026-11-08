@@ -11,8 +11,10 @@ service cloud.firestore {
     function signedIn() { return request.auth != null && request.auth.token.email != null; }
     function email() { return request.auth.token.email.lower(); }
     function provider() { return request.auth.token.firebase.sign_in_provider; }
-    function schoolGoogle() { return signedIn() && provider() == 'google.com' && request.auth.token.email_verified == true && email().matches('.*@pcshspt[.]ac[.]th$'); }
-    function bootstrap() { return signedIn() && email() in ['tripop@pcshspt.ac.th']; }
+    function googleVerified() { return signedIn() && provider() == 'google.com' && request.auth.token.email_verified == true; }
+    function schoolGoogle() { return googleVerified() && email().matches('.*@pcshspt[.]ac[.]th$'); }
+    // ผู้ดูแลระบบสูงสุดคนแรก (อีเมลนอกโรงเรียนได้ แต่ต้องเข้าด้วย Google เท่านั้น)
+    function bootstrap() { return googleVerified() && email() in ['carbooking.gad@gmail.com']; }
     function userPath(e) { return /databases/$(database)/documents/users/$(e); }
     function hasProfile() { return signedIn() && exists(userPath(email())); }
     function me() { return get(userPath(email())).data; }
@@ -28,9 +30,10 @@ service cloud.firestore {
     match /users/{userEmail} {
       allow read: if (signedIn() && userEmail == email()) || admin();
       // ครูเข้าระบบด้วย Google ครั้งแรก → สร้างโปรไฟล์ตัวเอง (สิทธิ์ครูเท่านั้น ยกเว้นผู้ดูแลระบบสูงสุดคนแรก)
-      allow create: if (signedIn() && userEmail == email() && schoolGoogle()
+      allow create: if (signedIn() && userEmail == email()
                         && request.resource.data.active == true
-                        && (request.resource.data.roles == ['teacher'] || (bootstrap() && request.resource.data.roles.hasAll(['superadmin']))))
+                        && ((schoolGoogle() && request.resource.data.roles == ['teacher'])
+                            || (bootstrap() && request.resource.data.roles.hasAll(['superadmin']))))
                     || (admin() && (sup() || noAdminRoles(request.resource.data.roles)));
       // แก้โปรไฟล์ตัวเองได้ แต่เปลี่ยนสิทธิ์/สถานะ/ผู้ให้บริการไม่ได้
       allow update: if (signedIn() && userEmail == email() && active() && unchanged(['roles', 'active', 'provider', 'email', 'driverId']))

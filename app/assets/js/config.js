@@ -13,14 +13,14 @@ window.APP_CONFIG = {
   domains: ['pcshspt.ac.th'],               // โดเมนอีเมลที่เข้าสู่ระบบด้วย Google ได้
   usernameDomain: 'vehicle.pcshspt.local',  // บัญชี username จะถูกแปลงเป็น <username>@vehicle.pcshspt.local (ไม่ต้องแก้)
   firebase: {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+    apiKey: 'AIzaSyC9NrI4yb5ecaI2L6n98SpGvP1nREt1HmQ',
+    authDomain: 'carbooking-ae9d8.firebaseapp.com',
+    projectId: 'carbooking-ae9d8',
+    storageBucket: 'carbooking-ae9d8.firebasestorage.app',
+    messagingSenderId: '758321103802',
+    appId: '1:758321103802:web:c87107905e7691e6955383'
   },
   appsScriptUrl: '',
   longdoKey: '',
-  bootstrapAdmins: ['tripop@pcshspt.ac.th']
+  bootstrapAdmins: ['carbooking.gad@gmail.com']   // เข้าด้วย Google ได้แม้ไม่ใช่อีเมลโรงเรียน
 };

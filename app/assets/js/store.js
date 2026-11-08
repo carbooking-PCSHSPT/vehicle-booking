@@ -396,6 +396,11 @@ const Store = (() => {
     if (!db.settings.categories) db.settings.categories = defaultSettings().categories;
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, db })); } catch (e) { console.warn('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม', e); if (typeof UI !== 'undefined') UI.toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม (โหมดทดลอง) ลองลบรูปบางส่วน', 'error'); } };
     save();
+    // เปิดหลายแท็บในเครื่องเดียว: แท็บหนึ่งบันทึก → แท็บอื่นเห็นทันที (โหมดจริงใช้ Firestore เรียลไทม์แทน)
+    window.addEventListener('storage', e => {
+      if (e.key !== KEY || !e.newValue) return;
+      try { const s = JSON.parse(e.newValue); if (s && s.v === 1) { db = s.db; if (me) me = user(me.email) || me; emit(); } } catch (err) { /* ข้าม */ }
+    });
     const sessKey = 'pcs-vehicle-session';
     const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id' };
     return {
@@ -417,6 +422,16 @@ const Store = (() => {
         if (me) me = user(me.email) || me;
         save(); emit();
       },
+      // อ่านฉบับล่าสุด → แก้ด้วย fn → บันทึก (also(col, id, data) = บันทึกเอกสารอื่นพร้อมกัน)
+      async update(col, id, fn) {
+        const k = cols[col], cur = db[col].find(x => x[k] === id);
+        if (!cur) throw new Error('ไม่พบข้อมูล อาจถูกลบไปแล้ว');
+        const extra = [];
+        const next = fn(clone(cur), (c, i, d) => extra.push([c, i, d]));
+        for (const [c, i, d] of extra) await this.put(c, i, d);
+        await this.put(col, id, next);
+        return next;
+      },
       async del(col, id) {
         if (col === 'vprivate') delete db.vprivate[id];
         else db[col] = db[col].filter(x => x[cols[col]] !== id);
@@ -433,7 +448,7 @@ const Store = (() => {
         email = String(email || '').toLowerCase();
         let u = user(email);
         if (!u) {
-          const okDomain = DOMAINS.some(d => email.endsWith('@' + d));
+          const okDomain = DOMAINS.some(d => email.endsWith('@' + d)) || BOOT.includes(email);
           if (!okDomain) throw new Error('ใช้ได้เฉพาะอีเมล @' + DOMAINS[0] + ' หรืออีเมลที่แอดมินเพิ่มไว้');
           u = { email, name: '', dept: '', phone: '', position: 'ครู', roles: BOOT.includes(email) ? ['teacher', 'admin', 'superadmin'] : ['teacher'], active: true, provider: 'google', needsProfile: true, createdAt: nowISO() };
           await this.put('users', email, u);
@@ -465,8 +480,23 @@ const Store = (() => {
     fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
     const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate' };
     const strip = o => JSON.parse(JSON.stringify(o));
-    let unsubs = [], reqMaps = {};
+    // แปลงข้อผิดพลาดของ Firestore เป็นข้อความที่ผู้ใช้เข้าใจ (ข้อผิดพลาดจากการตรวจข้อมูลของระบบส่งต่อตามเดิม)
+    const friendly = e => {
+      const c = String((e && e.code) || '');
+      if (/permission-denied/.test(c)) return new Error('ไม่มีสิทธิ์ทำรายการนี้ (หรือสถานะงานเปลี่ยนไปแล้ว ลองรีเฟรชหน้า)');
+      if (/unavailable|deadline-exceeded/.test(c) || /offline/i.test((e && e.message) || '')) return new Error('เชื่อมต่อฐานข้อมูลไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+      if (/aborted|failed-precondition/.test(c)) return new Error('มีผู้อื่นแก้ไขรายการนี้พร้อมกัน กรุณาลองใหม่');
+      return e;
+    };
+    const guard = p => p.catch(e => { throw friendly(e); });
+    let unsubs = [], reqMaps = {}, profileUnsub = null, warned = false;
     const stopAll = () => { unsubs.forEach(u => { try { u(); } catch (e) { /* ข้าม */ } }); unsubs = []; reqMaps = {}; };
+    const stopProfile = () => { if (profileUnsub) { try { profileUnsub(); } catch (e) { /* ข้าม */ } } profileUnsub = null; };
+    // ตัวรับฟังเรียลไทม์หลุด → แจ้งผู้ใช้ครั้งเดียว (ไม่ให้เห็นข้อมูลว่างโดยไม่รู้สาเหตุ)
+    const onErr = name => e => {
+      console.error('Firestore', name, e);
+      if (!warned && typeof UI !== 'undefined') { warned = true; UI.toast('โหลดข้อมูลบางส่วนไม่สำเร็จ: ' + friendly(e).message, 'error'); }
+    };
     const mergeReq = () => {
       const m = new Map();
       Object.values(reqMaps).forEach(mp => mp.forEach((v, k) => m.set(k, v)));
@@ -475,24 +505,24 @@ const Store = (() => {
     };
     function listenReq(name, q) {
       reqMaps[name] = new Map();
-      unsubs.push(q.onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); reqMaps[name] = mp; mergeReq(); }, e => console.error('requests', name, e)));
+      unsubs.push(q.onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); reqMaps[name] = mp; mergeReq(); }, onErr('requests/' + name)));
     }
     function startData() {
-      stopAll();
+      stopAll(); warned = false;
       const col = n => fs.collection(n);
-      unsubs.push(fs.collection('config').doc('settings').onSnapshot(s => { db = { ...db, settings: { ...defaultSettings(), ...(s.data() || {}) } }; emit(); }));
-      ['vehicles', 'drivers'].forEach(n => unsubs.push(col(n).onSnapshot(s => { db = { ...db, [n]: s.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0)) }; emit(); }, e => console.error(n, e))));
-      unsubs.push(col('places').orderBy('count', 'desc').limit(400).onSnapshot(s => { db = { ...db, places: s.docs.map(d => d.data()) }; emit(); }, e => console.error('places', e)));
+      unsubs.push(fs.collection('config').doc('settings').onSnapshot(s => { db = { ...db, settings: { ...defaultSettings(), ...(s.data() || {}) } }; emit(); }, onErr('config')));
+      ['vehicles', 'drivers'].forEach(n => unsubs.push(col(n).onSnapshot(s => { db = { ...db, [n]: s.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0)) }; emit(); }, onErr(n))));
+      unsubs.push(col('places').orderBy('count', 'desc').limit(400).onSnapshot(s => { db = { ...db, places: s.docs.map(d => d.data()) }; emit(); }, onErr('places')));
       if (isBack(me)) listenReq('all', col('requests'));
       else {
         listenReq('window', col('requests').where('endAt', '>=', new Date(Date.now() - 45 * DAY).toISOString()));
         listenReq('mine', col('requests').where('requester.email', '==', me.email));
       }
       if (isAdmin(me)) {
-        unsubs.push(col('users').onSnapshot(s => { db = { ...db, users: s.docs.map(d => d.data()) }; if (me) me = db.users.find(u => u.email === me.email) || me; emit(); }));
+        unsubs.push(col('users').onSnapshot(s => { db = { ...db, users: s.docs.map(d => d.data()) }; if (me) me = db.users.find(u => u.email === me.email) || me; emit(); }, onErr('users')));
       }
-      if (isBack(me)) unsubs.push(col('vehiclePrivate').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); db = { ...db, vprivate: o }; emit(); }));
-      if (isBack(me)) unsubs.push(col('ratings').onSnapshot(s => { db = { ...db, ratings: s.docs.map(d => d.data()) }; emit(); }));
+      if (isBack(me)) unsubs.push(col('vehiclePrivate').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); db = { ...db, vprivate: o }; emit(); }, onErr('vehiclePrivate')));
+      if (isBack(me)) unsubs.push(col('ratings').onSnapshot(s => { db = { ...db, ratings: s.docs.map(d => d.data()) }; emit(); }, onErr('ratings')));
     }
     async function loadMe(fu) {
       const email = String(fu.email || '').toLowerCase();
@@ -501,14 +531,23 @@ const Store = (() => {
       let u = snap && snap.exists ? snap.data() : null;
       const isGoogle = (fu.providerData || []).some(p => p.providerId === 'google.com');
       if (!u) {
-        const okDomain = isGoogle && DOMAINS.some(d => email.endsWith('@' + d));
+        const okDomain = isGoogle && (DOMAINS.some(d => email.endsWith('@' + d)) || BOOT.includes(email));
         if (!okDomain) throw new Error('บัญชีนี้ยังไม่ได้รับอนุญาตให้ใช้งาน (ใช้ได้เฉพาะอีเมล @' + DOMAINS[0] + ' หรืออีเมลที่แอดมินเพิ่มไว้)');
         u = { email, name: fu.displayName || '', dept: '', phone: '', position: 'ครู', roles: BOOT.includes(email) ? ['teacher', 'admin', 'superadmin'] : ['teacher'], active: true, provider: 'google', needsProfile: true, createdAt: nowISO(), photoURL: fu.photoURL || '' };
         await ref.set(u);
       }
       if (!u.active) throw new Error('บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อแอดมิน');
-      // ติดตามโปรไฟล์ตัวเอง (สิทธิ์เปลี่ยนแล้วมีผลทันที)
-      unsubs.push(ref.onSnapshot(s => { if (s.exists) { const was = JSON.stringify(me && me.roles); me = s.data(); if (was !== JSON.stringify(me.roles)) startData(); emit(); } }));
+      // ติดตามโปรไฟล์ตัวเอง (แยกจากตัวรับฟังข้อมูล ไม่ให้ startData ปิดทิ้ง)
+      // แอดมินเปลี่ยนสิทธิ์ → โหลดข้อมูลตามสิทธิ์ใหม่ทันที · ปิดการใช้งาน → ออกจากระบบทันที
+      stopProfile();
+      profileUnsub = ref.onSnapshot(s => {
+        if (!s.exists) return;
+        const was = JSON.stringify(me && me.roles);
+        me = s.data();
+        if (me.active === false) { authError = 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อแอดมิน'; auth.signOut(); return; }
+        if (authState === 'in' && was !== JSON.stringify(me.roles)) startData();
+        emit();
+      }, onErr('profile'));
       return u;
     }
     async function callScript(action, payload) {
@@ -526,21 +565,36 @@ const Store = (() => {
     return {
       async start() {
         auth.onAuthStateChanged(async fu => {
-          stopAll();
+          stopAll(); stopProfile();
           if (!fu) { me = null; authState = 'out'; db = emptyDb(); emit(); return; }
           try { me = await loadMe(fu); authError = ''; authState = 'in'; startData(); emit(); }
-          catch (e) { authError = e.message; me = null; authState = 'out'; await auth.signOut(); emit(); }
+          catch (e) { stopProfile(); authError = friendly(e).message; me = null; authState = 'out'; await auth.signOut(); emit(); }
         });
       },
       async put(col, id, data) {
-        if (col === 'settings') return fs.collection('config').doc('settings').set(strip(data));
-        return fs.collection(colName[col]).doc(id).set(strip(data));
+        if (col === 'settings') return guard(fs.collection('config').doc('settings').set(strip(data)));
+        return guard(fs.collection(colName[col]).doc(id).set(strip(data)));
       },
-      async del(col, id) { return fs.collection(colName[col]).doc(id).delete(); },
+      // แก้เอกสารแบบธุรกรรม: อ่านฉบับล่าสุดจากเซิร์ฟเวอร์ → fn แก้ → เขียน
+      // ถ้ามีเครื่องอื่นเขียนก่อน Firestore จะเรียก fn ใหม่กับข้อมูลล่าสุดเอง (ไม่มีการเขียนทับกัน)
+      // fn ต้องไม่มี async และอาจถูกเรียกซ้ำ · also(col, id, data) = เขียนเอกสารอื่นในธุรกรรมเดียวกัน
+      async update(col, id, fn) {
+        const ref = fs.collection(colName[col]).doc(id);
+        return guard(fs.runTransaction(async tx => {
+          const s = await tx.get(ref);
+          if (!s.exists) throw new Error('ไม่พบข้อมูล อาจถูกลบไปแล้ว');
+          const extra = [];
+          const next = fn(clone(s.data()), (c, i, d) => extra.push([c, i, d]));
+          extra.forEach(([c, i, d]) => tx.set(fs.collection(colName[c]).doc(i), strip(d)));
+          tx.set(ref, strip(next));
+          return next;
+        }));
+      },
+      async del(col, id) { return guard(fs.collection(colName[col]).doc(id).delete()); },
       async nextId(d) {
         const y = beYear(d || new Date());
         const ref = fs.collection('counters').doc(String(y));
-        const n = await fs.runTransaction(async tx => { const s = await tx.get(ref); const v = ((s.exists && s.data().n) || 0) + 1; tx.set(ref, { n: v }); return v; });
+        const n = await guard(fs.runTransaction(async tx => { const s = await tx.get(ref); const v = ((s.exists && s.data().n) || 0) + 1; tx.set(ref, { n: v }); return v; }));
         return `VR-${y}-${String(n).padStart(4, '0')}`;
       },
       async loginGoogle() {
@@ -570,11 +624,13 @@ const Store = (() => {
         catch (e) { throw new Error(/requires-recent-login/.test(e.code || '') ? 'กรุณาออกจากระบบแล้วเข้าใหม่ก่อนเปลี่ยนรหัสผ่าน' : /weak-password/.test(e.code || '') ? 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร' : e.message); }
         await fs.collection('users').doc(me.email).set({ mustChangePassword: false }, { merge: true });
       },
-      async upload(files) {
-        return Promise.all((files || []).map(async f => {
+      // ส่งไฟล์ใหม่ (dataURL) ไป Google Drive ผ่าน Apps Script · ไฟล์ที่อัปโหลดแล้ว (drive:...) ส่งต่อตามเดิม
+      // meta: kind = ประเภท (แยกโฟลเดอร์ใน Drive) · ref = เลขคำขอ/ชื่อรถ (ใช้ตั้งชื่อไฟล์) · label = คำอธิบายไฟล์
+      async upload(files, meta = {}) {
+        return Promise.all((files || []).map(async (f, i) => {
           const m = typeof f === 'string' && f.match(/^data:([^;]+);base64,(.+)$/);
           if (!m) return f;
-          const r = await callScript('upload', { mime: m[1], data: m[2] });
+          const r = await callScript('upload', { mime: m[1], data: m[2], kind: meta.kind || '', ref: meta.ref || '', label: meta.label || '', n: i + 1 });
           return 'drive:' + r.id;
         }));
       },
@@ -597,7 +653,14 @@ const Store = (() => {
   const H = (action, note = '') => ({ at: nowISO(), by: me.email, byName: me.name || me.email, action, note });
   const needAdmin = () => { if (!isAdmin(me)) throw new Error('เฉพาะแอดมินเท่านั้น'); };
   const driverEmailsOf = list => (list || []).map(a => (driver(a.driverId) || {}).email).filter(Boolean);
-  const saveReq = r => { r.updatedAt = nowISO(); r.status = rollup(r); r.driverEmails = driverEmailsOf(r.assignments); return A.put('requests', r.id, r).then(() => r); };
+  // ปิดท้ายทุกครั้งที่บันทึกคำขอ: เวลาแก้ไข + สถานะรวม
+  // driverEmails คำนวณใหม่เฉพาะแอดมิน (ผู้มอบหมายงาน) — กฎ Firestore ห้ามคนขับแตะฟิลด์นี้
+  const finishReq = r => { r.updatedAt = nowISO(); r.status = rollup(r); if (isAdmin(me) || !r.driverEmails) r.driverEmails = driverEmailsOf(r.assignments); return r; };
+  const createReq = r => A.put('requests', r.id, finishReq(r)).then(() => r);
+  // แก้คำขอที่มีอยู่: ใช้ข้อมูลล่าสุดจากฐานข้อมูลกลางเสมอ (ธุรกรรม) → หลายเครื่องกดพร้อมกันไม่ทับกัน
+  // fn(r, also) แก้ r แล้วคืนค่า · ตรวจสิทธิ์/สถานะใน fn อีกครั้งเพราะข้อมูลอาจเปลี่ยนจากเครื่องอื่น
+  const mutateReq = (id, fn) => A.update('requests', id, (r, also) => finishReq(fn(r, also) || r));
+  const MEMO = id => ({ kind: 'memo', ref: id, label: 'บันทึกข้อความ' });
   const cleanReqInput = (x) => ({
     category: String(x.category || ''), categoryOther: x.category === 'other' ? String(x.categoryOther || '').trim() : '',
     purpose: String(x.purpose || '').trim(), project: String(x.project || '').trim(),
@@ -649,63 +712,76 @@ const Store = (() => {
       const lead = +db.settings.leadDays || 0;
       if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ถ้าเร่งด่วน กรุณาติดต่อแอดมิน)`);
       if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
-      x.attachments = await A.upload(x.attachments);
+      // ออกเลขคำขอก่อน เพื่อตั้งชื่อไฟล์บันทึกข้อความใน Drive ด้วยเลขคำขอ (ค้นในโฟลเดอร์ได้ง่าย)
       const id = await A.nextId(x.startAt);
+      x.attachments = await A.upload(x.attachments, MEMO(id));
       const r = { id, createdAt: nowISO(), ...x, requester: { email: me.email, name: me.name, dept: me.dept, phone: me.phone }, status: 'pending', emergency: false, createdBy: me.email, history: [H('submit')], decision: null, assignments: [], expenses: [] };
-      await saveReq(r); rememberPlaces(x.destinations);
+      await createReq(r); rememberPlaces(x.destinations);
       return r;
     },
     async updateRequest(id, input) {
-      const r = clone(request(id));
-      if (!r) throw new Error('ไม่พบคำขอ');
       const admin = isAdmin(me);
-      if (!admin && (r.requester.email !== me.email || !['pending', 'revise'].includes(r.status))) throw new Error('แก้ไขได้เฉพาะคำขอที่ยังรอตรวจสอบหรือถูกส่งกลับให้แก้ไข');
+      const canEdit = r => admin || (r.requester.email === me.email && ['pending', 'revise'].includes(r.status));
+      const EDIT_MSG = 'แก้ไขได้เฉพาะคำขอที่ยังรอตรวจสอบหรือถูกส่งกลับให้แก้ไข';
+      const cur = request(id);
+      if (!cur) throw new Error('ไม่พบคำขอ');
+      if (!canEdit(cur)) throw new Error(EDIT_MSG);
       const x = cleanReqInput(input);
       checkCat(x);
       if (!admin) { const lead = +db.settings.leadDays || 0; if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน`); }
-      x.attachments = await A.upload(x.attachments);
-      const wasRevise = r.status === 'revise';
-      Object.assign(r, x);
-      if (!admin || r.requester.email === me.email) { if (wasRevise) r.status = 'pending'; r.history.push(H(wasRevise ? 'resubmit' : 'edit')); }
-      else r.history.push(H('edit', 'แอดมินแก้ไขข้อมูลคำขอ'));
-      await saveReq(r); rememberPlaces(x.destinations);
+      x.attachments = await A.upload(x.attachments, MEMO(id));
+      const r = await mutateReq(id, r => {
+        if (!canEdit(r)) throw new Error(EDIT_MSG + ' (สถานะเพิ่งเปลี่ยน)');
+        const wasRevise = r.status === 'revise';
+        Object.assign(r, x);
+        if (!admin || r.requester.email === me.email) { if (wasRevise) r.status = 'pending'; r.history.push(H(wasRevise ? 'resubmit' : 'edit')); }
+        else r.history.push(H('edit', 'แอดมินแก้ไขข้อมูลคำขอ'));
+        return r;
+      });
+      rememberPlaces(x.destinations);
       return r;
     },
     async cancelRequest(id, reason) {
-      const r = clone(request(id));
-      if (!r) throw new Error('ไม่พบคำขอ');
-      if (r.requester.email !== me.email && !isAdmin(me)) throw new Error('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
-      if (!['pending', 'revise', 'approved'].includes(r.status) || (r.assignments || []).some(a => a.status !== 'assigned')) throw new Error('ยกเลิกไม่ได้ เพราะรถออกเดินทางแล้ว');
-      r.status = 'cancelled'; r.cancel = { at: nowISO(), by: me.email, reason: String(reason || '').trim() };
-      r.history.push(H('cancel', reason));
-      return saveReq(r);
+      const check = r => {
+        if (!r) throw new Error('ไม่พบคำขอ');
+        if (r.requester.email !== me.email && !isAdmin(me)) throw new Error('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
+        if (!['pending', 'revise', 'approved'].includes(r.status) || (r.assignments || []).some(a => a.status !== 'assigned')) throw new Error('ยกเลิกไม่ได้ เพราะรถออกเดินทางแล้ว');
+      };
+      check(request(id));
+      return mutateReq(id, r => {
+        check(r);
+        r.status = 'cancelled'; r.cancel = { at: nowISO(), by: me.email, reason: String(reason || '').trim() };
+        r.history.push(H('cancel', reason));
+        return r;
+      });
     },
     // แอดมิน: อนุมัติ (มอบหมายรถหลายคัน) / ไม่อนุมัติ / ส่งกลับให้แก้ไข
     async decide(id, { action, note, assignments, category, categoryOther }) {
       needAdmin();
-      const r = clone(request(id));
-      if (!r) throw new Error('ไม่พบคำขอ');
-      if (category) { if (category === 'other' && !String(categoryOther || '').trim()) throw new Error('กรุณาระบุหมวดงาน (อื่น ๆ)'); if (category !== r.category || (categoryOther || '') !== (r.categoryOther || '')) { const was = catName(r); r.category = category; r.categoryOther = category === 'other' ? String(categoryOther).trim() : ''; r.history.push(H('edit', `แอดมินเปลี่ยนหมวดงาน: ${was} → ${catName(r)}`)); } }
+      if (!request(id)) throw new Error('ไม่พบคำขอ');
       note = String(note || '').trim();
-      if (action === 'approve') {
-        if (!assignments || !assignments.length) throw new Error('กรุณาเลือกรถอย่างน้อย 1 คัน');
-        const old = r.assignments || [];
-        r.assignments = assignments.map(a => {
-          const prev = old.find(o => o.vehicleId === a.vehicleId);
-          return { status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false, ...(prev || {}), vehicleId: a.vehicleId, driverId: a.driverId || '', note: String(a.note || '').trim() };
-        });
-        const was = r.status;
-        r.status = 'approved';
-        r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note };
-        r.history.push(H(['approved', 'ontrip'].includes(was) ? 'reassign' : 'approve', note));
-      } else if (action === 'reject' || action === 'revise') {
-        if (!note) throw new Error(action === 'reject' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' : 'กรุณาระบุสิ่งที่ต้องการให้แก้ไข');
-        r.status = action === 'reject' ? 'rejected' : 'revise';
-        r.assignments = [];
-        r.decision = { by: me.email, byName: me.name, at: nowISO(), action, note };
-        r.history.push(H(action, note));
-      } else throw new Error('คำสั่งไม่ถูกต้อง');
-      return saveReq(r);
+      return mutateReq(id, r => {
+        if (category) { if (category === 'other' && !String(categoryOther || '').trim()) throw new Error('กรุณาระบุหมวดงาน (อื่น ๆ)'); if (category !== r.category || (categoryOther || '') !== (r.categoryOther || '')) { const was = catName(r); r.category = category; r.categoryOther = category === 'other' ? String(categoryOther).trim() : ''; r.history.push(H('edit', `แอดมินเปลี่ยนหมวดงาน: ${was} → ${catName(r)}`)); } }
+        if (action === 'approve') {
+          if (!assignments || !assignments.length) throw new Error('กรุณาเลือกรถอย่างน้อย 1 คัน');
+          const old = r.assignments || [];
+          r.assignments = assignments.map(a => {
+            const prev = old.find(o => o.vehicleId === a.vehicleId);
+            return { status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false, ...(prev || {}), vehicleId: a.vehicleId, driverId: a.driverId || '', note: String(a.note || '').trim() };
+          });
+          const was = r.status;
+          r.status = 'approved';
+          r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note };
+          r.history.push(H(['approved', 'ontrip'].includes(was) ? 'reassign' : 'approve', note));
+        } else if (action === 'reject' || action === 'revise') {
+          if (!note) throw new Error(action === 'reject' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' : 'กรุณาระบุสิ่งที่ต้องการให้แก้ไข');
+          r.status = action === 'reject' ? 'rejected' : 'revise';
+          r.assignments = [];
+          r.decision = { by: me.email, byName: me.name, at: nowISO(), action, note };
+          r.history.push(H(action, note));
+        } else throw new Error('คำสั่งไม่ถูกต้อง');
+        return r;
+      });
     },
     // แอดมิน: บันทึกคำขอเองกรณีฉุกเฉิน (ไม่ติดกฎล่วงหน้า) และอนุมัติทันทีได้
     async createEmergency(input, { requester, assignments, note }) {
@@ -713,97 +789,104 @@ const Store = (() => {
       const x = cleanReqInput(input);
       checkCat(x);
       if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
-      x.attachments = await A.upload(x.attachments);
       const id = await A.nextId(x.startAt);
+      x.attachments = await A.upload(x.attachments, MEMO(id));
       const r = { id, createdAt: nowISO(), ...x, requester: { email: requester.email || '', name: requester.name, dept: requester.dept || '', phone: requester.phone || '' }, status: 'pending', emergency: true, createdBy: me.email, history: [H('emergency', 'บันทึกโดยแอดมิน (กรณีเร่งด่วน)')], decision: null, assignments: [], expenses: [] };
       if (assignments && assignments.length) {
         r.assignments = assignments.map(a => ({ vehicleId: a.vehicleId, driverId: a.driverId || '', note: String(a.note || '').trim(), status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false }));
         r.status = 'approved'; r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note: String(note || '').trim() };
         r.history.push(H('approve', note));
       }
-      await saveReq(r); rememberPlaces(x.destinations);
+      await createReq(r); rememberPlaces(x.destinations);
       return r;
     },
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
     async tripStatus(id, idx, status, { odo, at } = {}) {
-      const r = clone(request(id));
-      const a = r && r.assignments[idx];
-      if (!a) throw new Error('ไม่พบงาน');
-      const d = driver(a.driverId);
-      if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('เฉพาะคนขับของงานนี้หรือแอดมิน');
-      if (!['approved', 'ontrip', 'returned'].includes(r.status)) throw new Error('งานนี้ยังไม่ได้รับอนุมัติ');
       const when = at ? new Date(at).toISOString() : nowISO();
-      const vName = (vehicle(a.vehicleId) || {}).name || '';
-      if (status === 'ontrip') { a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo; r.history.push(H('depart', vName)); }
-      else if (status === 'returned') {
-        if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
-        a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName));
-      } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
-      return saveReq(r);
+      return mutateReq(id, r => {
+        const a = r.assignments && r.assignments[idx];
+        if (!a) throw new Error('ไม่พบงาน');
+        const d = driver(a.driverId);
+        if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('เฉพาะคนขับของงานนี้หรือแอดมิน');
+        if (!['approved', 'ontrip', 'returned'].includes(r.status)) throw new Error('งานนี้ยังไม่ได้รับอนุมัติ');
+        const vName = (vehicle(a.vehicleId) || {}).name || '';
+        if (status === 'ontrip') { a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo; r.history.push(H('depart', vName)); }
+        else if (status === 'returned') {
+          if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
+          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName));
+        } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
+        return r;
+      });
     },
     async setOdo(id, idx, { odoStart, odoEnd }) {
-      const r = clone(request(id)); const a = r && r.assignments[idx];
-      if (!a) throw new Error('ไม่พบงาน');
-      const d = driver(a.driverId);
-      if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('ไม่มีสิทธิ์');
-      a.odoStart = odoStart === '' || odoStart == null ? null : +odoStart; a.odoEnd = odoEnd === '' || odoEnd == null ? null : +odoEnd;
-      if (a.odoStart != null && a.odoEnd != null && a.odoEnd < a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
-      return saveReq(r);
+      return mutateReq(id, r => {
+        const a = r.assignments && r.assignments[idx];
+        if (!a) throw new Error('ไม่พบงาน');
+        const d = driver(a.driverId);
+        if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('ไม่มีสิทธิ์');
+        a.odoStart = odoStart === '' || odoStart == null ? null : +odoStart; a.odoEnd = odoEnd === '' || odoEnd == null ? null : +odoEnd;
+        if (a.odoStart != null && a.odoEnd != null && a.odoEnd < a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
+        return r;
+      });
     },
+    // ค่าน้ำมัน/ค่าใช้จ่าย: รูปใบเสร็จเก็บใน Google Drive (โฟลเดอร์ใบเสร็จ ตั้งชื่อตามเลขคำขอ)
     async saveExpense(id, ex) {
-      const r = clone(request(id));
-      if (!r) throw new Error('ไม่พบคำขอ');
-      const mine = (r.assignments || []).some(a => a.vehicleId === ex.vehicleId && (driver(a.driverId) || {}).email === me.email);
-      if (!isAdmin(me) && !mine) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
-      const photos = await A.upload(ex.photos || []);
+      const canAdd = r => isAdmin(me) || (r.assignments || []).some(a => a.vehicleId === ex.vehicleId && (driver(a.driverId) || {}).email === me.email);
+      const cur = request(id);
+      if (!cur) throw new Error('ไม่พบคำขอ');
+      if (!canAdd(cur)) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
+      const photos = await A.upload(ex.photos || [], { kind: 'receipt', ref: id, label: EXPENSE[ex.type] || 'ใบเสร็จ' });
       const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), by: me.email, byName: me.name, at: nowISO() };
-      r.expenses = r.expenses || [];
-      const i = r.expenses.findIndex(x => x.id === e.id);
-      if (i >= 0) r.expenses[i] = e; else r.expenses.push(e);
-      return saveReq(r);
+      return mutateReq(id, r => {
+        if (!canAdd(r)) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
+        r.expenses = r.expenses || [];
+        const i = r.expenses.findIndex(x => x.id === e.id);
+        if (i >= 0) r.expenses[i] = e; else r.expenses.push(e);
+        return r;
+      });
     },
     async removeExpense(id, exId) {
-      const r = clone(request(id));
-      const e = (r.expenses || []).find(x => x.id === exId);
-      if (!e) return;
-      if (!isAdmin(me) && e.by !== me.email) throw new Error('ไม่มีสิทธิ์ลบ');
-      r.expenses = r.expenses.filter(x => x.id !== exId);
-      return saveReq(r);
+      return mutateReq(id, r => {
+        const e = (r.expenses || []).find(x => x.id === exId);
+        if (!e) return r;                       // ถูกลบจากเครื่องอื่นไปแล้ว
+        if (!isAdmin(me) && e.by !== me.email) throw new Error('ไม่มีสิทธิ์ลบ');
+        r.expenses = r.expenses.filter(x => x.id !== exId);
+        return r;
+      });
     },
     async closeRequest(id, note) {
       needAdmin();
-      const r = clone(request(id));
-      if (!r || r.status !== 'returned') throw new Error('ปิดงานได้เมื่อรถทุกคันกลับถึงแล้ว');
-      r.status = 'closed'; r.closedAt = nowISO(); r.history.push(H('close', note));
-      await A.put('requests', r.id, { ...r, updatedAt: nowISO(), driverEmails: driverEmailsOf(r.assignments) });
-      return r;
+      return mutateReq(id, r => {
+        if (r.status !== 'returned') throw new Error('ปิดงานได้เมื่อรถทุกคันกลับถึงแล้ว');
+        r.status = 'closed'; r.closedAt = nowISO(); r.history.push(H('close', note));
+        return r;
+      });
     },
     async reopenRequest(id) {
       needAdmin();
-      const r = clone(request(id));
-      r.status = 'returned'; r.history.push(H('reopen'));
-      return saveReq(r);
+      return mutateReq(id, r => { r.status = 'returned'; r.history.push(H('reopen')); return r; });
     },
-    // ประเมินคนขับ (เก็บแยก ไม่ผูกชื่อผู้ประเมิน)
+    // ประเมินคนขับ (เก็บแยก ไม่ผูกชื่อผู้ประเมิน) — บันทึกผลประเมิน + ทำเครื่องหมาย "ประเมินแล้ว" ในธุรกรรมเดียว
+    // กันประเมินซ้ำเมื่อเปิดหลายเครื่อง และไม่มีผลประเมินค้างถ้าบันทึกไม่สำเร็จ
     async rate(id, idx, { scores, comment }) {
-      const r = clone(request(id)); const a = r && r.assignments[idx];
-      if (!a || r.requester.email !== me.email) throw new Error('ประเมินได้เฉพาะผู้ขอใช้รถ');
-      if (a.rated) throw new Error('ประเมินงานนี้แล้ว');
-      const rt = { id: uid('rt'), at: nowISO(), driverId: a.driverId, vehicleId: a.vehicleId, scores, comment: String(comment || '').trim() };
-      await A.put('ratings', rt.id, rt);
-      a.rated = true;
-      await A.put('requests', r.id, { ...r, updatedAt: nowISO() });
+      const rid = uid('rt'), at = nowISO(), text = String(comment || '').trim();
+      await mutateReq(id, (r, also) => {
+        const a = r.assignments && r.assignments[idx];
+        if (!a || r.requester.email !== me.email) throw new Error('ประเมินได้เฉพาะผู้ขอใช้รถ');
+        if (a.rated) throw new Error('ประเมินงานนี้แล้ว');
+        also('ratings', rid, { id: rid, at, driverId: a.driverId, vehicleId: a.vehicleId, scores, comment: text });
+        a.rated = true;
+        return r;
+      });
     },
     async skipRating(id, idx) {
-      const r = clone(request(id)); const a = r && r.assignments[idx];
-      if (!a) return; a.ratingSkipped = true;
-      await A.put('requests', r.id, { ...r, updatedAt: nowISO() });
+      await mutateReq(id, r => { const a = r.assignments && r.assignments[idx]; if (a) a.ratingSkipped = true; return r; });
     },
     // ── รถ ──
     async saveVehicle(v) {
       needAdmin();
       v = { ...v, id: v.id || uid('v'), seats: +v.seats || 0, no: +v.no || 0, type: KINDS[v.kind] || v.type || '', updatedAt: nowISO() };
-      v.photos = await A.upload(v.photos || []);
+      v.photos = await A.upload(v.photos || [], { kind: 'vehicle', ref: v.name || v.plate, label: 'รูปรถ' });
       if (v.order == null) v.order = db.vehicles.length;
       await A.put('vehicles', v.id, v); return v;
     },
@@ -815,8 +898,9 @@ const Store = (() => {
     async saveVehiclePrivate(id, data) {
       needAdmin();
       const d = clone(data);
-      for (const rp of d.repairs || []) rp.photos = await A.upload(rp.photos || []);
-      d.docs = await A.upload(d.docs || []);
+      const vn = (vehicle(id) || {}).name || id;
+      for (const rp of d.repairs || []) rp.photos = await A.upload(rp.photos || [], { kind: 'repair', ref: vn, label: rp.item || 'ใบเสร็จค่าซ่อม' });
+      d.docs = await A.upload(d.docs || [], { kind: 'vdoc', ref: vn, label: 'เอกสารรถ' });
       d.id = id; d.updatedAt = nowISO();
       await A.put('vprivate', id, d);
     },
@@ -824,7 +908,7 @@ const Store = (() => {
     async saveDriver(d) {
       needAdmin();
       d = { ...d, id: d.id || uid('d'), updatedAt: nowISO(), active: d.active !== false };
-      d.photo = (await A.upload(d.photo ? [d.photo] : []))[0] || '';
+      d.photo = (await A.upload(d.photo ? [d.photo] : [], { kind: 'driver', ref: d.name, label: 'รูปคนขับ' }))[0] || '';
       if (d.order == null) d.order = db.drivers.length;
       await A.put('drivers', d.id, d); return d;
     },
@@ -880,7 +964,7 @@ const Store = (() => {
     async saveSettings(s) {
       needAdmin();
       const x = clone(s);
-      for (const c of x.committee || []) c.photo = (await A.upload(c.photo ? [c.photo] : []))[0] || '';
+      for (const c of x.committee || []) c.photo = (await A.upload(c.photo ? [c.photo] : [], { kind: 'committee', ref: c.name || c.position, label: 'รูป' }))[0] || '';
       await A.put('settings', 'settings', { ...db.settings, ...x });
     },
     async deletePlace(id) { needAdmin(); await A.del('places', id); },
