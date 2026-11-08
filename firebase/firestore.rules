@@ -24,6 +24,18 @@ service cloud.firestore {
     function sup() { return role('superadmin'); }
     function back() { return admin() || role('executive'); }
     function unchanged(keys) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    // รายการรถที่มอบหมาย (assignments) — ตรวจทีละคัน ให้แก้ได้เฉพาะฟิลด์ที่กำหนด (รองรับสูงสุด 10 คันต่อคำขอ)
+    function asgOnly(i, keys) {
+      return i >= resource.data.assignments.size()
+        || request.resource.data.assignments[i].diff(resource.data.assignments[i]).affectedKeys().hasOnly(keys);
+    }
+    function asgAllOnly(keys) {
+      return request.resource.data.assignments.size() == resource.data.assignments.size()
+        && resource.data.assignments.size() <= 10
+        && asgOnly(0, keys) && asgOnly(1, keys) && asgOnly(2, keys) && asgOnly(3, keys) && asgOnly(4, keys)
+        && asgOnly(5, keys) && asgOnly(6, keys) && asgOnly(7, keys) && asgOnly(8, keys) && asgOnly(9, keys);
+    }
     function noAdminRoles(roles) { return !roles.hasAny(['admin', 'superadmin']); }
 
     // ───── ผู้ใช้ ─────
@@ -68,18 +80,25 @@ service cloud.firestore {
                         && request.resource.data.assignments.size() == 0
                         && request.resource.data.decision == null);
       allow update: if admin()
-                    // ผู้ขอ: แก้ไข/ส่งใหม่/ยกเลิก/ประเมิน — ห้ามแตะผลการพิจารณาและค่าใช้จ่าย
-                    || (active() && resource.data.requester.email == email()
-                        && unchanged(['requester', 'decision', 'expenses', 'emergency', 'createdBy', 'id'])
-                        && (request.resource.data.status == resource.data.status
-                            || request.resource.data.status in ['pending', 'cancelled'])
-                        && request.resource.data.assignments.size() == resource.data.assignments.size())
-                    // คนขับ: กดสถานะ เลขไมล์ ค่าน้ำมัน ของงานที่ตัวเองได้รับมอบหมาย
+                    // ผู้ขอ — ห้ามแตะผลการพิจารณา ค่าใช้จ่าย และรถ/คนขับที่แอดมินจัดให้
+                    || (active() && resource.data.requester.email == email() && (
+                        // 1) แก้ไข / ส่งใหม่ / ยกเลิก ระหว่างรอตรวจสอบหรือถูกส่งกลับให้แก้ไข
+                        (resource.data.status in ['pending', 'revise']
+                          && request.resource.data.status in ['pending', 'cancelled']
+                          && unchanged(['requester', 'decision', 'expenses', 'emergency', 'createdBy', 'createdAt', 'id', 'assignments', 'driverEmails']))
+                        // 2) ยกเลิกคำขอที่อนุมัติแล้ว (สถานะ approved = รถยังไม่ออกเดินทาง)
+                        || (resource.data.status == 'approved' && request.resource.data.status == 'cancelled'
+                          && changedOnly(['status', 'cancel', 'history', 'updatedAt']))
+                        // 3) ประเมินคนขับ / ข้ามการประเมิน — แก้ได้เฉพาะเครื่องหมาย rated, ratingSkipped
+                        || (request.resource.data.status == resource.data.status
+                          && changedOnly(['assignments', 'updatedAt'])
+                          && asgAllOnly(['rated', 'ratingSkipped']))))
+                    // คนขับ: กดออกเดินทาง/กลับถึง เลขไมล์ ค่าน้ำมัน — เปลี่ยนรถ/คนขับ/รายละเอียดคำขอไม่ได้
                     || (role('driver') && email() in resource.data.driverEmails
                         && resource.data.status in ['approved', 'ontrip', 'returned']
                         && request.resource.data.status in ['approved', 'ontrip', 'returned']
-                        && unchanged(['requester', 'decision', 'destinations', 'startAt', 'endAt', 'emergency', 'createdBy', 'id', 'driverEmails'])
-                        && request.resource.data.assignments.size() == resource.data.assignments.size());
+                        && changedOnly(['assignments', 'expenses', 'history', 'status', 'updatedAt'])
+                        && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd']));
       allow delete: if admin();
     }
 
