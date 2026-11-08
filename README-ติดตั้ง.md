@@ -31,7 +31,7 @@ demo/                 ← ต้นแบบดีไซน์ (ไม่ต้�
 | 5 | อัปโหลดเว็บขึ้น GitHub Pages + เพิ่ม Authorized domain | ✅ https://carbooking-pcshspt.github.io/vehicle-booking/ |
 | 6 | เข้าระบบครั้งแรกด้วย carbooking.gad@gmail.com + นำเข้าข้อมูลเริ่มต้น | ✅ เสร็จแล้ว |
 | 7 | Apps Script (เก็บไฟล์ลง Google Drive) — ไดรฟ์ที่แชร์ "งานยานพาหนะ" | ✅ เสร็จแล้ว (ยังไม่ได้ตั้งค่า GCP project สำหรับปุ่มตั้งรหัสผ่านใหม่) |
-| 8 | Longdo Map (ไม่บังคับ) | ☐ |
+| 8 | Longdo Map (ไม่บังคับ) | ✅ key แพ็กเกจ Free · โดเมน carbooking-pcshspt.github.io (จัดการที่ https://api.longdo.com/console/) |
 | 9 | ทดสอบ 2 เครื่อง | ☐ |
 
 **ข้อมูลโปรเจกต์ (ใช้อ้างอิง)**
