@@ -22,7 +22,7 @@ const CONFIG = {
   // ที่เก็บไฟล์: ใส่ ID โฟลเดอร์ใน "ไดรฟ์ที่แชร์ (Shared drive)" ของโรงเรียน (แนะนำ — ไฟล์เป็นของโรงเรียน ไม่หายเมื่อบุคลากรย้าย)
   // ID คือส่วนท้ายของลิงก์โฟลเดอร์ https://drive.google.com/drive/folders/<ID>
   // เว้นว่าง = สร้างโฟลเดอร์ ROOT_FOLDER_NAME ใน "ไดรฟ์ของฉัน" ของบัญชีที่ Deploy สคริปต์
-  ROOT_FOLDER_ID: '',
+  ROOT_FOLDER_ID: '1htp9wDTNf6m7zY4T01leHnOdOoz_BgEM',   // ไดรฟ์ที่แชร์ "งานยานพาหนะ" › ระบบยานพาหนะ - ไฟล์
   ROOT_FOLDER_NAME: 'ระบบยานพาหนะ - ไฟล์',
   MAX_BYTES: 8 * 1024 * 1024                  // ไฟล์ละไม่เกิน 8 MB (เว็บย่อรูปให้ก่อนส่งอยู่แล้ว)
 };
@@ -101,7 +101,7 @@ function saveFile(body, user) {
   return file.getId() + (ext === 'pdf' ? '#pdf' : '');
 }
 // เก็บเฉพาะตัวอักษรไทย/อังกฤษ/ตัวเลข/ช่องว่าง . - (กันชื่อไฟล์แปลก ๆ)
-function safeName(s) { return String(s || '').replace(/[^\w฀-๿ .\-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); }
+function safeName(s) { return String(s || '').replace(/[^\w\u0E00-\u0E7F .\-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); }
 function readFile(id) {
   id = String(id || '').replace(/#pdf$/, '');
   if (!/^[\w-]{10,}$/.test(id)) throw new Error('ไม่พบไฟล์');

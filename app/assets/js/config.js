@@ -20,7 +20,7 @@ window.APP_CONFIG = {
     messagingSenderId: '758321103802',
     appId: '1:758321103802:web:c87107905e7691e6955383'
   },
-  appsScriptUrl: '',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwA2EJ2hWbVKr5ZcO9J0jSSz_VCJWt-Pi3gjrAH7sgZjdF6j3kkxZ9EqUZMV0NRBqJsqA/exec',
   longdoKey: '',
   bootstrapAdmins: ['carbooking.gad@gmail.com']   // เข้าด้วย Google ได้แม้ไม่ใช่อีเมลโรงเรียน
 };

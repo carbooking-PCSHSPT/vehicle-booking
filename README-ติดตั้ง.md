@@ -25,12 +25,12 @@ demo/                 ← ต้นแบบดีไซน์ (ไม่ต้�
 | | ขั้นตอน | สถานะ |
 |---|---|---|
 | 1 | สร้างโปรเจกต์ Firebase `carbooking` (ID `carbooking-ae9d8`) | ✅ เสร็จแล้ว |
-| 2 | เปิด Authentication (Google + Email/Password) | ☐ |
-| 3 | สร้าง Firestore + วางกฎ `firestore.rules` → Publish | ☐ |
+| 2 | เปิด Authentication (Google + Email/Password) | ✅ เสร็จแล้ว |
+| 3 | สร้าง Firestore + วางกฎ `firestore.rules` → Publish | ✅ เสร็จแล้ว |
 | 4 | ใส่ค่า Firebase ใน `config.js` และ `Code.gs` | ✅ เสร็จแล้ว |
-| 5 | อัปโหลดเว็บขึ้น GitHub Pages + เพิ่ม Authorized domain | ☐ |
-| 6 | เข้าระบบครั้งแรกด้วย carbooking.gad@gmail.com + นำเข้าข้อมูลเริ่มต้น | ☐ |
-| 7 | Apps Script (เก็บไฟล์ลง Google Drive) | ☐ |
+| 5 | อัปโหลดเว็บขึ้น GitHub Pages + เพิ่ม Authorized domain | ✅ https://carbooking-pcshspt.github.io/vehicle-booking/ |
+| 6 | เข้าระบบครั้งแรกด้วย carbooking.gad@gmail.com + นำเข้าข้อมูลเริ่มต้น | ✅ เสร็จแล้ว |
+| 7 | Apps Script (เก็บไฟล์ลง Google Drive) — ไดรฟ์ที่แชร์ "งานยานพาหนะ" | ✅ เสร็จแล้ว (ยังไม่ได้ตั้งค่า GCP project สำหรับปุ่มตั้งรหัสผ่านใหม่) |
 | 8 | Longdo Map (ไม่บังคับ) | ☐ |
 | 9 | ทดสอบ 2 เครื่อง | ☐ |
 
