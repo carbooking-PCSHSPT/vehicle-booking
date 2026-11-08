@@ -656,6 +656,16 @@ const Store = (() => {
   // ปิดท้ายทุกครั้งที่บันทึกคำขอ: เวลาแก้ไข + สถานะรวม
   // driverEmails คำนวณใหม่เฉพาะแอดมิน (ผู้มอบหมายงาน) — กฎ Firestore ห้ามคนขับแตะฟิลด์นี้
   const finishReq = r => { r.updatedAt = nowISO(); r.status = rollup(r); if (isAdmin(me) || !r.driverEmails) r.driverEmails = driverEmailsOf(r.assignments); return r; };
+  // ผูก/เปลี่ยนอีเมลคนขับ (เช่น สร้างบัญชีให้คนขับหลังอนุมัติงานไปแล้ว) → อัปเดต driverEmails ในงานที่ยังไม่จบ
+  // ไม่งั้นคนขับกดออกเดินทาง/กลับถึงไม่ได้ เพราะกฎ Firestore ตรวจสิทธิ์คนขับจาก driverEmails
+  async function syncDriverEmails(driverId, email) {
+    if (!isAdmin(me) || !driverId) return;
+    const emailOfA = a => a.driverId === driverId ? email : (driver(a.driverId) || {}).email;
+    const open = db.requests.filter(r => ['approved', 'ontrip', 'returned'].includes(r.status) && (r.assignments || []).some(a => a.driverId === driverId));
+    for (const r of open) {
+      await A.update('requests', r.id, x => ({ ...x, driverEmails: (x.assignments || []).map(emailOfA).filter(Boolean), updatedAt: nowISO() }));
+    }
+  }
   const createReq = r => A.put('requests', r.id, finishReq(r)).then(() => r);
   // แก้คำขอที่มีอยู่: ใช้ข้อมูลล่าสุดจากฐานข้อมูลกลางเสมอ (ธุรกรรม) → หลายเครื่องกดพร้อมกันไม่ทับกัน
   // fn(r, also) แก้ r แล้วคืนค่า · ตรวจสิทธิ์/สถานะใน fn อีกครั้งเพราะข้อมูลอาจเปลี่ยนจากเครื่องอื่น
@@ -910,7 +920,10 @@ const Store = (() => {
       d = { ...d, id: d.id || uid('d'), updatedAt: nowISO(), active: d.active !== false };
       d.photo = (await A.upload(d.photo ? [d.photo] : [], { kind: 'driver', ref: d.name, label: 'รูปคนขับ' }))[0] || '';
       if (d.order == null) d.order = db.drivers.length;
-      await A.put('drivers', d.id, d); return d;
+      const prevEmail = (driver(d.id) || {}).email || '';
+      await A.put('drivers', d.id, d);
+      if ((d.email || '') !== prevEmail) await syncDriverEmails(d.id, d.email || '');
+      return d;
     },
     async deleteDriver(id) {
       needAdmin();
@@ -929,7 +942,7 @@ const Store = (() => {
       if (x.active == null) x.active = true;
       if (!LOCAL) delete x.password;
       await A.put('users', x.email, x);
-      if (x.driverId) { const d = driver(x.driverId); if (d && d.email !== x.email) await A.put('drivers', d.id, { ...d, email: x.email }); }
+      if (x.driverId) { const d = driver(x.driverId); if (d && d.email !== x.email) { await A.put('drivers', d.id, { ...d, email: x.email }); await syncDriverEmails(d.id, x.email); } }
       return x;
     },
     async createUsernameAccount({ username, password, name, roles, driverId, phone }) {
@@ -943,7 +956,7 @@ const Store = (() => {
       const u = { email, name: String(name || '').trim(), dept: roles.includes('driver') ? 'งานยานพาหนะ' : 'ฝ่ายบริหารงานทั่วไป', phone: phone || '', position: roles.includes('driver') ? 'พนักงานขับรถ' : 'เจ้าหน้าที่', roles, active: true, provider: 'username', mustChangePassword: true, driverId: driverId || '', createdAt: nowISO(), createdBy: me.email };
       if (LOCAL) u.password = password;
       await A.put('users', email, u);
-      if (driverId) { const d = driver(driverId); if (d) await A.put('drivers', d.id, { ...d, email }); }
+      if (driverId) { const d = driver(driverId); if (d) { await A.put('drivers', d.id, { ...d, email }); await syncDriverEmails(d.id, email); } }
       return u;
     },
     async resetPassword(email, password) {

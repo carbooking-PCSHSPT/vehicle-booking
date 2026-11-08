@@ -1,6 +1,6 @@
 # ระบบยานพาหนะ ขอรถส่วนกลาง — คู่มือติดตั้ง
 
-> อัปเดตล่าสุด: 7 พ.ย. 2569 · ใช้กับ Firebase Console หน้าตาใหม่ (เมนูซ้ายแบ่งเป็น Databases & Storage / Security / …)
+> อัปเดตล่าสุด: 8 พ.ย. 2569 · ใช้กับ Firebase Console หน้าตาใหม่ (เมนูซ้ายแบ่งเป็น Databases & Storage / Security / …)
 
 ระบบประกอบด้วย 4 ส่วน
 | ส่วน | หน้าที่ |
@@ -30,9 +30,9 @@ demo/                 ← ต้นแบบดีไซน์ (ไม่ต้�
 | 4 | ใส่ค่า Firebase ใน `config.js` และ `Code.gs` | ✅ เสร็จแล้ว |
 | 5 | อัปโหลดเว็บขึ้น GitHub Pages + เพิ่ม Authorized domain | ✅ https://carbooking-pcshspt.github.io/vehicle-booking/ |
 | 6 | เข้าระบบครั้งแรกด้วย carbooking.gad@gmail.com + นำเข้าข้อมูลเริ่มต้น | ✅ เสร็จแล้ว |
-| 7 | Apps Script (เก็บไฟล์ลง Google Drive) — ไดรฟ์ที่แชร์ "งานยานพาหนะ" | ✅ เสร็จแล้ว (ยังไม่ได้ตั้งค่า GCP project สำหรับปุ่มตั้งรหัสผ่านใหม่) |
+| 7 | Apps Script (เก็บไฟล์ลง Google Drive) — ไดรฟ์ที่แชร์ "งานยานพาหนะ" | ✅ เสร็จแล้ว · ปุ่มตั้งรหัสผ่านใหม่ใช้ได้ (8 พ.ย. 2569 — วาง appsscript.json ที่มี scope cloud-platform แล้ว ไม่ต้องผูก GCP project) |
 | 8 | Longdo Map (ไม่บังคับ) | ✅ key แพ็กเกจ Free · โดเมน carbooking-pcshspt.github.io (จัดการที่ https://api.longdo.com/console/) |
-| 9 | ทดสอบ 2 เครื่อง | ☐ |
+| 9 | ทดสอบ 2 เครื่อง (เรียลไทม์ · ไฟล์แนบ · คนขับออกเดินทาง/ค่าน้ำมัน/กลับถึง · ประเมินคนขับ) | ✅ เสร็จแล้ว 8 พ.ย. 2569 |
 
 **ข้อมูลโปรเจกต์ (ใช้อ้างอิง)**
 | รายการ | ค่า |
@@ -90,7 +90,7 @@ demo/                 ← ต้นแบบดีไซน์ (ไม่ต้�
 - `apps-script/Code.gs` → `FIREBASE_API_KEY`, `FIREBASE_PROJECT: 'carbooking-ae9d8'`
 - `firebase/firestore.rules` → `bootstrap()` = `carbooking.gad@gmail.com`
 
-ยังว่างอยู่ (ใส่ภายหลัง): `appsScriptUrl` (ขั้นตอนที่ 7) · `longdoKey` (ขั้นตอนที่ 8)
+ใส่แล้วเช่นกัน: `appsScriptUrl` (ขั้นตอนที่ 7) · `longdoKey` (ขั้นตอนที่ 8)
 
 > ค่า Firebase ในเว็บเปิดเผยได้ตามปกติ ความปลอดภัยอยู่ที่กฎ `firestore.rules`
 > **เปลี่ยนผู้ดูแลระบบสูงสุดคนแรก** ต้องแก้ 2 ที่ให้ตรงกัน: `bootstrapAdmins` ใน `config.js` และ `bootstrap()` ใน `firestore.rules` (แล้ววางกฎใหม่ + Publish)
@@ -181,6 +181,8 @@ demo/                 ← ต้นแบบดีไซน์ (ไม่ต้�
 | เข้าด้วย carbooking.gad@gmail.com แล้วไม่ได้เป็นผู้ดูแลระบบสูงสุด | ต้องเข้าด้วย**ปุ่ม Google** ไม่ใช่ช่องชื่อผู้ใช้/รหัสผ่าน · ตรวจว่า Publish กฎฉบับที่มี carbooking.gad@gmail.com แล้ว |
 | แนบไฟล์แล้วขึ้น "ยังไม่ได้ตั้งค่าที่เก็บไฟล์" | ยังไม่ใส่ `appsScriptUrl` ใน `config.js` (ขั้นตอน 7) |
 | แนบไฟล์แล้วขึ้น "เชื่อมต่อ Apps Script ไม่ได้" | Deploy ไม่ได้ตั้ง Who has access = **Anyone** หรือ URL ไม่ใช่ตัวลงท้าย `/exec` |
+| คนขับกด "ออกเดินทาง" แล้วขึ้น "ไม่มีสิทธิ์ทำรายการนี้" | สร้างบัญชีคนขับหลังอนุมัติงานไปแล้ว (เว็บเวอร์ชันก่อน `?v=2026-11-08c`) → แอดมินเปิดคำขอนั้น → กด **บันทึกการเปลี่ยนแปลง** 1 ครั้ง · เวอร์ชันใหม่อัปเดตให้อัตโนมัติตอนสร้างบัญชี |
+| ตั้งรหัสผ่านใหม่แล้วขึ้น `403 ... insufficient authentication scopes` | ใน Apps Script ยังไม่มี/ยังไม่ได้วาง `appsscript.json` (ต้องมี scope `cloud-platform`) → ขั้นตอน 7 ข้อ 3 → Run `authorize` → Allow → Deploy เวอร์ชันใหม่ |
 | แก้ Code.gs แล้วไม่มีผล | ต้อง Manage deployments → Edit → **New version** |
 | Push แล้วเว็บยังเป็นของเก่า | เบราว์เซอร์จำไฟล์เก่าไว้ (สูงสุด ~10 นาที) → เปิดหน้าต่างไม่ระบุตัวตน หรือรอ · ทุกครั้งที่แก้ไฟล์ใน `app/assets/` ให้เปลี่ยนเลข `?v=...` ใน `app/index.html` ด้วย เครื่องผู้ใช้จะได้ไฟล์ใหม่ทันที |
 
