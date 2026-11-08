@@ -160,7 +160,8 @@ const Maps = (() => {
           const init = () => {
             if (done) return; done = true;
             const c = cur.lat != null ? { lon: cur.lng, lat: cur.lat } : { lon: s.lng, lat: s.lat };
-            step('center', () => { map.location(c, true); map.zoom(cur.lat != null ? 14 : 10, true); });
+            // ไม่ใช้แอนิเมชัน — ถ้าเลื่อนแบบมีแอนิเมชันแล้วซูมต่อทันที การซูมจะตัดการเลื่อนกลางทาง
+            step('center', () => { map.zoom(cur.lat != null ? 14 : 11, false); map.location(c, false); });
             step('school', () => map.Overlays.add(new L.Marker({ lon: s.lng, lat: s.lat }, { title: 'โรงเรียน', icon: { html: '<div class="school-mk">🏫</div>', offset: { x: 14, y: 14 } } })));
             if (cur.lat != null) addMarker();
             step('click', () => map.Event.bind('click', () => {
