@@ -145,21 +145,35 @@ const Maps = (() => {
           if (sv) { const p = Store.db.places.find(x => x.id === sv.dataset.saved); setPoint({ ...p }); if (p.lat == null) { setF('#pkKm', p.km); setF('#pkMin', p.mins); } res.innerHTML = ''; }
           if (fd) { setPoint(res._found[+fd.dataset.found]); res.innerHTML = ''; }
         });
+        const mapFail = e => {
+          const box = el.querySelector('#pkMap'); if (!box) return;
+          const h = box.querySelector('.pk-map-hint');
+          if (h) h.innerHTML = `${icon('alert')} โหลดแผนที่ไม่สำเร็จ — กรอกข้อมูลเองได้`;
+          console.warn('Longdo Map:', e);
+        };
         if (enabled) loadSdk().then(L => {
           const box = el.querySelector('#pkMap');
-          map = new L.Map({ placeholder: box, language: 'th' });
-          const c = cur.lat != null ? { lon: cur.lng, lat: cur.lat } : { lon: s.lng, lat: s.lat };
-          map.location(c, true); map.zoom(cur.lat != null ? 14 : 10, true);
-          try { map.Overlays.add(new L.Marker({ lon: s.lng, lat: s.lat }, { title: 'โรงเรียน', icon: { html: '<div class="school-mk">🏫</div>', offset: { x: 14, y: 14 } } })); } catch (e) { /* ข้าม */ }
-          if (cur.lat != null) addMarker();
-          map.Event.bind('click', () => {
-            const loc = map.location(L.LocationMode.Pointer);
-            if (marker) { try { map.Overlays.remove(marker); } catch (e) { /* ข้าม */ } }
-            cur.lat = loc.lat; cur.lng = loc.lon; addMarker();
-            setPoint({ lat: loc.lat, lng: loc.lon }, { fromMap: true });
-          });
-          map.Event.bind('overlayDrop', o => { try { const loc = o.location(); setPoint({ lat: loc.lat, lng: loc.lon }, { fromMap: true }); } catch (e) { /* ข้าม */ } });
-        }).catch(e => { el.querySelector('#pkMap').innerHTML = `<div class="pk-map-hint">${icon('alert')} โหลดแผนที่ไม่สำเร็จ — กรอกข้อมูลเองได้</div>`; console.warn(e); });
+          try { map = new L.Map({ placeholder: box, language: 'th' }); } catch (e) { return mapFail(e); }
+          // ตั้งค่าแผนที่หลังแผนที่พร้อม (เรียกก่อนพร้อมจะ error) · แต่ละขั้นแยก try ขั้นหนึ่งพลาดขั้นอื่นยังทำงาน
+          const step = (name, fn) => { try { fn(); } catch (e) { console.warn('Longdo Map: ' + name, e); } };
+          let done = false;
+          const init = () => {
+            if (done) return; done = true;
+            const c = cur.lat != null ? { lon: cur.lng, lat: cur.lat } : { lon: s.lng, lat: s.lat };
+            step('center', () => { map.location(c, true); map.zoom(cur.lat != null ? 14 : 10, true); });
+            step('school', () => map.Overlays.add(new L.Marker({ lon: s.lng, lat: s.lat }, { title: 'โรงเรียน', icon: { html: '<div class="school-mk">🏫</div>', offset: { x: 14, y: 14 } } })));
+            if (cur.lat != null) addMarker();
+            step('click', () => map.Event.bind('click', () => {
+              const loc = map.location(L.LocationMode.Pointer);
+              if (marker) { try { map.Overlays.remove(marker); } catch (e) { /* ข้าม */ } }
+              cur.lat = loc.lat; cur.lng = loc.lon; addMarker();
+              setPoint({ lat: loc.lat, lng: loc.lon }, { fromMap: true });
+            }));
+            step('drop', () => map.Event.bind('overlayDrop', o => { try { const loc = o.location(); setPoint({ lat: loc.lat, lng: loc.lon }, { fromMap: true }); } catch (e) { /* ข้าม */ } }));
+          };
+          step('ready', () => map.Event.bind('ready', init));
+          setTimeout(init, 4000);   // กันกรณีแผนที่ไม่ส่งสัญญาณ ready
+        }).catch(mapFail);
       }
     });
   }
