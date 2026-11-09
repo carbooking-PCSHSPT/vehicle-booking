@@ -186,7 +186,7 @@
   // ═════════ รายละเอียดคำขอ (แอดมิน) ═════════
   Pages.adminRequest = ({ params }) => {
     const r = S.request(params.id);
-    if (!r) return { layout: 'admin', html: UI.empty('ไม่พบคำขอนี้') };
+    if (!r) return { layout: 'admin', html: S.needHistory() ? histNote(true) : UI.empty('ไม่พบคำขอนี้') };   // คำขอเก่า → โหลดย้อนหลังก่อน
     const canDecide = ['pending', 'revise'].includes(r.status);
     const canReassign = ['approved', 'ontrip'].includes(r.status);
     const exp = r.expenses || [];
@@ -329,6 +329,7 @@
     const tab = isNew ? 'public' : (query.tab || 'public');
     const p = JSON.parse(JSON.stringify(S.db.vprivate[v.id] || { id: v.id, actExpiry: '', taxExpiry: '', insurance: { company: '', cls: '', policyNo: '', expiry: '', phone: '' }, repairs: [], maintenancePlan: [], accidents: [], docs: [], notes: '', chassisNo: '', engineNo: '', fuelType: 'ดีเซล', fuelCard: '' }));
     p.insurance = p.insurance || {}; p.repairs = p.repairs || []; p.maintenancePlan = p.maintenancePlan || []; p.accidents = p.accidents || []; p.docs = p.docs || [];
+    const histUsage = tab === 'usage' && S.needHistory();   // แท็บประวัติการใช้งาน = ทั้งหมดตั้งแต่เริ่มใช้ระบบ
     const trips = S.db.requests.filter(r => (r.assignments || []).some(a => a.vehicleId === v.id) && ['returned', 'closed', 'ontrip'].includes(r.status)).sort((a, b) => b.startAt.localeCompare(a.startAt));
     const T = (k, l, ic) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}">${icon(ic)} ${l}</button>`;
     let body = '';
@@ -391,11 +392,11 @@
     else {
       const rows = trips.map(r => { const a = r.assignments.find(x => x.vehicleId === v.id); const km = a.odoStart != null && a.odoEnd != null ? a.odoEnd - a.odoStart : null; const ex = (r.expenses || []).filter(e => e.vehicleId === v.id); return { r, a, km, fuel: ex.filter(e => e.type === 'fuel').reduce((s, e) => s + e.amount, 0), liters: ex.reduce((s, e) => s + (+e.liters || 0), 0), other: ex.filter(e => e.type !== 'fuel').reduce((s, e) => s + e.amount, 0) }; });
       const sum = k => rows.reduce((s, x) => s + (+x[k] || 0), 0);
-      body = `<div class="kpis" style="margin-bottom:16px"><div class="kpi"><span class="k-ic">${icon('route')}</span><b>${rows.length}<em>ทริป</em></b><span class="l">ใช้งานทั้งหมด</span></div><div class="kpi"><span class="k-ic">${icon('gauge')}</span><b>${fmt.num(sum('km'))}<em>กม.</em></b><span class="l">ระยะทางตามเลขไมล์</span></div><div class="kpi"><span class="k-ic">${icon('fuel')}</span><b>${fmt.money(sum('fuel'))}<em>฿</em></b><span class="l">ค่าน้ำมัน (${fmt.num(sum('liters'), 1)} ลิตร)</span></div><div class="kpi"><span class="k-ic">${icon('gauge')}</span><b>${sum('liters') ? fmt.num(rows.filter(x => x.liters && x.km).reduce((s, x) => s + x.km, 0) / rows.filter(x => x.liters && x.km).reduce((s, x) => s + x.liters, 0), 1) : '-'}<em>กม./ลิตร</em></b><span class="l">อัตราสิ้นเปลือง</span></div></div>
+      body = `${histNote(histUsage)}<div class="kpis" style="margin-bottom:16px"><div class="kpi"><span class="k-ic">${icon('route')}</span><b>${rows.length}<em>ทริป</em></b><span class="l">ใช้งานทั้งหมด</span></div><div class="kpi"><span class="k-ic">${icon('gauge')}</span><b>${fmt.num(sum('km'))}<em>กม.</em></b><span class="l">ระยะทางตามเลขไมล์</span></div><div class="kpi"><span class="k-ic">${icon('fuel')}</span><b>${fmt.money(sum('fuel'))}<em>฿</em></b><span class="l">ค่าน้ำมัน (${fmt.num(sum('liters'), 1)} ลิตร)</span></div><div class="kpi"><span class="k-ic">${icon('gauge')}</span><b>${sum('liters') ? fmt.num(rows.filter(x => x.liters && x.km).reduce((s, x) => s + x.km, 0) / rows.filter(x => x.liters && x.km).reduce((s, x) => s + x.liters, 0), 1) : '-'}<em>กม./ลิตร</em></b><span class="l">อัตราสิ้นเปลือง</span></div></div>
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>วันที่</th><th>ปลายทาง</th><th>คนขับ</th><th class="r">กม.</th><th class="r">น้ำมัน (฿)</th><th class="r">อื่น ๆ (฿)</th></tr></thead><tbody>${rows.map(x => `<tr class="click" data-href="#/admin/requests/${x.r.id}"><td>${fmt.date(x.r.startAt)}<small>${x.r.id}</small></td><td>${esc(S.destName(x.r))}<small>${esc(x.r.requester.name)}</small></td><td>${esc(C.dName(x.a.driverId))}</td><td class="r">${x.km != null ? fmt.num(x.km) : '-'}</td><td class="r">${fmt.money(x.fuel)}</td><td class="r">${fmt.money(x.other)}</td></tr>`).join('') || `<tr><td colspan="6">${UI.empty('ยังไม่มีประวัติการใช้งาน')}</td></tr>`}</tbody></table></div></div>`;
     }
     return {
-      layout: 'admin', live: false,
+      layout: 'admin', live: !!histUsage,   // ระหว่างโหลดประวัติย้อนหลัง ให้วาดใหม่เมื่อโหลดเสร็จ
       html: `<a class="crumb" href="#/admin/vehicles">${icon('arrowL')} ข้อมูลรถทั้งหมด</a>
         ${head(isNew ? 'เพิ่มรถใหม่' : `รหัสรถ ${v.no || '-'}`, isNew ? 'เพิ่มรถ' : esc(v.name), isNew ? '' : `${esc(v.plate)} · ${pill(S.vehicleState(v))}`, isNew ? '' : `<a class="btn btn-ghost btn-sm" href="#/vehicles/${v.id}">${icon('eye')} ดูหน้าที่ครูเห็น</a>`)}
         ${isNew ? '' : `<div class="tabs">${T('public', 'ข้อมูลเผยแพร่', 'eye')}${T('private', 'ข้อมูลเชิงลึก (ไม่เผยแพร่)', 'lock')}${T('usage', 'ประวัติการใช้งาน', 'activity')}</div>`}
@@ -579,10 +580,13 @@
   }
   const bindPeriod = (root, base, query) => { const go = () => { location.hash = base + '?' + new URLSearchParams({ ...query, p: 'custom', from: $('#pFrom', root).value, to: $('#pTo', root).value }); }; $('#pFrom', root)?.addEventListener('change', go); $('#pTo', root)?.addEventListener('change', go); };
   const inPer = (d, per) => new Date(d) >= per.from && new Date(d) <= per.to;
+  // แถบแจ้งระหว่างโหลดข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน — ดู Store.needHistory)
+  const histNote = loading => loading ? `<div class="note-box" style="margin-bottom:14px">${icon('clock')}<div>กำลังโหลดข้อมูลย้อนหลัง… ตัวเลขจะครบเมื่อโหลดเสร็จ</div></div>` : '';
 
   // ═════════ ค่าน้ำมัน / ค่าใช้จ่าย ═════════
   Pages.adminExpenses = ({ query }) => {
     const per = periodOf(query), vf = query.v || '', tf = query.t || '', cf = query.c || '';
+    const hist = S.needHistory(per.from);
     const rows = [];
     S.db.requests.forEach(r => (r.expenses || []).forEach(e => { if (inPer(e.date + 'T12:00:00', per) && (!vf || e.vehicleId === vf) && (!tf || e.type === tf) && (!cf || (r.category || '') === (cf === 'none' ? '' : cf))) rows.push({ r, e }); }));
     rows.sort((a, b) => b.e.date.localeCompare(a.e.date));
@@ -592,7 +596,7 @@
     return {
       layout: 'admin',
       html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
-        ${periodBar('#/admin/expenses', per, query)}
+        ${periodBar('#/admin/expenses', per, query)}${histNote(hist)}
         <div class="toolbar"><select class="input" id="vf" style="width:auto"><option value="">รถทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}" ${v.id === vf ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
           <select class="input" id="tf" style="width:auto"><option value="">ทุกประเภท</option>${Object.entries(S.EXPENSE).map(([k, l]) => `<option value="${k}" ${k === tf ? 'selected' : ''}>${l}</option>`).join('')}</select>
           <select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select></div>
@@ -620,13 +624,14 @@
   // ═════════ ประเมินคนขับ ═════════
   Pages.adminRatings = ({ query }) => {
     const per = periodOf(query), df = query.d || '';
+    const hist = S.needHistory(per.from);
     const list = S.db.ratings.filter(x => inPer(x.at, per) && (!df || x.driverId === df)).sort((a, b) => b.at.localeCompare(a.at));
     const avgOf = (arr, k) => arr.length ? arr.reduce((s, x) => s + (k ? x.scores[k] : Object.values(x.scores).reduce((a, b) => a + b, 0) / 4), 0) / arr.length : 0;
     const drivers = S.db.drivers.map(d => ({ d, rs: list.filter(x => x.driverId === d.id) })).filter(x => x.rs.length || !df).sort((a, b) => avgOf(b.rs) - avgOf(a.rs));
     return {
       layout: 'admin',
       html: `${head('รายงาน', 'ผลการประเมินคนขับ', `${per.label} · ${list.length} ครั้ง · ไม่แสดงชื่อผู้ประเมิน`, `<select class="input" id="df" style="width:auto"><option value="">คนขับทุกคน</option>${S.db.drivers.map(d => `<option value="${d.id}" ${d.id === df ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`)}
-        ${periodBar('#/admin/ratings', per, query)}
+        ${periodBar('#/admin/ratings', per, query)}${histNote(hist)}
         <div class="kpis" style="margin-bottom:16px">${Object.entries(S.RATE_KEYS).map(([k, l]) => `<div class="kpi" style="--kb:#fef3c7;--kc:#d97706"><span class="k-ic">${icon('star')}</span><b class="num">${avgOf(list, k).toFixed(2)}<em>/ 5</em></b><span class="l">${l}</span></div>`).join('')}</div>
         <div class="split">
           <div class="card"><div class="card-head"><h3>${icon('users')} คะแนนรายคน</h3></div><div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th>คนขับ</th><th>ครั้ง</th>${Object.values(S.RATE_KEYS).map(l => `<th>${l.split('และ')[0]}</th>`).join('')}<th>เฉลี่ย</th></tr></thead>
@@ -640,6 +645,7 @@
   // ═════════ สถิติและรายงาน ═════════
   Pages.adminStats = ({ query }) => {
     const per = periodOf(query);
+    const hist = S.needHistory(per.from);
     const reqs = S.db.requests.filter(r => inPer(r.startAt, per));
     const done = reqs.filter(r => ['ontrip', 'returned', 'closed', 'approved'].includes(r.status));
     const trips = done.filter(r => ['returned', 'closed'].includes(r.status));
@@ -679,7 +685,7 @@
     return {
       layout: 'admin',
       html: `${head('รายงาน', 'สถิติการใช้รถ', `${per.label} · ${fmt.date(per.from)} – ${fmt.date(per.to > new Date(2900, 0) ? new Date() : per.to)}`, `<button class="btn btn-ghost btn-sm no-print" id="pdf">${icon('printer')} PDF / พิมพ์</button><button class="btn btn-primary btn-sm no-print" id="xls">${icon('download')} Excel ทุกตาราง</button>`)}
-        ${periodBar('#/admin/stats', per, query)}
+        ${periodBar('#/admin/stats', per, query)}${histNote(hist)}
         <div class="kpis">
           <div class="kpi"><span class="k-ic">${icon('clipboard')}</span><b class="num">${K.req}<em>คำขอ</em></b><span class="l">อนุมัติ ${K.ok} · ไม่อนุมัติ ${K.rej} · ยกเลิก ${K.cancel}</span></div>
           <div class="kpi" style="--kb:var(--gold-50);--kc:var(--gold-700)"><span class="k-ic">${icon('gauge')}</span><b class="num">${fmt.num(K.km)}<em>กม.</em></b><span class="l">ระยะทางรวม · ${asg.length} เที่ยวรถ</span></div>
@@ -746,11 +752,12 @@
 
   // ═════════ ตั้งค่า ═════════
   Pages.adminSettings = () => {
+    const hist = S.needHistory();   // จำนวนครั้งที่ใช้แต่ละหมวดงาน (หมวดที่เคยใช้ลบไม่ได้) ต้องนับจากคำขอทั้งหมด
     const s = JSON.parse(JSON.stringify(S.db.settings));
     const cm = s.committee || [];
     const cats = JSON.parse(JSON.stringify(S.categories(true)));
     return {
-      layout: 'admin', live: false,
+      layout: 'admin', live: hist,   // วาดใหม่ครั้งเดียวเมื่อโหลดข้อมูลย้อนหลังเสร็จ (ปกติไม่ถึง 1 วินาที)
       html: `${head('ระบบ', 'ตั้งค่า', 'ข้อมูลทั่วไป กฎการขอใช้รถ ข้อมูลติดต่อ และคณะทำงาน')}
         <form id="sf">
           <div class="form-section"><h3>${icon('settings')} ทั่วไป</h3><div class="grid2">

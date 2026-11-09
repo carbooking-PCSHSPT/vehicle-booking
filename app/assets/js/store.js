@@ -14,6 +14,9 @@ const Store = (() => {
   const BOOT = (CFG.bootstrapAdmins || []).map(s => s.toLowerCase());
   const KEY = 'pcs-vehicle-db-v1';
   const DAY = 864e5, HOUR = 36e5;
+  // คำขอ/ผลประเมินที่จบก่อนวันนี้ (~13 เดือน) = ข้อมูลย้อนหลัง โหลดเมื่อจำเป็นเท่านั้น (ครอบคลุมช่วง ปีงบ/ปีการศึกษา/12 เดือน ในหน้าสถิติ)
+  const HISTORY_DAYS = 400;
+  const historyCutoff = () => new Date(Date.now() - HISTORY_DAYS * DAY);
 
   const uid = (p = '') => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const nowISO = () => new Date().toISOString();
@@ -468,6 +471,8 @@ const Store = (() => {
       async changeOwnPassword(password) { const u = user(me.email); u.password = password; u.mustChangePassword = false; save(); me = u; emit(); },
       async upload(files) { return files; },          // เก็บ dataURL ในเบราว์เซอร์
       async fileUrl(ref) { return ref; },
+      histState: () => 'done',                         // โหมดทดลองมีข้อมูลครบในเครื่องอยู่แล้ว
+      async loadHistory() {},
       reset() { localStorage.removeItem(KEY); localStorage.removeItem(sessKey); location.reload(); }
     };
   }
@@ -489,8 +494,11 @@ const Store = (() => {
       return e;
     };
     const guard = p => p.catch(e => { throw friendly(e); });
-    let unsubs = [], reqMaps = {}, profileUnsub = null, warned = false;
-    const stopAll = () => { unsubs.forEach(u => { try { u(); } catch (e) { /* ข้าม */ } }); unsubs = []; reqMaps = {}; };
+    let unsubs = [], reqMaps = {}, rateMaps = {}, profileUnsub = null, warned = false;
+    // ประหยัดโควตาอ่าน: แอดมิน/ผู้บริหารฟังเรียลไทม์เฉพาะคำขอ/ผลประเมิน ~13 เดือนล่าสุด
+    // ข้อมูลเก่ากว่านั้นโหลดครั้งเดียวเมื่อหน้าที่ต้องใช้ขอ (needHistory) — histState: none | loading | done
+    let histState = 'none', dataGen = 0;
+    const stopAll = () => { unsubs.forEach(u => { try { u(); } catch (e) { /* ข้าม */ } }); unsubs = []; reqMaps = {}; rateMaps = {}; histState = 'none'; dataGen++; };
     const stopProfile = () => { if (profileUnsub) { try { profileUnsub(); } catch (e) { /* ข้าม */ } } profileUnsub = null; };
     // ตัวรับฟังเรียลไทม์หลุด → แจ้งผู้ใช้ครั้งเดียว (ไม่ให้เห็นข้อมูลว่างโดยไม่รู้สาเหตุ)
     const onErr = name => e => {
@@ -503,6 +511,37 @@ const Store = (() => {
       db = { ...db, requests: [...m.values()].sort((a, b) => a.startAt.localeCompare(b.startAt)) };
       emit();
     };
+    const mergeRatings = () => {
+      const m = new Map();
+      Object.values(rateMaps).forEach(mp => mp.forEach((v, k) => m.set(k, v)));
+      db = { ...db, ratings: [...m.values()] };
+      emit();
+    };
+    async function loadHistory() {
+      if (histState !== 'none' || !me || !isBack(me)) return;
+      histState = 'loading';
+      const gen = dataGen, cut = historyCutoff().toISOString();
+      try {
+        const [rq, rt] = await Promise.all([
+          fs.collection('requests').where('endAt', '<', cut).get(),
+          fs.collection('ratings').where('at', '<', cut).get()
+        ]);
+        if (gen !== dataGen) return;   // ออกจากระบบ/เปลี่ยนสิทธิ์ระหว่างโหลด
+        const mq = new Map(); rq.docs.forEach(d => mq.set(d.id, d.data())); reqMaps.history = mq;
+        const mr = new Map(); rt.docs.forEach(d => mr.set(d.id, d.data())); rateMaps.history = mr;
+        histState = 'done';
+        mergeRatings(); mergeReq();
+      } catch (e) {
+        if (gen !== dataGen) return;
+        histState = 'none'; onErr('history')(e); emit();
+      }
+    }
+    // ข้อมูลย้อนหลังไม่ได้ฟังเรียลไทม์ → แก้คำขอเก่าจากเครื่องนี้แล้วอัปเดตในหน่วยความจำให้ด้วย
+    function keepHistory(col, id, data) {
+      if (col !== 'requests' || !reqMaps.history || !reqMaps.history.has(id)) return;
+      reqMaps.history.set(id, strip(data));
+      mergeReq();
+    }
     function listenReq(name, q) {
       reqMaps[name] = new Map();
       unsubs.push(q.onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); reqMaps[name] = mp; mergeReq(); }, onErr('requests/' + name)));
@@ -513,16 +552,14 @@ const Store = (() => {
       unsubs.push(fs.collection('config').doc('settings').onSnapshot(s => { db = { ...db, settings: { ...defaultSettings(), ...(s.data() || {}) } }; emit(); }, onErr('config')));
       ['vehicles', 'drivers'].forEach(n => unsubs.push(col(n).onSnapshot(s => { db = { ...db, [n]: s.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0)) }; emit(); }, onErr(n))));
       unsubs.push(col('places').orderBy('count', 'desc').limit(400).onSnapshot(s => { db = { ...db, places: s.docs.map(d => d.data()) }; emit(); }, onErr('places')));
-      if (isBack(me)) listenReq('all', col('requests'));
-      else {
-        listenReq('window', col('requests').where('endAt', '>=', new Date(Date.now() - 45 * DAY).toISOString()));
-        listenReq('mine', col('requests').where('requester.email', '==', me.email));
-      }
+      if (isBack(me)) listenReq('recent', col('requests').where('endAt', '>=', historyCutoff().toISOString()));
+      else listenReq('window', col('requests').where('endAt', '>=', new Date(Date.now() - 45 * DAY).toISOString()));
+      listenReq('mine', col('requests').where('requester.email', '==', me.email));   // "การขอใช้รถของฉัน" ครบทุกใบ (รวมแอดมินที่ขอรถเอง)
       if (isAdmin(me)) {
         unsubs.push(col('users').onSnapshot(s => { db = { ...db, users: s.docs.map(d => d.data()) }; if (me) me = db.users.find(u => u.email === me.email) || me; emit(); }, onErr('users')));
       }
       if (isBack(me)) unsubs.push(col('vehiclePrivate').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); db = { ...db, vprivate: o }; emit(); }, onErr('vehiclePrivate')));
-      if (isBack(me)) unsubs.push(col('ratings').onSnapshot(s => { db = { ...db, ratings: s.docs.map(d => d.data()) }; emit(); }, onErr('ratings')));
+      if (isBack(me)) unsubs.push(col('ratings').where('at', '>=', historyCutoff().toISOString()).onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); rateMaps.recent = mp; mergeRatings(); }, onErr('ratings')));
     }
     async function loadMe(fu) {
       const email = String(fu.email || '').toLowerCase();
@@ -571,16 +608,19 @@ const Store = (() => {
           catch (e) { stopProfile(); authError = friendly(e).message; me = null; authState = 'out'; await auth.signOut(); emit(); }
         });
       },
+      histState: () => histState,
+      loadHistory,
       async put(col, id, data) {
         if (col === 'settings') return guard(fs.collection('config').doc('settings').set(strip(data)));
-        return guard(fs.collection(colName[col]).doc(id).set(strip(data)));
+        await guard(fs.collection(colName[col]).doc(id).set(strip(data)));
+        keepHistory(col, id, data);
       },
       // แก้เอกสารแบบธุรกรรม: อ่านฉบับล่าสุดจากเซิร์ฟเวอร์ → fn แก้ → เขียน
       // ถ้ามีเครื่องอื่นเขียนก่อน Firestore จะเรียก fn ใหม่กับข้อมูลล่าสุดเอง (ไม่มีการเขียนทับกัน)
       // fn ต้องไม่มี async และอาจถูกเรียกซ้ำ · also(col, id, data) = เขียนเอกสารอื่นในธุรกรรมเดียวกัน
       async update(col, id, fn) {
         const ref = fs.collection(colName[col]).doc(id);
-        return guard(fs.runTransaction(async tx => {
+        const next = await guard(fs.runTransaction(async tx => {
           const s = await tx.get(ref);
           if (!s.exists) throw new Error('ไม่พบข้อมูล อาจถูกลบไปแล้ว');
           const extra = [];
@@ -589,6 +629,8 @@ const Store = (() => {
           tx.set(ref, strip(next));
           return next;
         }));
+        keepHistory(col, id, next);
+        return next;
       },
       async del(col, id) { return guard(fs.collection(colName[col]).doc(id).delete()); },
       async nextId(d) {
@@ -703,6 +745,17 @@ const Store = (() => {
     categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
     notifications, markSeen, pendingRatings,
+    // ข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน): หน้าที่ต้องใช้ข้อมูลตั้งแต่วันที่ from เรียกฟังก์ชันนี้ตอนสร้างหน้า
+    // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง
+    needHistory(from) {
+      if (!A || !me || !isBack(me)) return false;
+      const st = A.histState();
+      if (st === 'done') return false;
+      if (st === 'loading') return true;
+      if (from && new Date(from) >= historyCutoff()) return false;
+      setTimeout(() => A.loadHistory(), 0);   // ไม่เรียกระหว่างวาดหน้า
+      return true;
+    },
     myRequests: () => me ? db.requests.filter(r => r.requester && r.requester.email === me.email).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [],
     // ── เข้าสู่ระบบ ──
     loginGoogle: email => A.loginGoogle(email),
