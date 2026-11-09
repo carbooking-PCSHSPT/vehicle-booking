@@ -3,6 +3,8 @@
  *  1) upload       รับรูป/PDF จากเว็บ เก็บลง Google Drive ของโรงเรียน แยกโฟลเดอร์ตามประเภท/ปี พ.ศ./เดือน
  *  2) file         ส่งไฟล์กลับไปแสดงบนเว็บ (ตรวจสิทธิ์ทุกครั้ง โฟลเดอร์ไม่แชร์สาธารณะ)
  *  3) setpassword  แอดมินตั้งรหัสผ่านใหม่ให้บัญชีชื่อผู้ใช้ (username) ผ่าน Identity Toolkit
+ *  4) สำรองข้อมูล   backupNow() ทุกคืนตี 2 → ระบบยานพาหนะ - ไฟล์/สำรองข้อมูล/<ปี>/<เดือน>/สำรองข้อมูล_<วันเวลา>.json
+ *                  ตั้งเวลาครั้งเดียวด้วย installBackupTrigger() · กู้คืนด้วย restoreBackup() (ดู README ขั้นตอนที่ 11)
  *
  * โครงสร้างใน Drive:
  *   ระบบยานพาหนะ - ไฟล์/
@@ -41,7 +43,7 @@ const OTHER_KIND = 'อื่น ๆ';
 const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
 function doGet() {
-  return json({ ok: true, service: 'pcshs-vehicle', version: '2026-11-07', features: ['upload', 'file', 'setpassword', 'kinds'], time: new Date().toISOString() });
+  return json({ ok: true, service: 'pcshs-vehicle', version: '2026-11-09', features: ['upload', 'file', 'setpassword', 'kinds', 'backup'], time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -107,7 +109,8 @@ function readFile(id) {
   if (!/^[\w-]{10,}$/.test(id)) throw new Error('ไม่พบไฟล์');
   let file;
   try { file = DriveApp.getFileById(id); } catch (e) { throw new Error('ไม่พบไฟล์ (อาจถูกลบออกจาก Drive)'); }
-  if (file.isTrashed() || !isOurs(file)) throw new Error('ไม่พบไฟล์');
+  // ส่งกลับเฉพาะรูป/PDF ที่ผู้ใช้อัปโหลด — ไฟล์สำรองข้อมูล (.json) เปิดผ่านเว็บไม่ได้
+  if (file.isTrashed() || !isOurs(file) || !/^(image\/|application\/pdf)/.test(file.getMimeType())) throw new Error('ไม่พบไฟล์');
   const blob = file.getBlob();
   return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
 }
@@ -184,6 +187,95 @@ function fsValue(v) {
   if ('arrayValue' in v) return (v.arrayValue.values || []).map(fsValue);
   if ('mapValue' in v) return fromFirestore(v.mapValue.fields || {});
   return null;
+}
+
+// ───────── สำรองข้อมูล Firestore → Google Drive ─────────
+// ใช้สิทธิ์เจ้าของสคริปต์ (เจ้าของโปรเจกต์ Firebase) อ่านทุก collection แล้วบันทึกเป็นไฟล์ JSON ไฟล์เดียว
+// เก็บค่าแบบ Firestore ดั้งเดิม (fields) เพื่อกู้คืนได้ตรงชนิดข้อมูล
+const BACKUP = {
+  FOLDER: 'สำรองข้อมูล',
+  KEEP_DAYS: 60,        // ลบไฟล์สำรองที่เก่ากว่า 60 วัน — ยกเว้นไฟล์ของวันที่ 1 ทุกเดือน (เก็บไว้ตลอด)
+  HOUR: 2               // เวลาสำรองอัตโนมัติ (ตี 2 เวลาไทย)
+};
+// กู้คืน: ใส่ ID ไฟล์สำรอง และพิมพ์ CONFIRM ให้ตรง แล้ว Run restoreBackup — เสร็จแล้วล้างค่ากลับเป็นว่าง
+const RESTORE = { FILE_ID: '', CONFIRM: '' };   // CONFIRM ต้องเป็น 'ยืนยันกู้คืน'
+
+function fsBase() { return 'https://firestore.googleapis.com/v1/projects/' + CONFIG.FIREBASE_PROJECT + '/databases/(default)/documents'; }
+function ownerFetch(url, payload) {
+  const opt = { muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'x-goog-user-project': CONFIG.FIREBASE_PROJECT } };
+  if (payload) { opt.method = 'post'; opt.contentType = 'application/json'; opt.payload = JSON.stringify(payload); }
+  const res = UrlFetchApp.fetch(url, opt);
+  if (res.getResponseCode() !== 200) throw new Error('Firestore ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+  return JSON.parse(res.getContentText() || '{}');
+}
+
+function backupNow() {
+  const started = new Date();
+  const ids = ownerFetch(fsBase() + ':listCollectionIds', { pageSize: 100 }).collectionIds || [];
+  const data = { app: 'pcshs-vehicle', format: 'firestore-rest-v1', project: CONFIG.FIREBASE_PROJECT, createdAt: started.toISOString(), counts: {}, collections: {} };
+  ids.forEach(function (col) {
+    const docs = [];
+    let token = '';
+    do {
+      const r = ownerFetch(fsBase() + '/' + encodeURIComponent(col) + '?pageSize=300' + (token ? '&pageToken=' + encodeURIComponent(token) : ''));
+      (r.documents || []).forEach(function (d) { docs.push({ id: decodeURIComponent(d.name.split('/').pop()), fields: d.fields || {}, updateTime: d.updateTime }); });
+      token = r.nextPageToken || '';
+    } while (token);
+    data.collections[col] = docs;
+    data.counts[col] = docs.length;
+  });
+  const name = 'สำรองข้อมูล_' + Utilities.formatDate(started, TZ, 'yyyyMMdd-HHmm') + '.json';
+  const file = kindFolder(BACKUP.FOLDER, started).createFile(Utilities.newBlob(JSON.stringify(data), 'application/json', name));
+  file.setDescription('สำรองข้อมูลระบบยานพาหนะ · ' + Object.keys(data.counts).map(function (k) { return k + ' ' + data.counts[k]; }).join(' · '));
+  const removed = pruneBackups();
+  Logger.log('สำรองข้อมูลแล้ว: ' + name + ' → ' + file.getUrl());
+  Logger.log('จำนวนเอกสาร: ' + JSON.stringify(data.counts) + (removed ? ' · ลบไฟล์สำรองเก่า ' + removed + ' ไฟล์' : ''));
+  return file;
+}
+
+// ลบไฟล์สำรองที่เก่ากว่า KEEP_DAYS วัน (ไฟล์ของวันที่ 1 ของเดือนเก็บไว้เสมอ) — ย้ายไปถังขยะ กู้คืนได้ 30 วัน
+function pruneBackups() {
+  const it = rootFolder().getFoldersByName(BACKUP.FOLDER);
+  if (!it.hasNext()) return 0;
+  const cutoff = Date.now() - BACKUP.KEEP_DAYS * 864e5;
+  let removed = 0;
+  const walk = function (folder) {
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next(), m = f.getName().match(/^สำรองข้อมูล_(\d{4})(\d{2})(\d{2})-/);
+      if (!m || m[3] === '01' || f.getDateCreated().getTime() >= cutoff) continue;
+      f.setTrashed(true); removed++;
+    }
+    const subs = folder.getFolders();
+    while (subs.hasNext()) walk(subs.next());
+  };
+  walk(it.next());
+  return removed;
+}
+
+// Run ครั้งเดียว: ตั้งเวลาสำรองอัตโนมัติทุกวัน (Run ซ้ำได้ ไม่สร้างซ้อน)
+function installBackupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'backupNow') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('backupNow').timeBased().everyDays(1).atHour(BACKUP.HOUR).inTimezone(TZ).create();
+  Logger.log('ตั้งเวลาสำรองข้อมูลอัตโนมัติแล้ว: ทุกวัน ประมาณ ' + BACKUP.HOUR + ':00–' + (BACKUP.HOUR + 1) + ':00 น. (ถ้าสำรองไม่สำเร็จ Google จะส่งอีเมลแจ้งเจ้าของสคริปต์)');
+}
+
+// กู้คืนจากไฟล์สำรอง: เขียนทับเอกสารทุกตัวในไฟล์กลับเข้า Firestore
+// - เอกสารที่สร้างหลังวันสำรอง (ไม่มีในไฟล์) จะไม่ถูกลบ
+// - ก่อนกู้คืน ระบบสำรองข้อมูลปัจจุบันไว้ให้อัตโนมัติ 1 ไฟล์ (ย้อนกลับได้)
+function restoreBackup() {
+  if (!RESTORE.FILE_ID || RESTORE.CONFIRM !== 'ยืนยันกู้คืน') throw new Error('ใส่ RESTORE.FILE_ID และพิมพ์ RESTORE.CONFIRM = \'ยืนยันกู้คืน\' ก่อน แล้วค่อย Run');
+  const data = JSON.parse(DriveApp.getFileById(RESTORE.FILE_ID).getBlob().getDataAsString());
+  if (data.format !== 'firestore-rest-v1' || data.project !== CONFIG.FIREBASE_PROJECT) throw new Error('ไฟล์นี้ไม่ใช่ไฟล์สำรองของโปรเจกต์ ' + CONFIG.FIREBASE_PROJECT);
+  const safety = backupNow();
+  Logger.log('สำรองข้อมูลปัจจุบันไว้ก่อนกู้คืน: ' + safety.getName());
+  const prefix = 'projects/' + CONFIG.FIREBASE_PROJECT + '/databases/(default)/documents/';
+  const writes = [];
+  Object.keys(data.collections).forEach(function (col) {
+    data.collections[col].forEach(function (d) { writes.push({ update: { name: prefix + col + '/' + d.id, fields: d.fields } }); });
+  });
+  for (let i = 0; i < writes.length; i += 400) ownerFetch(fsBase() + ':commit', { writes: writes.slice(i, i + 400) });
+  Logger.log('กู้คืนแล้ว ' + writes.length + ' เอกสาร จากไฟล์สำรองวันที่ ' + data.createdAt + ' — อย่าลืมล้าง RESTORE.FILE_ID / CONFIRM กลับเป็นว่าง');
 }
 
 // ทดสอบสิทธิ์ครั้งแรก: กด Run ฟังก์ชันนี้ในหน้า Apps Script เพื่ออนุญาตการเข้าถึง Drive/เครือข่าย
