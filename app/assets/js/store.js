@@ -45,7 +45,9 @@ const Store = (() => {
     free: { label: 'ว่าง', tone: 'free' }, booked: { label: 'มีคิววันนี้', tone: 'booked' },
     ontrip: { label: 'กำลังเดินทาง', tone: 'live', pulse: true }, maint: { label: 'ซ่อมบำรุง', tone: 'bad' }, off: { label: 'งดให้บริการ', tone: 'mute' }
   };
-  const KINDS = { van: 'รถตู้', bus: 'รถบัส', minibus: 'รถโดยสาร 6 ล้อ', car: 'รถเก๋ง', pickup: 'รถกระบะ', truck: 'รถบรรทุก', special: 'รถเฉพาะกิจ' };
+  const KINDS = { van: 'รถตู้', bus: 'รถบัส', minibus: 'รถโดยสาร 6 ล้อ', car: 'รถเก๋ง', suv: 'รถอเนกประสงค์ (SUV)', pickup: 'รถกระบะ', truck: 'รถบรรทุก', special: 'รถเฉพาะกิจ' };
+  // ชนิดรถที่ใช้รับส่งคน (แสดงก่อนตอนแอดมินจัดรถ · ชนิดอื่นซ่อนไว้ใต้ปุ่ม "แสดงรถประเภทอื่น")
+  const PASSENGER_KINDS = ['van', 'bus', 'minibus', 'car', 'suv'];
   const FEATURES = ['แอร์', 'ไมโครโฟน/ลำโพง', 'จอทีวี', 'ช่องชาร์จ USB', 'ช่องเก็บสัมภาระ', 'เข็มขัดนิรภัยทุกที่นั่ง', 'กล้องหน้ารถ', 'ถังดับเพลิง', 'ชุดปฐมพยาบาล', 'ทางลาด/รองรับวีลแชร์'];
   const EXPENSE = { fuel: 'ค่าน้ำมัน', toll: 'ค่าทางด่วน', parking: 'ค่าที่จอดรถ', other: 'ค่าใช้จ่ายอื่น' };
   const PAY = { cash: 'เงินสด', card: 'บัตรเติมน้ำมัน', transfer: 'โอน/เบิกภายหลัง', credit: 'เครดิตปั๊ม' };
@@ -226,15 +228,15 @@ const Store = (() => {
       [3, 'รถตู้ 03', 'ฮล 4536 กทม.', 'TOYOTA', 'Commuter', 'van', 12, 'd3', 'สีขาว'], [4, 'รถตู้ 04', 'ฮจ 1618 กทม.', 'TOYOTA', 'Hiace', 'van', 12, 'd4', 'สีขาว'],
       [5, 'รถตู้ 05', 'ย 0567 ปทุมธานี', 'TOYOTA', 'Hiace', 'van', 12, 'd4', 'สีขาว'], [6, 'รถกระบะ 06', 'ย 0566 ปทุมธานี', 'TOYOTA', 'Hilux Revo', 'pickup', 3, 'd5', 'สีขาว'],
       [7, 'รถโดยสาร 6 ล้อ', '40-0686 ปทุมธานี', 'MITSUBISHI', 'Fuso', 'minibus', 25, 'd2', 'สีขาว-น้ำเงิน'], [8, 'รถบัสโดยสาร', '40-0889 ปทุมธานี', 'HINO', 'RN8J', 'bus', 35, 'd2', 'ขาว-แดง-น้ำเงิน'],
-      [9, 'รถกระบะ 09', '1ฒศ 4050 กทม.', 'TOYOTA', 'Hilux Revo', 'pickup', 3, 'd6', 'สีเทา'], [10, 'รถเก๋ง', '3ขว 9163 กทม.', 'TOYOTA', 'Camry', 'car', 4, 'd7', 'สีดำ'],
+      [9, 'รถกระบะ 09', '1ฒศ 4050 กทม.', 'TOYOTA', 'Hilux Revo', 'pickup', 3, 'd6', 'สีเทา'], [10, 'รถฟอร์จูนเนอร์', '3ขว 9163 กทม.', 'TOYOTA', 'Fortuner', 'suv', 6, 'd7', 'สีดำ'],
       [11, 'รถกระเช้า', '83-9417 ปทุมธานี', 'ISUZU', 'FRR', 'truck', 2, 'd6', 'สีขาว'], [12, 'รถขนขยะ', '82-8443 ปทุมธานี', 'TOYOTA', 'Dyna', 'truck', 2, 'd5', 'สีเขียว'],
       [13, 'รถขนน้ำ', 'ไม่มีเลขทะเบียน', 'KUBOTA', 'RT', 'special', 1, 'd5', 'สีส้ม'], [14, 'รถกอล์ฟไฟฟ้า', 'ไม่มีเลขทะเบียน', 'EI-GO', 'Golf cart', 'special', 4, 'd4', 'สีขาว']
     ];
     const photoOf = { 1: ['images/fleet.jpg'], 2: ['images/fleet.jpg'], 8: ['images/bus-side.jpg', 'images/bus-team.jpg', 'images/fleet.jpg'] };
     const vehicles = V.map(([no, name, plate, brand, model, kind, seats, driverId, color], i) => ({
       id: 'v' + no, no, name, plate, brand, model, kind, type: KINDS[kind], color, seats, driverId, order: i,
-      photos: photoOf[no] || [], features: kind === 'van' ? ['แอร์', 'ช่องชาร์จ USB', 'ช่องเก็บสัมภาระ', 'เข็มขัดนิรภัยทุกที่นั่ง'] : kind === 'bus' ? ['แอร์', 'ไมโครโฟน/ลำโพง', 'จอทีวี', 'ช่องเก็บสัมภาระ', 'ถังดับเพลิง', 'ชุดปฐมพยาบาล'] : kind === 'minibus' ? ['แอร์', 'ไมโครโฟน/ลำโพง', 'ช่องเก็บสัมภาระ'] : kind === 'car' ? ['แอร์', 'ช่องชาร์จ USB'] : [],
-      suitable: kind === 'bus' ? 'ทัศนศึกษา ค่าย และการเดินทางเป็นหมู่คณะใหญ่' : kind === 'van' ? 'ประชุม อบรม แข่งขัน คณะไม่เกิน 12 คน' : kind === 'car' ? 'ผู้บริหาร/ประชุมระยะใกล้ 1–3 คน' : kind === 'pickup' ? 'ขนวัสดุอุปกรณ์ ไม่เหมาะกับการรับส่งคน' : 'งานเฉพาะกิจภายในโรงเรียน',
+      photos: photoOf[no] || [], features: kind === 'van' ? ['แอร์', 'ช่องชาร์จ USB', 'ช่องเก็บสัมภาระ', 'เข็มขัดนิรภัยทุกที่นั่ง'] : kind === 'bus' ? ['แอร์', 'ไมโครโฟน/ลำโพง', 'จอทีวี', 'ช่องเก็บสัมภาระ', 'ถังดับเพลิง', 'ชุดปฐมพยาบาล'] : kind === 'minibus' ? ['แอร์', 'ไมโครโฟน/ลำโพง', 'ช่องเก็บสัมภาระ'] : kind === 'car' || kind === 'suv' ? ['แอร์', 'ช่องชาร์จ USB'] : [],
+      suitable: kind === 'bus' ? 'ทัศนศึกษา ค่าย และการเดินทางเป็นหมู่คณะใหญ่' : kind === 'van' ? 'ประชุม อบรม แข่งขัน คณะไม่เกิน 12 คน' : kind === 'car' ? 'ผู้บริหาร/ประชุมระยะใกล้ 1–3 คน' : kind === 'suv' ? 'ผู้บริหาร/คณะเล็กไม่เกิน 6 คน เดินทางไกลหรือทางขรุขระ' : kind === 'pickup' ? 'ขนวัสดุอุปกรณ์ ไม่เหมาะกับการรับส่งคน' : 'งานเฉพาะกิจภายในโรงเรียน',
       rules: kind === 'bus' || kind === 'van' || kind === 'minibus' ? 'งดรับประทานอาหารที่มีกลิ่นในรถ · คาดเข็มขัดนิรภัยทุกครั้ง · ตรวจสอบสัมภาระก่อนลงจากรถ' : '',
       note: '(ข้อมูลตัวอย่าง — แก้ไขได้ในหลังบ้าน)', bookable: true,
       maint: no === 5 ? { active: true, from: addDays(new Date(), -1).toISOString(), to: addDays(new Date(), 2).toISOString(), note: 'เปลี่ยนยาง + เช็กระยะ 100,000 กม.' } : { active: false, from: '', to: '', note: '' }
@@ -281,13 +283,13 @@ const Store = (() => {
     const requests = [], ratings = [], seedBusy = [];
     let n = 0;
     const mkId = d => { n++; return `VR-${beYear(d)}-${String(n).padStart(4, '0')}`; };
-    const vansAndBus = vehicles.filter(v => ['van', 'bus', 'minibus', 'car'].includes(v.kind) && v.no !== 5);
+    const vansAndBus = vehicles.filter(v => PASSENGER_KINDS.includes(v.kind) && v.no !== 5);
     function mk(startAt, endAt, opts = {}) {
       const t = opts.teacher || pick(teacherUsers), p = opts.place || pick(places);
       const students = opts.students != null ? opts.students : (R() < .5 ? Math.round(R() * 30) : 0), teachers = opts.teachers || 1 + Math.round(R() * 3);
       const pax = students + teachers;
       let vs = opts.vehicles;
-      if (!vs) { const big = pax > 12; vs = big ? [vehicles.find(v => v.no === 8)] : [pick(vansAndBus.filter(v => v.kind === 'van' || (pax <= 4 && v.kind === 'car')))]; if (pax > 35) vs.push(vehicles.find(v => v.no === 1)); }
+      if (!vs) { const big = pax > 12; vs = big ? [vehicles.find(v => v.no === 8)] : [pick(vansAndBus.filter(v => v.kind === 'van' || (pax <= 6 && (v.kind === 'car' || v.kind === 'suv'))))]; if (pax > 35) vs.push(vehicles.find(v => v.no === 1)); }
       const created = addDays(new Date(startAt), -3 - Math.round(R() * 6)).toISOString();
       const id = mkId(startAt);
       const r = {
@@ -319,7 +321,7 @@ const Store = (() => {
             a.returnedAt = new Date(new Date(r.endAt).getTime() + Math.round(R() * 40 - 10) * 6e4).toISOString(); a.odoEnd = odo0 + r.totalKm + Math.round(R() * 10);
             r.history.push({ at: a.departedAt, by: (drivers.find(d => d.id === a.driverId) || {}).email, byName: (drivers.find(d => d.id === a.driverId) || {}).name, action: 'depart', note: vehicle2(vehicles, a.vehicleId).name });
             r.history.push({ at: a.returnedAt, by: (drivers.find(d => d.id === a.driverId) || {}).email, byName: (drivers.find(d => d.id === a.driverId) || {}).name, action: 'return', note: vehicle2(vehicles, a.vehicleId).name });
-            const v = vehicle2(vehicles, a.vehicleId), kmpl = v.kind === 'bus' ? 4.2 : v.kind === 'minibus' ? 6 : v.kind === 'car' ? 13 : 9.5;
+            const v = vehicle2(vehicles, a.vehicleId), kmpl = v.kind === 'bus' ? 4.2 : v.kind === 'minibus' ? 6 : v.kind === 'car' ? 13 : v.kind === 'suv' ? 10 : 9.5;
             const liters = Math.round((a.odoEnd - a.odoStart) / kmpl * 10) / 10, ppl = 31.94 + Math.round(R() * 80) / 100;
             if (r.totalKm > 40 || R() < .6) r.expenses.push({ id: uid('ex'), vehicleId: a.vehicleId, type: 'fuel', date: a.returnedAt.slice(0, 10), station: pick(['ปตท. ลาดหลุมแก้ว', 'บางจาก คลองหลวง', 'เชลล์ รังสิต']), liters, pricePerL: ppl, amount: Math.round(liters * ppl), odo: a.odoEnd, pay: pick(['card', 'cash', 'credit']), photos: [], note: '', by: 'tripop@pcshspt.ac.th', at: a.returnedAt });
             if (/กรุงเทพ|สมุทรปราการ/.test(r.destinations[0].province)) r.expenses.push({ id: uid('ex'), vehicleId: a.vehicleId, type: 'toll', date: a.returnedAt.slice(0, 10), station: 'ทางพิเศษ', liters: 0, pricePerL: 0, amount: 50 + Math.round(R() * 4) * 25, odo: null, pay: 'cash', photos: [], note: '', by: 'tripop@pcshspt.ac.th', at: a.returnedAt });
@@ -735,7 +737,7 @@ const Store = (() => {
   }
 
   const api = {
-    LOCAL, ROLES, STATUS, ASSIGN, VSTATE, KINDS, FEATURES, EXPENSE, PAY, RATE_KEYS, DEPTS, DOMAINS, UDOMAIN,
+    LOCAL, ROLES, STATUS, ASSIGN, VSTATE, KINDS, PASSENGER_KINDS, FEATURES, EXPENSE, PAY, RATE_KEYS, DEPTS, DOMAINS, UDOMAIN,
     get db() { return db; }, get me() { return me; }, get authState() { return authState; }, get authError() { return authError; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     start() { A = LOCAL ? makeLocal() : makeCloud(); return A.start(); },

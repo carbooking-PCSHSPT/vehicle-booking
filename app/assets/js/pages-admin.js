@@ -155,7 +155,7 @@
       const a = sel.get(v.id) || {};
       const busy = c.length > 0;
       const dId = a.driverId || v.driverId || '';
-      const extra = !['van', 'bus', 'minibus', 'car'].includes(v.kind) && !sel.has(v.id);
+      const extra = !S.PASSENGER_KINDS.includes(v.kind) && !sel.has(v.id);
       return `<div class="av-row ${sel.has(v.id) ? 'on' : ''} ${busy && !sel.has(v.id) ? 'busy' : ''} ${extra ? 'extra' : ''}" data-v="${v.id}" ${extra ? 'hidden' : ''}>
         <input type="checkbox" ${sel.has(v.id) ? 'checked' : ''} aria-label="เลือก ${esc(v.name)}">
         <div><b>${icon(kindIcon(v.kind))} ${esc(v.name)}</b><small>${esc(v.plate)} · <b style="display:inline">${v.seats}</b> ที่นั่ง</small>${busy ? `<small class="bad">${icon('alert')} ${c.map(x => x.maint ? esc(x.dest) : `ไม่ว่าง: ${x.id} ${esc(S.destName(x))}`).join(', ')}</small>` : '<small style="color:var(--ok)">ว่างในช่วงเวลานี้</small>'}</div>
@@ -164,7 +164,7 @@
         <span></span>
       </div>`;
     }).join('')}</div>
-    ${vs.some(v => !['van', 'bus', 'minibus', 'car'].includes(v.kind) && !sel.has(v.id)) ? `<button type="button" class="btn btn-ghost btn-sm" id="avMore" style="margin-top:10px">${icon('plus')} แสดงรถประเภทอื่น (กระบะ / รถเฉพาะกิจ)</button>` : ''}
+    ${vs.some(v => !S.PASSENGER_KINDS.includes(v.kind) && !sel.has(v.id)) ? `<button type="button" class="btn btn-ghost btn-sm" id="avMore" style="margin-top:10px">${icon('plus')} แสดงรถประเภทอื่น (กระบะ / รถเฉพาะกิจ)</button>` : ''}
     <div class="seat-meter" id="seatMeter" style="margin-top:12px"></div>`;
   }
   function bindVehiclePicker(root, getPax) {

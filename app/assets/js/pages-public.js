@@ -499,7 +499,7 @@
           <div class="seg"><a href="#/vehicles"><button class="${!kind ? 'on' : ''}" tabindex="-1">ทั้งหมด ${S.db.vehicles.length}</button></a>${kinds.map(k => `<a href="#/vehicles?kind=${k}"><button class="${kind === k ? 'on' : ''}" tabindex="-1">${S.KINDS[k] || k}</button></a>`).join('')}</div></div>
         <div class="veh-grid">${list.map((v, i) => { const st = S.vehicleState(v), d = S.driver(v.driverId); return `
           <a class="vcard reveal" style="--d:${(i % 8) * .05}s" href="#/vehicles/${v.id}">
-            <div class="vphoto">${v.photos && v.photos[0] ? UI.img(v.photos[0], v.name) : icon(kindIcon(v.kind))}<span class="el"><small>${v.no || ''}</small><b>${({ van: 'Va', bus: 'Bu', minibus: 'Mb', car: 'Se', pickup: 'Pk', truck: 'Tr', special: 'Sp' })[v.kind] || 'Ve'}</b></span>${pill(st)}</div>
+            <div class="vphoto">${v.photos && v.photos[0] ? UI.img(v.photos[0], v.name) : icon(kindIcon(v.kind))}<span class="el"><small>${v.no || ''}</small><b>${({ van: 'Va', bus: 'Bu', minibus: 'Mb', car: 'Se', suv: 'Su', pickup: 'Pk', truck: 'Tr', special: 'Sp' })[v.kind] || 'Ve'}</b></span>${pill(st)}</div>
             <div class="vbody"><h3>${esc(v.name)}</h3><span class="plate">${esc(v.plate)} · ${esc(v.brand || '')} ${esc(v.model || '')}</span>
               <div class="vmeta"><span class="tag navy">${icon('seat')}${v.seats} ที่นั่ง</span><span class="tag">${icon(kindIcon(v.kind))}${esc(v.type || S.KINDS[v.kind] || '')}</span>${(v.features || []).includes('แอร์') ? `<span class="tag">${icon('snow')}แอร์</span>` : ''}</div>
               <div class="vdriver">${UI.avatar(d ? d.name : '?')}<div><b>${d ? esc(d.name) : 'ยังไม่ระบุคนขับ'}</b><small>${d && d.phone ? esc(d.phone) : 'คนขับที่รับผิดชอบ'}</small></div></div></div>

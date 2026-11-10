@@ -40,7 +40,7 @@ const UI = (() => {
   // แปลง 'YYYY-MM-DD' จากลิงก์เป็นวันที่ (ค่าผิดรูปแบบ → วันนี้ ไม่ให้หน้าเว็บพัง)
   const dayOf = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(); return isNaN(d) ? new Date() : d; };
   const pill = (m, extra = '') => m ? `<span class="pill tone-${m.tone} ${m.pulse ? 'pulse' : ''} ${extra}">${esc(m.label)}</span>` : '';
-  const kindIcon = k => ({ bus: 'bus', minibus: 'bus', car: 'car', pickup: 'truck', truck: 'truck', special: 'cart' }[k] || 'van');
+  const kindIcon = k => ({ bus: 'bus', minibus: 'bus', car: 'car', suv: 'car', pickup: 'truck', truck: 'truck', special: 'cart' }[k] || 'van');
   const avatar = (name, cls = '') => `<span class="avatar ${cls}">${esc((String(name || '?').replace(/^(นาย|นางสาว|นาง|ครู|ดร\.)\s*/, '').trim()[0]) || '?')}</span>`;
   const empty = (text, ic = 'info', extra = '') => `<div class="empty">${icon(ic)}<p>${text}</p>${extra}</div>`;
 
