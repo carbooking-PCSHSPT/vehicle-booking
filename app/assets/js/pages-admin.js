@@ -777,8 +777,8 @@
             </div>`; }).join('')}</div>
             <button type="button" class="btn btn-ghost btn-sm" id="addCat" style="margin-top:12px">${icon('plus')} เพิ่มหมวดงาน</button></div>
           <div class="form-section"><h3>${icon('pin')} ตำแหน่งโรงเรียน (จุดเริ่มต้นคำนวณระยะทาง)</h3><div class="grid3">
-            <div class="field"><label>ละติจูด</label><input name="lat" type="number" step="0.000001" value="${s.school.lat}"></div>
-            <div class="field"><label>ลองจิจูด</label><input name="lng" type="number" step="0.000001" value="${s.school.lng}"></div>
+            <div class="field"><label>ละติจูด</label><input name="lat" type="number" step="any" value="${s.school.lat}"></div>
+            <div class="field"><label>ลองจิจูด</label><input name="lng" type="number" step="any" value="${s.school.lng}"></div>
             <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-ghost" id="pinSchool">${icon('pin')} ${Maps.enabled ? 'ปักหมุดบนแผนที่' : 'ค้นหา/ตั้งค่า'}</button></div>
           </div><p class="hint">${icon('info')} ค่าเริ่มต้นเป็นพิกัดโดยประมาณ — กรุณาตรวจสอบและปักหมุดให้ตรงกับที่ตั้งโรงเรียนจริง</p></div>
           <div class="form-section"><h3>${icon('phone')} ข้อมูลติดต่อ (หน้า "ติดต่อเรา")</h3><div class="grid3">
@@ -819,7 +819,7 @@
           if (e.target.closest('#addC')) { const x = collect(); x.committee.push({ id: 'c' + Date.now(), level: 3, position: 'เจ้าหน้าที่งานยานพาหนะ', name: '', phone: '', email: '', photo: '' }); await S.saveSettings(x); App.render(); }
           const rm = e.target.closest('[data-rmc]'); if (rm) { const x = collect(); x.committee.splice(+rm.dataset.rmc, 1); await S.saveSettings(x); App.render(); }
           const dp = e.target.closest('[data-dpl]'); if (dp) { await S.deletePlace(dp.dataset.dpl); App.render(); }
-          if (e.target.closest('#pinSchool')) { const p = await Maps.pick({ name: s.school.name, lat: s.school.lat, lng: s.school.lng }); if (p && p.lat != null) { $('#sf', root).lat.value = p.lat; $('#sf', root).lng.value = p.lng; } }
+          if (e.target.closest('#pinSchool')) { const p = await Maps.pick({ name: s.school.name, lat: s.school.lat, lng: s.school.lng }); if (p && p.lat != null) { $('#sf', root).lat.value = (+p.lat).toFixed(6); $('#sf', root).lng.value = (+p.lng).toFixed(6); } }
         });
         $('#sf', root).addEventListener('submit', e => { e.preventDefault(); UI.busy(e.target.querySelector('[type=submit]'), () => S.saveSettings(collect())).then(() => UI.toast('บันทึกการตั้งค่าแล้ว')).catch(() => {}); });
       }
