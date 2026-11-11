@@ -515,7 +515,7 @@
     const qs = o => '#/admin/users?' + new URLSearchParams({ f, q: query.q || '', ...o });
     return {
       layout: 'admin',
-      html: `${head('ข้อมูลหลัก', 'ผู้ใช้และสิทธิ์', `ครูเข้าระบบด้วย Google (@${S.DOMAINS[0]}) ได้ทันที · แอดมิน/คนขับที่ไม่มีอีเมลใช้บัญชีชื่อผู้ใช้`, `<button class="btn btn-ghost btn-sm" id="addG">${icon('mail')} เพิ่มอีเมลภายนอก</button><button class="btn btn-primary btn-sm" id="addU">${icon('key')} สร้างบัญชีชื่อผู้ใช้</button>`)}
+      html: `${head('ข้อมูลหลัก', 'ผู้ใช้และสิทธิ์', `ครูเข้าระบบด้วย Google (@${S.DOMAINS[0]}) ได้ทันที · แอดมิน/คนขับที่ไม่มีอีเมลใช้บัญชีชื่อผู้ใช้`, `<button class="btn btn-ghost btn-sm" id="addG">${icon('mail')} เพิ่มผู้ใช้ด้วยอีเมล</button><button class="btn btn-primary btn-sm" id="addU">${icon('key')} สร้างบัญชีชื่อผู้ใช้</button>`)}
         <div class="toolbar"><div class="seg">${[['all', 'ทั้งหมด'], ['admin', 'แอดมิน'], ['driver', 'คนขับ'], ['executive', 'ผู้บริหาร'], ['username', 'บัญชีชื่อผู้ใช้'], ['off', 'ปิดใช้งาน']].map(([k, l]) => `<a href="${qs({ f: k })}"><button class="${f === k ? 'on' : ''}" tabindex="-1">${l} ${S.db.users.filter(G[k]).length}</button></a>`).join('')}</div>
           <div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหาชื่อ อีเมล ฝ่าย" value="${esc(query.q || '')}"></div></div>
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
@@ -533,12 +533,12 @@
         root.addEventListener('click', async e => {
           if (e.target.closest('#addU')) { if (await accountModal({ roles: ['driver'] })) App.render(); }
           if (e.target.closest('#addG')) {
-            const res = await UI.modal({ title: `${icon('mail')} เพิ่มอีเมลภายนอก (whitelist)`, body: `<p class="hint" style="margin-bottom:12px">สำหรับครูที่ไม่มีอีเมลโรงเรียน ให้เข้าระบบด้วยบัญชี Google อื่น (เช่น Gmail)</p><form id="gF" class="grid2"><div class="field full"><label>อีเมล Google <b class="req">*</b></label><input name="email" type="email"></div><div class="field"><label>ชื่อ-นามสกุล</label><input name="name"></div><div class="field"><label>ฝ่าย</label><select name="dept"><option value=""></option>${S.DEPTS.map(d => `<option>${esc(d)}</option>`).join('')}</select></div></form>`,
+            const res = await UI.modal({ title: `${icon('mail')} เพิ่มผู้ใช้ด้วยอีเมล`, body: `<p class="hint" style="margin-bottom:12px">เพิ่มรายชื่อไว้ล่วงหน้า แล้วกดดินสอเพื่อให้สิทธิ์ (แอดมิน/ผู้บริหาร/คนขับ) ได้ทันที — เจ้าของอีเมลเข้าระบบด้วยปุ่ม Google ครั้งแรกจะได้สิทธิ์ที่ตั้งไว้ · ใช้ได้ทั้งอีเมลโรงเรียน (@${S.DOMAINS[0]}) และ Gmail ของครูที่ไม่มีอีเมลโรงเรียน</p><form id="gF" class="grid2"><div class="field full"><label>อีเมล Google <b class="req">*</b></label><input name="email" type="email"></div><div class="field"><label>ชื่อ-นามสกุล</label><input name="name"></div><div class="field"><label>ฝ่าย</label><select name="dept"><option value=""></option>${S.DEPTS.map(d => `<option>${esc(d)}</option>`).join('')}</select></div></form>`,
               actions: [{ label: 'ยกเลิก', value: null }, { label: 'เพิ่ม', kind: 'btn-primary', onClick: async el => { const f = UI.formData(el.querySelector('#gF')); if (!/^\S+@\S+\.\S+$/.test(f.email)) { UI.toast('อีเมลไม่ถูกต้อง', 'error'); return false; } if (S.user(f.email)) { UI.toast('มีผู้ใช้นี้แล้ว', 'error'); return false; } await S.saveUser({ email: f.email.toLowerCase(), name: f.name, dept: f.dept, phone: '', roles: ['teacher'], active: true, provider: 'google', needsProfile: true, invited: true }); return true; } }] });
-            if (res) { UI.toast('เพิ่มอีเมลแล้ว ผู้ใช้เข้าระบบด้วย Google ได้ทันที'); App.render(); }
+            if (res) { UI.toast('เพิ่มผู้ใช้แล้ว — กดดินสอเพื่อให้สิทธิ์ได้เลย'); App.render(); }
           }
           const pw = e.target.closest('[data-pw]');
-          if (pw) { const res = await UI.confirm(`ตั้งรหัสผ่านใหม่ให้ <b>${esc(S.usernameOf(pw.dataset.pw))}</b> (ผู้ใช้ต้องเปลี่ยนเมื่อเข้าครั้งถัดไป)`, { title: 'ตั้งรหัสผ่านใหม่', ok: 'บันทึก', input: { label: 'รหัสผ่านใหม่ (≥ 6 ตัว)', required: true, value: Math.random().toString(36).slice(2, 8) } }); if (res) S.resetPassword(pw.dataset.pw, res.value).then(() => UI.toast('ตั้งรหัสผ่านใหม่แล้ว')).catch(err => UI.toast(err.message, 'error')); }
+          if (pw) { const res = await UI.confirm(`ตั้งรหัสผ่านใหม่ให้ <b>${esc(S.usernameOf(pw.dataset.pw))}</b> (ผู้ใช้ต้องเปลี่ยนเมื่อเข้าครั้งถัดไป)`, { title: 'ตั้งรหัสผ่านใหม่', ok: 'บันทึก', input: { label: 'รหัสผ่านใหม่ (≥ 6 ตัว)', required: true, value: String(Math.floor(100000 + Math.random() * 900000)) } }); if (res) S.resetPassword(pw.dataset.pw, res.value).then(() => UI.toast('ตั้งรหัสผ่านใหม่แล้ว')).catch(err => UI.toast(err.message, 'error')); }
           const ed = e.target.closest('[data-ed]');
           if (ed) {
             const u = S.user(ed.dataset.ed), sup = S.isSuper(S.me);
