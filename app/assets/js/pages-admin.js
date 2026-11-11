@@ -492,8 +492,8 @@
       title: `${icon('key')} สร้างบัญชีชื่อผู้ใช้ (username)`,
       body: `<form id="acF" class="grid2">
         <div class="field full note-box navy">${icon('info')}<div>สำหรับแอดมินหรือพนักงานขับรถที่ไม่มีอีเมลโรงเรียน · ผู้ใช้ต้องเปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก</div></div>
-        <div class="field"><label>ชื่อผู้ใช้ (a-z 0-9 . _ -) <b class="req">*</b></label><input name="username" autocapitalize="none" placeholder="เช่น sawong"></div>
-        <div class="field"><label>รหัสผ่านชั่วคราว (≥ 6 ตัว) <b class="req">*</b></label><input name="password" value="${Math.random().toString(36).slice(2, 8)}"></div>
+        <div class="field"><label>ชื่อผู้ใช้ (a-z 0-9 . _ -) <b class="req">*</b></label><input name="username" autocapitalize="none" placeholder="เช่น 0812345678 หรือ sawong" value="${esc(d && d.phone ? String(d.phone).replace(/\D/g, '') : '')}"><span class="hint">คนขับ: แนะนำใช้เบอร์โทร (ตัวเลขล้วน) จำง่าย ไม่ต้องพิมพ์ภาษาอังกฤษ</span></div>
+        <div class="field"><label>รหัสผ่านชั่วคราว (≥ 6 ตัว) <b class="req">*</b></label><input name="password" inputmode="numeric" value="${String(Math.floor(100000 + Math.random() * 900000))}"><span class="hint">ตัวเลข 6 หลัก · ผู้ใช้ต้องตั้งรหัสใหม่เมื่อเข้าครั้งแรก</span></div>
         <div class="field full"><label>ชื่อ-นามสกุล <b class="req">*</b></label><input name="name" value="${esc(d ? d.name : '')}"></div>
         <div class="field full"><label>สิทธิ์</label><div class="checks">${['driver', 'admin', 'executive'].map(r => `<label class="check"><input type="checkbox" name="roles" data-multi value="${r}" ${roles.includes(r) ? 'checked' : ''} ${(r === 'admin') && !sup ? 'disabled' : ''}>${S.ROLES[r]}</label>`).join('')}</div>${!sup ? '<span class="hint">สิทธิ์แอดมิน กำหนดได้เฉพาะผู้ดูแลระบบสูงสุด</span>' : ''}</div>
         <div class="field full"><label>ผูกกับรายชื่อพนักงานขับรถ</label><select name="driverId"><option value="">— ไม่ผูก —</option>${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === driverId ? 'selected' : ''}>${esc(x.name)}${x.email ? ' (มีบัญชีแล้ว)' : ''}</option>`).join('')}</select></div>
@@ -503,7 +503,7 @@
         if (!f.name.trim()) { UI.toast('กรุณาระบุชื่อ', 'error'); return false; }
         if (!(f.roles || []).length) { UI.toast('กรุณาเลือกสิทธิ์อย่างน้อย 1 อย่าง', 'error'); return false; }
         const u = await S.createUsernameAccount({ ...f, phone: d ? d.phone : '' });
-        await UI.modal({ title: `${icon('checkCircle')} สร้างบัญชีแล้ว`, body: `<p>แจ้งข้อมูลนี้ให้ผู้ใช้ (เปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก)</p><div class="note-box" style="margin-top:12px;font-size:1.05rem">${icon('key')}<div>ชื่อผู้ใช้: <b>${esc(f.username)}</b><br>รหัสผ่าน: <b>${esc(f.password)}</b></div></div>`, actions: [{ label: 'เรียบร้อย', kind: 'btn-primary' }] });
+        await UI.modal({ title: `${icon('checkCircle')} สร้างบัญชีแล้ว`, body: `<p>แจ้งข้อมูลนี้ให้ผู้ใช้ (เปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก)</p><div class="note-box" style="margin-top:12px;font-size:1.05rem">${icon('key')}<div>ชื่อผู้ใช้: <b>${esc(S.usernameOf(u.email) || f.username)}</b><br>รหัสผ่าน: <b>${esc(f.password)}</b></div></div>`, actions: [{ label: 'เรียบร้อย', kind: 'btn-primary' }] });
         return u;
       } }]
     });

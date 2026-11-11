@@ -22,7 +22,9 @@ const Store = (() => {
   const nowISO = () => new Date().toISOString();
   const clone = o => JSON.parse(JSON.stringify(o));
   const beYear = d => new Date(d).getFullYear() + 543;
-  const emailOf = username => `${String(username).trim().toLowerCase()}@${UDOMAIN}`;
+  // ชื่อผู้ใช้ที่เป็นเบอร์โทร (คนขับ) พิมพ์แบบมีขีด/เว้นวรรคก็ได้ — ตัดเหลือตัวเลขล้วน เช่น 081-448-5831 → 0814485831
+  const normUser = u => { const s = String(u || '').trim().toLowerCase(); return /^[\d\s-]+$/.test(s) ? s.replace(/\D/g, '') : s; };
+  const emailOf = username => `${normUser(username)}@${UDOMAIN}`;
   const isUsernameEmail = e => String(e || '').endsWith('@' + UDOMAIN);
   const usernameOf = e => isUsernameEmail(e) ? e.split('@')[0] : '';
 
@@ -1002,7 +1004,7 @@ const Store = (() => {
     },
     async createUsernameAccount({ username, password, name, roles, driverId, phone }) {
       needAdmin();
-      username = String(username || '').trim().toLowerCase();
+      username = normUser(username);
       if (!/^[a-z0-9._-]{3,30}$/.test(username)) throw new Error('ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - (3–30 ตัว)');
       if (String(password || '').length < 6) throw new Error('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร');
       if (user(emailOf(username))) throw new Error('ชื่อผู้ใช้นี้ถูกใช้แล้ว');

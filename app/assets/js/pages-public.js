@@ -174,7 +174,7 @@
           ${S.LOCAL ? `<div class="demo-accts" id="demoG" hidden>${demoGoogle.map(u => `<button data-em="${esc(u.email)}">${UI.avatar(u.name)}<span><b>${esc(u.name)}</b><small>${esc(u.email)} · ${(u.roles || []).map(r => S.ROLES[r]).join(', ')}</small></span></button>`).join('')}</div>` : ''}
           <div class="or">หรือ สำหรับแอดมิน / พนักงานขับรถ</div>
           <form id="uForm" class="stack" autocomplete="on">
-            <div class="field"><label>ชื่อผู้ใช้ (username)</label><input name="u" autocomplete="username" required autocapitalize="none"></div>
+            <div class="field"><label>ชื่อผู้ใช้ / เบอร์โทร (สำหรับคนขับ)</label><input name="u" autocomplete="username" required autocapitalize="none" placeholder="เช่น 0812345678"></div>
             <div class="field"><label>รหัสผ่าน</label><div class="pw-wrap"><input name="p" type="password" autocomplete="current-password" required><button type="button" data-eye aria-label="แสดงรหัสผ่าน">${icon('eye')}</button></div></div>
             <button class="btn btn-primary btn-block" type="submit">${icon('login')} เข้าสู่ระบบ</button>
           </form>
