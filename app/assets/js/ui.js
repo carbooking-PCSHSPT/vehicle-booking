@@ -93,6 +93,7 @@ const UI = (() => {
         } else close(a.value ?? true);
       });
       if (onOpen) onOpen(el, close);
+      stackTables(el);
       const f = el.querySelector('input:not([type=hidden]),textarea,select');
       if (f && !('ontouchstart' in window)) setTimeout(() => f.focus(), 60);
     });
@@ -139,6 +140,29 @@ const UI = (() => {
     $$('img[data-file]', root).forEach(img => {
       if (img._h) return; img._h = 1;
       Store.fileUrl(img.dataset.file).then(u => { img.src = u; }).catch(() => { img.alt = 'โหลดรูปไม่สำเร็จ'; img.classList.add('broken'); });
+    });
+    stackTables(root);
+  }
+  // ตาราง 4 คอลัมน์ขึ้นไป → บนมือถือแสดงเป็นการ์ดทีละแถว (CSS .lt640 .tbl.tbl-cards) โดยติดป้ายชื่อคอลัมน์ให้แต่ละช่อง
+  function stackTables(root = document) {
+    $$('table.tbl', root).forEach(t => {
+      if (t.classList.contains('mtx') || t.dataset.nostack != null) return;
+      const head = t.tHead && t.tHead.rows[0];
+      const hs = head ? [...head.cells].map(th => th.textContent.trim()) : [];
+      if (hs.length < 4) return;
+      t.classList.add('tbl-cards');
+      [...t.tBodies, ...(t.tFoot ? [t.tFoot] : [])].forEach(sec => [...sec.rows].forEach(tr => {
+        const cells = [...tr.cells]; let col = 0;
+        cells.forEach((td, k) => {
+          if (td.colSpan > 1) td.classList.add('st-span');
+          else {
+            td.dataset.label = hs[col] || '';
+            if (k === 0) td.classList.add('st-head');
+            else if (!hs[col] && k === cells.length - 1) { td.classList.add('st-act'); tr.classList.add('st-has-act'); }
+          }
+          col += td.colSpan || 1;
+        });
+      }));
     });
   }
   async function openFile(ref) {

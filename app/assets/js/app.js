@@ -369,6 +369,8 @@ const App = (() => {
               ${onlyDriver ? '' : `<a href="#/my"><span class="dd-ic">${icon('clipboard')}</span><span><strong>การขอใช้รถของฉัน</strong></span></a>`}
               ${back ? `<a href="#/admin"><span class="dd-ic">${icon('shield')}</span><span><strong>ระบบหลังบ้าน</strong></span></a>` : ''}
               <div class="dd-sep"></div>
+              ${ViewMode.pickerHTML()}
+              <div class="dd-sep"></div>
               <button class="dd-item" data-logout><span class="dd-ic">${icon('logout')}</span><span><strong>ออกจากระบบ</strong></span></button>
             </div>
           </div>` : `<a class="btn btn-primary btn-sm" href="#/login">${icon('login')}<span>เข้าสู่ระบบ</span></a>`}</div>
@@ -386,6 +388,7 @@ const App = (() => {
             <div><strong>ระบบยานพาหนะ</strong><span>${esc(s.division)}<br>${esc(s.schoolName)}</span></div></div>
           <ul class="footer-links"><li><a href="#/request">ขอใช้รถ</a></li><li><a href="#/schedule">ตารางรถ</a></li><li><a href="#/vehicles">ข้อมูลรถ</a></li><li><a href="#/my">การขอใช้รถของฉัน</a></li><li><a href="#/contact">ติดต่อเรา</a></li></ul>
         </div>
+        ${ViewMode.pickerHTML('in-footer')}
         <div class="footer-bottom"><span><span class="line"></span>© ${new Date().getFullYear() + 543} ${esc(s.division)}</span><span>${esc(s.schoolNameEn)}</span></div>
       </div>
     </footer>`;
@@ -522,6 +525,8 @@ const App = (() => {
       if (e.target.closest('[data-logout]')) { Store.logout().then(() => go('#/')); }
       if (e.target.closest('[data-seen]')) { e.preventDefault(); Store.markSeen(); }
       if (e.target.closest('[data-reset]')) UI.confirm('ล้างข้อมูลทั้งหมดในโหมดทดลอง แล้วสร้างข้อมูลตัวอย่างใหม่?', { title: 'ล้างข้อมูลตัวอย่าง', ok: 'ล้างข้อมูล', danger: true }).then(ok => ok && Store.reset());
+      const vm = e.target.closest('[data-vmode]');
+      if (vm) { const m = vm.dataset.vmode; if (m !== ViewMode.get()) { ViewMode.set(m); UI.toast(m === 'auto' ? 'ปรับมุมมองอัตโนมัติตามขนาดจอ' : `เปลี่ยนเป็นมุมมอง${ViewMode.MODES[m].label}แล้ว`); } return; }
       const op = e.target.closest('[data-view]');
       if (op) { e.preventDefault(); UI.openFile(op.dataset.view); return; }
       // การ์ดที่กดได้ทั้งใบ (ไม่ใช้ <a> ซ้อน <a>)

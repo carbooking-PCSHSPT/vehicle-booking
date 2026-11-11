@@ -128,7 +128,7 @@
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
           <tbody>${list.map(r => `<tr class="click" data-href="#/admin/requests/${r.id}">
-            <td><b>${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
+            <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
             <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${r.overnight ? '<small>ค้างคืน</small>' : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
             <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
