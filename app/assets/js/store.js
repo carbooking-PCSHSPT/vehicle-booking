@@ -890,6 +890,17 @@ const Store = (() => {
         return r;
       });
     },
+    // แอดมินแนบบันทึกข้อความฉบับลงนามครบ (ผู้ขอ · หัวหน้างานยานพาหนะ · รองผู้อำนวยการ) เก็บเป็นหลักฐานของฝ่าย
+    async attachSigned(id, files) {
+      needAdmin();
+      if (!(files || []).length) throw new Error('กรุณาเลือกไฟล์ที่สแกน');
+      const refs = await A.upload(files, { kind: 'memo', ref: id, label: 'บันทึกอนุมัติลงนาม' });
+      return mutateReq(id, r => { r.signed = [...(r.signed || []), ...refs]; r.history.push(H('signed', 'แนบบันทึกข้อความฉบับลงนาม')); return r; });
+    },
+    async removeSigned(id, ref) {
+      needAdmin();
+      return mutateReq(id, r => { r.signed = (r.signed || []).filter(x => x !== ref); r.history.push(H('signed', 'ลบไฟล์ฉบับลงนาม 1 ไฟล์')); return r; });
+    },
     // แอดมินยกเว้นบันทึกข้อความ (เช่น ผู้อำนวยการสั่งการด้วยวาจา / บุคคลภายนอก) — ต้องระบุเหตุผล
     async waiveMemo(id, note) {
       needAdmin();

@@ -761,8 +761,11 @@
       html: `<div class="page"><div class="container">
         <a class="crumb" href="#/my">${icon('arrowL')} การขอใช้รถของฉัน</a>
         <div class="page-head"><div><div class="eyebrow">${r.id}${r.emergency ? ' · บันทึกโดยแอดมิน (เร่งด่วน)' : ''}</div><h1>${esc(S.destName(r))}</h1><p>ส่งเมื่อ ${fmt.dt(r.createdAt)}</p></div>
-          <div class="row">${mine ? `<a class="btn btn-ghost btn-sm" href="#/request?copy=${r.id}">${icon('copy')} คัดลอกเป็นคำขอใหม่</a>` : ''}${canEdit ? `<a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} ${r.status === 'revise' ? 'แก้ไขและส่งใหม่' : 'แก้ไข'}</a>` : ''}${canCancel ? `<button class="btn btn-danger btn-sm" id="cancelBtn">${icon('xCircle')} ยกเลิกคำขอ</button>` : ''}</div></div>
+          <div class="row">${C.canMemo(r) && (mine || S.isAdmin(S.me)) ? `<button class="btn btn-primary btn-sm" id="memoPrint">${icon('printer')} พิมพ์บันทึกข้อความ</button>` : ''}${mine ? `<a class="btn btn-ghost btn-sm" href="#/request?copy=${r.id}">${icon('copy')} คัดลอกเป็นคำขอใหม่</a>` : ''}${canEdit ? `<a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} ${r.status === 'revise' ? 'แก้ไขและส่งใหม่' : 'แก้ไข'}</a>` : ''}${canCancel ? `<button class="btn btn-danger btn-sm" id="cancelBtn">${icon('xCircle')} ยกเลิกคำขอ</button>` : ''}</div></div>
         <div style="margin-bottom:18px">${decisionBox(r)}</div>
+        ${C.canMemo(r) && mine ? `<div class="note-box ${(r.signed || []).length ? 'green' : 'navy'}" style="margin-bottom:18px">${icon((r.signed || []).length ? 'checkCircle' : 'file')}<div>${(r.signed || []).length
+          ? `<b>งานยานพาหนะเก็บบันทึกข้อความฉบับลงนามแล้ว</b><div class="thumbs" style="margin-top:6px">${r.signed.map(p => UI.thumb(p, 'sm')).join('')}</div>`
+          : `<b>อนุมัติแล้ว</b> — กด "พิมพ์บันทึกข้อความ" ลงนามในช่องผู้ขอใช้รถ แล้วส่งที่งานยานพาหนะ เพื่อเสนอหัวหน้างานยานพาหนะและรองผู้อำนวยการฯ ลงนาม`}</div></div>` : ''}
         ${S.needsMemo(r) && (mine || S.isAdmin(S.me)) ? `<div class="card memo-late" style="margin-bottom:18px"><div class="card-head"><h3>${icon('filePlus')} แนบบันทึกข้อความตามหลัง</h3><span class="pill tone-bad">ค้างบันทึกข้อความ</span></div>
           <p class="hint" style="margin-bottom:12px">คำขอนี้แอดมินบันทึกแทนให้กรณีเร่งด่วน — ${mine ? 'ต้องแนบบันทึกข้อความที่มีลายเซ็นผู้อำนวยการ (หรือผู้รักษาราชการแทน) ก่อน จึงจะขอใช้รถครั้งต่อไปได้' : 'ผู้ขอยังไม่ได้แนบ แอดมินแนบแทนได้'} · ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</p>
           ${C.filePicker('memoLate', [], { label: 'เลือกไฟล์บันทึกข้อความ', pdf: true })}
@@ -776,6 +779,7 @@
           </div>
         </div></div></div>`,
       mount(root) {
+        $('#memoPrint', root)?.addEventListener('click', () => C.printMemo(S.request(r.id)));
         if ($('#memoSave', root)) {
           const getMemo = C.bindFilePicker(root, 'memoLate', [], { pdf: true });
           $('#memoSave', root).addEventListener('click', e => {

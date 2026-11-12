@@ -240,7 +240,7 @@ const C = (() => {
   }
 
   // ประวัติคำขอ
-  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'],submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
+  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'], signed: ['file', 'บันทึกข้อความฉบับลงนาม'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
   const history = r => `<div class="hist">${(r.history || []).slice().reverse().map(h => { const [ic, t] = HIST[h.action] || ['info', h.action]; return `<div class="hist-item"><span class="hi">${icon(ic)}</span><div><b>${t}${h.action === 'depart' || h.action === 'return' ? ` · ${esc(h.note)}` : ''}</b><small>${esc(h.byName || h.by || '')} · ${fmt.dt(h.at)}</small>${h.note && !['depart', 'return'].includes(h.action) ? `<p>${esc(h.note)}</p>` : ''}</div></div>`; }).join('')}</div>`;
 
   // รถที่ได้รับมอบหมาย (สำหรับผู้ขอ/แอดมินดู)
@@ -389,7 +389,71 @@ const C = (() => {
     return api;
   }
 
-  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer };
+  // ═════════ บันทึกข้อความขออนุญาตใช้รถ (หลักฐานของฝ่าย · พิมพ์ A4 ลงนาม 3 ฝ่าย) ═════════
+  // ผู้ลงนาม: ตั้งค่า → "บันทึกข้อความอนุมัติใช้รถ" (ว่าง = ใช้ชื่อจากคณะทำงานในหน้าติดต่อเรา)
+  function memoSettings() {
+    const st = S().db.settings, m = st.memo || {}, cm = st.committee || [];
+    const byPos = re => (cm.find(c => re.test(c.position || '') && c.name) || {}).name || '';
+    return {
+      to: m.to || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป',
+      noPrefix: m.noPrefix || '',
+      headName: m.headName || byPos(/หัวหน้างานยานพาหนะ/), headPos: m.headPos || 'หัวหน้างานยานพาหนะ',
+      depName: m.depName || byPos(/รองผู้อำนวยการ/), depPos: m.depPos || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป'
+    };
+  }
+  const canMemo = r => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);
+  function printMemo(r) {
+    const s = S(), st = s.db.settings, M = memoSettings();
+    const dTh = d => new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+    const tm = d => `${UI.fmt.time(d)} น.`;
+    const dots = n => '.'.repeat(n);
+    const u = s.user(r.requester.email) || (s.me && s.me.email === r.requester.email ? s.me : {}) || {};
+    const pos = u.position || '';
+    const t = s.tripType(r), sameDay = s.sameDay(r.startAt, r.endAt);
+    const when = sameDay ? `วันที่ ${dTh(r.startAt)} เวลา ${UI.fmt.time(r.startAt)} – ${tm(r.endAt)}`
+      : `ตั้งแต่วันที่ ${dTh(r.startAt)} เวลา ${tm(r.startAt)} ถึงวันที่ ${dTh(r.endAt)} เวลา ${tm(r.endAt)}`;
+    const pax = s.passengers(r);
+    const paxParts = [r.teachers ? `ครู/บุคลากร ${r.teachers} คน` : '', r.students ? `นักเรียน ${r.students} คน` : '', r.others ? `บุคคลอื่น ${r.others} คน` : ''].filter(Boolean).join(' ');
+    const dests = (r.destinations || []).map(d => d.name + (d.province ? ` จังหวัด${d.province.replace(/^จ(\.|ังหวัด)\s*/, '')}` : '')).join(', ') || s.destName(r);
+    const asg = r.assignments || [];
+    const apv = (r.history || []).filter(h => h.action === 'approve').pop();
+    const sig = (role, name, p) => `<div class="mm-sig"><p>(ลงชื่อ) ${dots(42)} ${role}</p><p>(${name ? esc(name) : dots(40)})</p><p>ตำแหน่ง ${p ? esc(p) : dots(36)}</p></div>`;
+    const html = `<div class="memo-doc">
+      <div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>
+      <div class="mm-line"><b>ส่วนราชการ</b><span>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
+      <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${r.id}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(r.createdAt)}</span></div></div>
+      <div class="mm-line"><b>เรื่อง</b><span>ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน</span></div>
+      <hr>
+      <p class="mm-to"><b>เรียน</b> ${esc(M.to)}</p>
+      <p class="mm-p">ด้วยข้าพเจ้า ${esc(r.requester.name)}${pos ? ` ตำแหน่ง ${esc(pos)}` : ''}${r.requester.dept ? ` ${esc(r.requester.dept)}` : ''} มีความประสงค์ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน เพื่อ${esc(r.purpose || '')}${r.project ? ` (${esc(r.project)})` : ''} โดยมีรายละเอียดดังนี้</p>
+      <ol class="mm-list">
+        <li><b>สถานที่ไปราชการ</b> ${esc(dests)}</li>
+        <li><b>กำหนดเดินทาง</b> ${when} (${esc(s.TRIP[t].label)}${t === 'overnight' && r.lodging ? ` · ที่พัก ${esc(r.lodging)}` : ''})</li>
+        <li><b>ผู้เดินทาง</b> รวม ${pax} คน${paxParts ? ` (${paxParts})` : ''}${r.passengerNames ? ` ได้แก่ ${esc(r.passengerNames)}` : ''}</li>
+        <li><b>จุดขึ้นรถ</b> ${esc(r.pickup || '-')} · <b>โทรศัพท์ติดต่อระหว่างเดินทาง</b> ${esc(r.contactPhone || r.requester.phone || '-')}</li>
+        ${r.note ? `<li><b>หมายเหตุ</b> ${esc(r.note)}</li>` : ''}
+      </ol>
+      <p class="mm-p">จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต</p>
+      <div class="mm-right">${sig('ผู้ขอใช้รถ', r.requester.name, pos)}</div>
+      <div class="mm-boxes">
+        <div class="mm-box"><h3>ความเห็นหัวหน้างานยานพาหนะ</h3>
+          <p>เรียน ${esc(M.to)}</p>
+          <p class="mm-ind">งานยานพาหนะได้ตรวจสอบแล้ว และจัดรถให้ดังนี้</p>
+          ${asg.length ? `<ul>${asg.map(a => `<li>${esc(vName(a.vehicleId))}${vPlate(a.vehicleId) ? ` ทะเบียน ${esc(vPlate(a.vehicleId))}` : ''} · พนักงานขับรถ ${esc(dName(a.driverId))}${dPhone(a.driverId) ? ` โทร ${esc(dPhone(a.driverId))}` : ''}</li>`).join('')}</ul>` : `<p>${dots(70)}</p>`}
+          ${r.decision && r.decision.note ? `<p class="mm-note">หมายเหตุ: ${esc(r.decision.note)}</p>` : ''}
+          <p class="mm-ind">เห็นควรอนุญาต</p>
+          ${sig('', M.headName, M.headPos)}<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p></div>
+        <div class="mm-box"><h3>ความเห็น / คำสั่ง</h3>
+          <p class="mm-chk"><span class="cb"></span> อนุญาต &nbsp;&nbsp;&nbsp; <span class="cb"></span> ไม่อนุญาต</p>
+          <p>${dots(70)}</p><p>${dots(70)}</p>
+          ${sig('', M.depName, M.depPos)}<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p></div>
+      </div>
+      <p class="mm-foot">อ้างอิงระบบยานพาหนะ เลขที่คำขอ ${r.id} · ส่งคำขอ ${UI.fmt.dt(r.createdAt)}${apv ? ` · จัดรถ/อนุมัติในระบบโดย ${esc(apv.byName || apv.by)} เมื่อ ${UI.fmt.dt(apv.at)}` : ''} · พิมพ์เมื่อ ${UI.fmt.dt(new Date().toISOString())}</p>
+    </div>`;
+    UI.printDoc(html, { title: `บันทึกข้อความขอใช้รถ ${r.id}`, margin: '15mm 18mm 12mm 25mm', pageNo: false });
+  }
+
+  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, canMemo, memoSettings };
 })();
 
 const App = (() => {

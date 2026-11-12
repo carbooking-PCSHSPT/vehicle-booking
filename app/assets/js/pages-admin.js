@@ -198,7 +198,7 @@
       layout: 'admin', live: false,
       html: `<a class="crumb" href="#/admin/requests">${icon('arrowL')} รายการคำขอ</a>
         ${head(`${r.id}${r.emergency ? ' · เร่งด่วน' : ''}`, esc(S.destName(r)), `ส่งเมื่อ ${fmt.dt(r.createdAt)} · ${esc(r.requester.name)}`,
-          `${docs.length ? `<button class="btn btn-ghost btn-sm dv-toggle" id="dvToggle" aria-pressed="${dvOpen}">${icon('file')} <span>${dvOpen ? 'ซ่อนบันทึกข้อความ' : 'แสดงบันทึกข้อความคู่กัน'}</span></button>` : ''}${['pending', 'revise', 'approved'].includes(r.status) ? `<a class="btn btn-ghost btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขข้อมูล</a>` : ''}${['pending', 'revise', 'approved'].includes(r.status) && r.assignments.every(a => a.status === 'assigned') ? `<button class="btn btn-ghost btn-sm" id="aCancel">${icon('xCircle')} ยกเลิก</button>` : ''}${r.status === 'returned' ? `<button class="btn btn-ok btn-sm" id="aClose">${icon('check')} ปิดงาน</button>` : ''}${r.status === 'closed' ? `<button class="btn btn-ghost btn-sm" id="aReopen">${icon('refresh')} เปิดงานอีกครั้ง</button>` : ''}`)}
+          `${C.canMemo(r) ? `<button class="btn btn-primary btn-sm" data-memo>${icon('printer')} พิมพ์บันทึกข้อความ</button>` : ''}${docs.length ? `<button class="btn btn-ghost btn-sm dv-toggle" id="dvToggle" aria-pressed="${dvOpen}">${icon('file')} <span>${dvOpen ? 'ซ่อนบันทึกข้อความ' : 'แสดงบันทึกข้อความคู่กัน'}</span></button>` : ''}${['pending', 'revise', 'approved'].includes(r.status) ? `<a class="btn btn-ghost btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขข้อมูล</a>` : ''}${['pending', 'revise', 'approved'].includes(r.status) && r.assignments.every(a => a.status === 'assigned') ? `<button class="btn btn-ghost btn-sm" id="aCancel">${icon('xCircle')} ยกเลิก</button>` : ''}${r.status === 'returned' ? `<button class="btn btn-ok btn-sm" id="aClose">${icon('check')} ปิดงาน</button>` : ''}${r.status === 'closed' ? `<button class="btn btn-ghost btn-sm" id="aReopen">${icon('refresh')} เปิดงานอีกครั้ง</button>` : ''}`)}
         <div class="rq-split ${docs.length ? 'has-doc' : ''} ${docs.length && dvOpen ? 'dv-open' : ''}">
         ${docs.length ? `<div class="rq-doc">${C.docSlot()}</div>
           <button type="button" class="dv-fab no-print" id="dvFab">${icon('file')} บันทึกข้อความ${docs.length > 1 ? ` (${docs.length})` : ''}</button>` : ''}
@@ -232,12 +232,28 @@
               <div class="stack">${exp.map(e => `<div class="exp-row"><span class="ei">${icon(e.type === 'fuel' ? 'fuel' : 'coins')}</span><div><b>${S.EXPENSE[e.type]} · ${esc(C.vName(e.vehicleId))}</b><small>${fmt.date(e.date)}${e.station ? ' · ' + esc(e.station) : ''}${e.liters ? ` · ${e.liters} ล. × ${e.pricePerL} บ.` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''} · โดย ${esc(e.byName || e.by)}</small>${(e.photos || []).length ? `<div class="thumbs" style="margin-top:6px">${e.photos.map(p => UI.thumb(p, 'sm')).join('')}</div>` : ''}</div><span class="money">${fmt.money(e.amount)} ฿</span><div class="row" style="gap:4px"><button class="icon-btn sm" data-eexp="${e.id}" aria-label="แก้ไข">${icon('edit')}</button><button class="icon-btn sm" data-dexp="${e.id}" aria-label="ลบ">${icon('trash')}</button></div></div>`).join('') || UI.empty('ยังไม่มีการบันทึกค่าใช้จ่าย', 'fuel')}</div>
               ${exp.length ? `<div class="row between" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--navy-50)"><b>รวม</b><span class="money">${fmt.money(expTotal)} บาท</span></div>` : ''}
             </div>` : ''}
+            ${C.canMemo(r) ? `<div class="card memo-card"><div class="card-head"><h3>${icon('file')} บันทึกข้อความขอใช้รถ</h3><button class="btn btn-primary btn-sm" data-memo>${icon('printer')} พิมพ์ / PDF</button></div>
+              <ol class="memo-steps"><li>พิมพ์บันทึกข้อความ (ข้อมูลคำขอ + รถ/คนขับที่จัดให้)</li><li>ลงนาม: ผู้ขอใช้รถ → หัวหน้างานยานพาหนะ → รองผู้อำนวยการฯ</li><li>สแกนแล้วแนบกลับที่นี่ เก็บเป็นหลักฐานของฝ่าย</li></ol>
+              ${(r.signed || []).length ? `<div class="note-box green" style="margin-bottom:10px">${icon('checkCircle')}<div><b>เก็บฉบับลงนามแล้ว</b> (${r.signed.length} ไฟล์)<div class="thumbs" style="margin-top:6px">${r.signed.map(p => `<span class="sg-item">${UI.thumb(p, 'sm')}<button type="button" class="icon-btn sm" data-rmsig="${esc(p)}" aria-label="ลบไฟล์นี้">${icon('trash')}</button></span>`).join('')}</div></div></div>` : `<p style="margin-bottom:10px"><span class="pill tone-warn">ยังไม่มีฉบับลงนาม</span></p>`}
+              ${C.filePicker('sig', [], { label: 'แนบไฟล์สแกนฉบับลงนาม', pdf: true })}
+              <button class="btn btn-ghost btn-sm" id="sigSave" style="margin-top:10px">${icon('upload')} บันทึกไฟล์ฉบับลงนาม</button></div>` : ''}
             <div class="card"><div class="card-head"><h3>${icon('activity')} ความเคลื่อนไหว</h3></div>${C.history(r)}</div>
           </div>
         </div>
         </div></div>`,
       mount(root) {
         const P = (canDecide || canReassign) ? bindVehiclePicker(root, () => S.passengers(r)) : null;
+        const getSig = $('#sigSave', root) ? C.bindFilePicker(root, 'sig', [], { pdf: true }) : null;
+        root.querySelectorAll('[data-memo]').forEach(b => b.addEventListener('click', () => C.printMemo(S.request(r.id))));
+        $('#sigSave', root)?.addEventListener('click', e => {
+          const files = getSig(); if (!files.length) return UI.toast('กรุณาเลือกไฟล์ที่สแกน', 'error');
+          UI.busy(e.currentTarget, () => S.attachSigned(r.id, files)).then(() => { UI.toast('เก็บบันทึกข้อความฉบับลงนามแล้ว'); App.render(); }).catch(() => {});
+        });
+        root.addEventListener('click', async e => {
+          const rm = e.target.closest('[data-rmsig]'); if (!rm) return;
+          e.stopPropagation();
+          if (await UI.confirm('ลบไฟล์ฉบับลงนามนี้ออกจากคำขอ?', { danger: true, ok: 'ลบ' })) S.removeSigned(r.id, rm.dataset.rmsig).then(() => { UI.toast('ลบแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error'));
+        });
         Pages._catPicker.bind(root, 'dcat');
         const DVA = docs.length ? C.mountDocViewer(root, docs, r.id + '|' + docs.join(',')) : null;
         const split = root.querySelector('.rq-split');
@@ -883,6 +899,16 @@
             <div class="field"><label>ต้องขอใช้รถล่วงหน้าอย่างน้อย (วัน)</label><input name="leadDays" type="number" min="0" value="${s.leadDays}"></div>
             <div class="field"><label>งานประจำ: ขอก่อนเวลาออกอย่างน้อย (ชั่วโมง)</label><input name="quickLeadHours" type="number" min="0" step="0.5" value="${S.quickHours()}"><span class="hint">ใช้กับหมวดที่ติ๊ก "งานประจำ" ด้านล่าง — ขอในวันได้ ไม่ต้องแนบบันทึกข้อความ</span></div>
           </div></div>
+          <div class="form-section"><h3>${icon('file')} บันทึกข้อความขอใช้รถ <span class="hint" style="font-weight:400">(เอกสารที่พิมพ์ให้ลงนามหลังอนุมัติ · เว้นชื่อว่าง = ใช้ชื่อจากคณะทำงานด้านล่าง)</span></h3>
+            ${(() => { const M = C.memoSettings(), m = s.memo || {}; return `<div class="grid2">
+              <div class="field"><label>เรียน</label><input name="m_to" value="${esc(m.to || '')}" placeholder="${esc(M.to)}"></div>
+              <div class="field"><label>คำนำหน้าเลขที่หนังสือ (ช่อง "ที่")</label><input name="m_noPrefix" value="${esc(m.noPrefix || '')}" placeholder="(ถ้ามี) เช่น ยพ."><span class="hint">ต่อด้วยเลขที่คำขอ เช่น ยพ. VR-2569-0012</span></div>
+              <div class="field"><label>ชื่อหัวหน้างานยานพาหนะ</label><input name="m_headName" value="${esc(m.headName || '')}" placeholder="${esc(M.headName || 'ชื่อ-นามสกุล')}"></div>
+              <div class="field"><label>ตำแหน่ง</label><input name="m_headPos" value="${esc(m.headPos || '')}" placeholder="${esc(M.headPos)}"></div>
+              <div class="field"><label>ชื่อรองผู้อำนวยการฝ่ายบริหารงานทั่วไป</label><input name="m_depName" value="${esc(m.depName || '')}" placeholder="${esc(M.depName || 'ชื่อ-นามสกุล')}"></div>
+              <div class="field"><label>ตำแหน่ง</label><input name="m_depPos" value="${esc(m.depPos || '')}" placeholder="${esc(M.depPos)}"></div>
+            </div>`; })()}
+            <p class="hint" style="margin-top:8px">${icon('info')} ตราครุฑมุมซ้ายบน: วางไฟล์รูปครุฑชื่อ <b>krut.png</b> ในโฟลเดอร์ <b>app/images</b> แล้ว Commit/Push (ถ้าไม่มี ระบบใช้ตราโรงเรียนแทน)</p></div>
           <div class="form-section"><h3>${icon('flag')} หมวดงาน <span class="hint" style="font-weight:400">(ใช้ในแบบฟอร์มขอใช้รถและสถิติ · หมวดที่เคยใช้แล้วซ่อนได้แต่ลบไม่ได้)</span></h3>
             <div class="stack" id="catList">${cats.map((c, i) => { const n = S.db.requests.filter(r => r.category === c.id).length; return `<div class="cat-row ${c.active === false ? 'off' : ''}" data-ci2="${i}">
               <span class="ci">${icon(c.icon || 'info')}</span>
@@ -926,7 +952,8 @@
           const f = UI.formData($('#sf', root));
           const committee = $$('[data-ci]', root).map(row => { const i = +row.dataset.ci; const o = { ...(cm[i] || { id: 'c' + Date.now() + i }) }; $$('[data-k]', row).forEach(el => { o[el.dataset.k] = el.dataset.k === 'level' ? +el.value : el.value; }); o.photo = (photoGetters[i] ? photoGetters[i]() : [])[0] || ''; return o; });
           const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.quick = c.id !== 'other' && row.querySelector('[data-ck=quick]').checked; c.order = i; return c; });
-          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactPhone: f.contactPhone, contactLine: f.contactLine, contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories };
+          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactPhone: f.contactPhone, contactLine: f.contactLine, contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
+            memo: { to: f.m_to.trim(), noPrefix: f.m_noPrefix.trim(), headName: f.m_headName.trim(), headPos: f.m_headPos.trim(), depName: f.m_depName.trim(), depPos: f.m_depPos.trim() } };
         };
         const saveCats = async mut => { const x = collect(); mut(x.categories); x.categories.forEach((c, i) => { c.order = i; }); await S.saveSettings(x); App.render(); };
         root.addEventListener('click', async e => {

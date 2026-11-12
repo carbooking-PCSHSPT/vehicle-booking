@@ -244,10 +244,10 @@ const UI = (() => {
   }
   // พิมพ์ / บันทึก PDF: วางเอกสารไว้ใน #printArea แล้วเรียกหน้าต่างพิมพ์ของเบราว์เซอร์ (เลือก "บันทึกเป็น PDF" ได้)
   // ใช้ฟอนต์ไทยของหน้าเว็บได้ครบ ไม่ต้องใช้ไลบรารีสร้าง PDF · ชื่อไฟล์ PDF = title
-  async function printDoc(html, { title = 'เอกสาร', landscape = false } = {}) {
+  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true } = {}) {
     $('#printArea')?.remove(); $('#printPage')?.remove();
     const area = document.createElement('div'); area.id = 'printArea'; area.className = 'print-doc'; area.innerHTML = html;
-    const st = document.createElement('style'); st.id = 'printPage'; st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'}; }`;
+    const st = document.createElement('style'); st.id = 'printPage'; st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'};${margin ? ` margin: ${margin};` : ''}${pageNo ? '' : ' @bottom-right { content: none; }'} }`;
     document.body.appendChild(area); document.head.appendChild(st);
     hydrate(area);
     const imgs = $$('img', area);
