@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo · หน้าแรกคนขับ (3 แบบ)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-2: #3b47b8; --navy-50: #eef0fa; --navy-100: #dde1f3; --gold: #c9962b; --gold-2: #e8c36a; --gold-50: #fbf3e1; --cream: #fbf7ef; --sand: #f6f0e3; --ink: #1b1f3b; --ink-2: #3b3f5e; --muted: #6e6a7c; --line: rgba(80, 60, 20, .12); --line2: rgba(80, 60, 20, .07);
+  --font-display: "Prompt", system-ui, sans-serif; --font-body: "IBM Plex Sans Thai", "Prompt", system-ui, sans-serif;
+  --c-done: #94a3b8; --c-live: #ea580c; --c-ok: #3b47b8; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--cream); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { font-family: var(--font-display); margin: 0; line-height: 1.3; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+.i { width: 1.1em; height: 1.1em; flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.wrap { width: min(100% - 32px, 1280px); margin: 0 auto; }
+.top { padding: 30px 0 4px; } .top h1 { color: var(--navy); font-size: 1.6rem; } .top p { color: var(--muted); margin-top: 6px; max-width: 760px; }
+.jump { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.jump a { padding: 8px 16px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--navy); font-family: var(--font-display); text-decoration: none; font-size: .9rem; }
+.sec { padding: 36px 0 30px; border-top: 3px solid var(--gold); margin-top: 30px; display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 40px; align-items: start; }
+.badge { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--navy); color: #fff; font-family: var(--font-display); font-size: .8rem; margin-bottom: 8px; }
+.about h2 { color: var(--navy); font-size: 1.45rem; }
+.about > p { color: var(--ink-2); margin-top: 8px; }
+.about ul { margin: 16px 0 0; padding-left: 20px; color: var(--ink-2); line-height: 1.75; }
+.about .pros b { color: #047857; } .about .cons b { color: #b45309; }
+.about h4 { margin-top: 18px; font-size: .95rem; color: var(--navy); }
+@media (max-width: 900px) { .sec { grid-template-columns: 1fr; } .phone { margin: 0 auto; } }
+
+/* ── กรอบมือถือ ── */
+.phone { position: relative; width: 390px; max-width: 100%; height: 800px; border-radius: 40px; border: 10px solid #1b1f3b; background: var(--cream); overflow: hidden; box-shadow: 0 40px 80px -40px rgba(20, 20, 50, .6); }
+.scr { height: 100%; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; } .scr::-webkit-scrollbar { display: none; }
+.app-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(251, 247, 239, .94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line2); }
+.app-bar .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #e8c36a, #c9962b); color: var(--navy); font-family: var(--font-display); font-weight: 600; }
+.app-bar b { font-family: var(--font-display); font-size: .98rem; display: block; line-height: 1.2; } .app-bar small { color: var(--muted); font-size: .76rem; }
+.app-bar .bell { margin-left: auto; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; color: var(--ink-2); }
+.pad { padding: 14px 16px 28px; }
+.seg { display: flex; padding: 4px; border-radius: 16px; background: var(--sand); gap: 2px; }
+.seg button { flex: 1; border: 0; background: none; padding: 10px 6px; border-radius: 12px; cursor: pointer; font-family: var(--font-display); font-size: .92rem; color: var(--ink-2); }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 12px -6px rgba(60, 40, 10, .45); font-weight: 600; }
+.seg button small { display: block; font-size: .7rem; color: var(--muted); font-weight: 400; }
+.nav-row { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 10px; }
+.nav-row b { font-family: var(--font-display); color: var(--navy); font-size: 1.02rem; text-align: center; flex: 1; }
+.nav-row button { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; display: grid; place-items: center; color: var(--navy); }
+.today-btn { display: block; margin: -4px auto 8px; border: 0; background: none; color: var(--gold); font-family: var(--font-display); font-size: .82rem; cursor: pointer; }
+.empty { text-align: center; color: var(--muted); padding: 34px 10px; font-size: .92rem; }
+.empty .i { width: 34px; height: 34px; color: var(--gold); display: block; margin: 0 auto 8px; }
+.st { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-family: var(--font-display); font-size: .72rem; white-space: nowrap; }
+.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st.done { color: #475569; background: #ecedf1; } .st.live { color: #c2410c; background: #ffe7d4; } .st.ok { color: #1d4ed8; background: #e0e9ff; }
+.st.live::before { animation: ping 1.4s infinite; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, .6); } 100% { box-shadow: 0 0 0 7px rgba(234, 88, 12, 0); } }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; background: var(--gold-50); color: #8a6414; font-size: .72rem; font-family: var(--font-display); }
+.tag.n { background: var(--navy-50); color: var(--navy); }
+
+/* ── แบบ A: รายการเรียงตามวัน ── */
+.a-next { margin-top: 14px; padding: 16px; border-radius: 22px; background: linear-gradient(135deg, #24307a, #3b47b8); color: #fff; cursor: pointer; box-shadow: 0 18px 30px -18px rgba(36, 48, 122, .8); }
+.a-next small { color: #c7cdff; font-size: .76rem; letter-spacing: .04em; }
+.a-next h3 { font-size: 1.2rem; margin: 2px 0 6px; }
+.a-next .row { display: flex; gap: 8px; flex-wrap: wrap; font-size: .82rem; color: #e1e5ff; }
+.a-next .row span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 8px; background: rgba(255, 255, 255, .12); }
+.a-day { margin-top: 16px; }
+.a-dh { display: flex; align-items: baseline; gap: 8px; padding: 0 4px 6px; font-family: var(--font-display); color: var(--navy); font-size: .9rem; }
+.a-dh small { color: var(--muted); font-weight: 400; font-size: .78rem; }
+.a-dh.today { color: var(--gold); }
+.a-item { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border-radius: 18px; background: #fff; border: 1px solid var(--line); margin-bottom: 8px; cursor: pointer; position: relative; overflow: hidden; transition: transform .15s; }
+.a-item:active { transform: scale(.98); }
+.a-item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+.a-item .t { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; color: var(--navy); text-align: center; line-height: 1.1; }
+.a-item .t small { display: block; font-size: .66rem; color: var(--muted); font-weight: 400; margin-top: 3px; }
+.a-item h4 { font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a-item .m { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+.a-item .m b { color: var(--ink-2); font-weight: 500; }
+.a-item .r { display: grid; justify-items: end; gap: 6px; }
+.a-item.done { opacity: .62; }
+.a-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.a-sum div { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; text-align: center; }
+.a-sum b { display: block; font-family: var(--font-display); font-size: 1.2rem; color: var(--navy); } .a-sum small { font-size: .72rem; color: var(--muted); }
+
+/* ── แบบ B: แถบวันที่ + ตั๋วงาน ── */
+.b-strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; margin: 10px -2px 4px; scrollbar-width: none; scroll-snap-type: x mandatory; }
+.b-strip::-webkit-scrollbar { display: none; }
+.b-d { flex: none; width: 50px; padding: 8px 0 7px; border-radius: 16px; background: #fff; border: 1px solid var(--line); text-align: center; cursor: pointer; scroll-snap-align: center; font-family: var(--font-display); }
+.b-d small { display: block; font-size: .66rem; color: var(--muted); }
+.b-d b { display: block; font-size: 1.1rem; color: var(--ink); line-height: 1.3; }
+.b-d .dots { display: flex; gap: 2px; justify-content: center; height: 6px; margin-top: 2px; } .b-d .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.b-d.today { border-color: var(--gold); } .b-d.today small { color: var(--gold); }
+.b-d.sel { background: var(--navy); border-color: var(--navy); } .b-d.sel small, .b-d.sel b { color: #fff; }
+.b-d.we b { color: #b45309; } .b-d.sel.we b { color: #fff; }
+.b-kpi { display: flex; gap: 8px; margin: 6px 0 4px; }
+.b-kpi div { flex: 1; padding: 10px; border-radius: 14px; background: var(--navy-50); text-align: center; }
+.b-kpi b { display: block; font-family: var(--font-display); color: var(--navy); font-size: 1.15rem; } .b-kpi small { font-size: .72rem; color: var(--muted); }
+.b-tk { display: grid; grid-template-columns: 74px minmax(0, 1fr); margin-top: 10px; border-radius: 20px; background: #fff; border: 1px solid var(--line); cursor: pointer; overflow: hidden; box-shadow: 0 10px 22px -18px rgba(60, 40, 10, .5); transition: transform .15s; }
+.b-tk:active { transform: scale(.98); }
+.b-tk .dt { display: grid; place-content: center; text-align: center; padding: 10px 4px; background: var(--c); color: #fff; font-family: var(--font-display); position: relative; }
+.b-tk .dt small { font-size: .7rem; opacity: .85; } .b-tk .dt b { font-size: 1.5rem; line-height: 1.05; } .b-tk .dt b.rg { font-size: 1.08rem; letter-spacing: -.02em; } .b-tk .dt em { font-style: normal; font-size: .72rem; opacity: .9; }
+.b-tk .dt::after { content: ""; position: absolute; right: -7px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: #fff; }
+.b-tk .bd { padding: 11px 14px 12px 16px; min-width: 0; }
+.b-tk .bd .hd { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.b-tk h4 { font-size: 1rem; line-height: 1.25; }
+.b-tk .when { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: .8rem; color: var(--ink-2); font-family: var(--font-display); }
+.b-tk .when .ln { flex: 1; height: 2px; background: repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 10px); min-width: 16px; }
+.b-tk .when b { font-weight: 600; color: var(--navy); }
+.b-tk .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.b-tk.done { opacity: .6; }
+.b-mh { margin: 18px 4px 0; font-family: var(--font-display); color: var(--muted); font-size: .8rem; }
+
+/* ── แบบ C: ปฏิทิน/แถบเวลา ── */
+.c-cal { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 10px 8px 8px; }
+.c-dow { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: .7rem; color: var(--muted); font-family: var(--font-display); padding-bottom: 4px; }
+.c-wk { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--line2); }
+.c-c { min-height: 30px; padding: 3px 0 0; text-align: center; cursor: pointer; font-family: var(--font-display); font-size: .8rem; color: var(--ink-2); }
+.c-c span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; }
+.c-c.out { color: #c8c3cf; } .c-c.today span { border: 1.5px solid var(--gold); color: var(--gold); } .c-c.sel span { background: var(--navy); color: #fff; border: 0; }
+.c-bars { position: relative; }
+.c-bar { position: absolute; height: 16px; border-radius: 6px; background: var(--c); color: #fff; font-size: .62rem; font-family: var(--font-display); padding: 0 5px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.c-bar.cl { border-top-left-radius: 0; border-bottom-left-radius: 0; } .c-bar.cr { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.c-list h5 { font-family: var(--font-display); color: var(--navy); font-size: .9rem; margin: 16px 4px 8px; }
+.c-it { display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 16px; background: #fff; border: 1px solid var(--line); margin-bottom: 8px; cursor: pointer; }
+.c-it .bar { width: 6px; align-self: stretch; border-radius: 6px; background: var(--c); }
+.c-it h4 { font-size: .95rem; } .c-it small { font-size: .76rem; color: var(--muted); display: block; margin-top: 1px; }
+.c-it .r { margin-left: auto; }
+.c-week { background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+.c-wr { display: grid; grid-template-columns: 54px minmax(0, 1fr); border-top: 1px solid var(--line2); min-height: 52px; }
+.c-wr:first-child { border-top: 0; }
+.c-wr .dn { padding: 8px 4px; text-align: center; font-family: var(--font-display); border-right: 1px solid var(--line2); }
+.c-wr .dn small { display: block; font-size: .66rem; color: var(--muted); } .c-wr .dn b { font-size: 1.05rem; color: var(--ink); }
+.c-wr.today { background: var(--gold-50); } .c-wr.today .dn b { color: var(--gold); }
+.c-wr .ln { padding: 6px; display: grid; gap: 5px; align-content: center; }
+.c-wb { display: flex; justify-content: space-between; gap: 6px; align-items: center; padding: 6px 9px; border-radius: 10px; background: var(--c); color: #fff; font-size: .78rem; font-family: var(--font-display); cursor: pointer; }
+.c-wb span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .c-wb em { font-style: normal; opacity: .85; font-size: .7rem; white-space: nowrap; }
+.c-wb.mid { border-radius: 0; opacity: .85; } .c-wb.first { border-bottom-left-radius: 0; border-bottom-right-radius: 0; } .c-wb.last { border-top-left-radius: 0; border-top-right-radius: 0; }
+.c-free { font-size: .74rem; color: #b8b2c2; padding-left: 4px; }
+.c-tl { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 6px 10px 6px 50px; }
+.c-hr { position: relative; height: 36px; border-top: 1px dashed var(--line); } .c-hr:first-child { border-top: 0; }
+.c-hr small { position: absolute; left: -44px; top: -8px; font-size: .68rem; color: var(--muted); font-family: var(--font-display); }
+.c-blk { position: absolute; left: 50px; right: 10px; border-radius: 12px; background: var(--c); color: #fff; padding: 6px 10px; font-size: .8rem; font-family: var(--font-display); cursor: pointer; overflow: hidden; box-shadow: 0 8px 16px -10px rgba(0, 0, 0, .5); }
+.c-blk b { display: block; font-size: .9rem; } .c-blk small { opacity: .9; }
+.c-now { position: absolute; left: 44px; right: 6px; height: 2px; background: #ea580c; z-index: 2; } .c-now::before { content: ""; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ea580c; }
+
+/* ── หน้ารายละเอียด (เลื่อนขึ้นจากล่าง) ── */
+.sheet-bg { position: absolute; inset: 0; background: rgba(20, 22, 50, .45); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 92%; overflow-y: auto; background: var(--cream); border-radius: 26px 26px 0 0; transform: translateY(100%); transition: transform .3s cubic-bezier(.2, .8, .2, 1); z-index: 21; scrollbar-width: none; }
+.sheet::-webkit-scrollbar { display: none; }
+.phone.open .sheet-bg { opacity: 1; pointer-events: auto; } .phone.open .sheet { transform: none; }
+.sh-grab { width: 44px; height: 5px; border-radius: 5px; background: #d6d0c4; margin: 10px auto 4px; }
+.sh-head { padding: 6px 18px 14px; border-bottom: 1px solid var(--line2); }
+.sh-head .x { float: right; width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; display: grid; place-items: center; }
+.sh-head h3 { font-size: 1.2rem; color: var(--navy); margin-top: 4px; }
+.sh-head p { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+.sh-body { padding: 14px 16px 22px; display: grid; gap: 8px; }
+.kv { padding: 10px 12px; border-radius: 14px; background: #fff; border: 1px solid var(--line2); }
+.kv small { display: block; font-size: .72rem; color: var(--muted); } .kv b { font-weight: 500; font-size: .92rem; } .kv a { color: var(--navy); font-weight: 600; text-decoration: none; }
+.kv2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.big { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 15px; border-radius: 16px; border: 0; font-family: var(--font-display); font-size: 1.02rem; font-weight: 600; cursor: pointer; color: #fff; background: #059669; box-shadow: 0 12px 22px -14px rgba(5, 150, 105, .9); }
+.big.go { background: var(--navy); box-shadow: 0 12px 22px -14px rgba(36, 48, 122, .9); }
+.btn2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.btn2 button { padding: 11px 4px; border-radius: 14px; border: 1px solid var(--line); background: #fff; font-family: var(--font-display); font-size: .8rem; cursor: pointer; display: grid; justify-items: center; gap: 4px; color: var(--ink-2); }
+.btn2 button .i { width: 20px; height: 20px; color: var(--gold); }
+.note { padding: 10px 12px; border-radius: 14px; background: var(--gold-50); border: 1px solid #f1dfb0; font-size: .84rem; color: #6b4e0e; }
+.foot { padding: 40px 0 60px; color: var(--muted); font-size: .85rem; text-align: center; }
+
+/* ── สลับมุมมอง มือถือ / คอมพิวเตอร์ ── */
+.dev-tg { display: inline-flex; padding: 4px; border-radius: 14px; background: var(--sand); gap: 2px; margin: 4px 0 12px; }
+.dev-tg button { border: 0; background: none; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-family: var(--font-display); font-size: .88rem; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.dev-tg button.on { background: #fff; color: var(--navy); font-weight: 600; box-shadow: 0 4px 12px -6px rgba(60, 40, 10, .45); }
+.top .dev-tg { margin-top: 16px; }
+.sec.wide { grid-template-columns: 1fr; gap: 18px; } .sec.wide .about { order: -1; } .sec.wide .about ul { columns: 2; column-gap: 34px; }
+@media (max-width: 900px) { .sec.wide .about ul { columns: 1; } }
+.phone.desk { width: 100%; max-width: 1180px; height: 760px; border-radius: 18px; border-width: 8px; }
+.phone.desk .app-bar { padding: 12px 24px; }
+.phone.desk .pad { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 26px; padding: 22px 26px 30px; align-items: start; }
+.phone.desk .col-l { position: sticky; top: 84px; }
+.phone.desk .a-day:first-child, .phone.desk .col-r > .b-strip:first-child { margin-top: 0; }
+.phone.desk .a-item { grid-template-columns: 74px minmax(0, 1fr) auto; padding: 14px 16px; }
+.phone.desk .b-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .phone.desk .b-list .b-tk { margin-top: 0; } .phone.desk .b-list .empty { grid-column: 1 / -1; }
+.phone.desk .b-strip { flex-wrap: wrap; overflow: visible; } .phone.desk .b-d { width: 58px; }
+.phone.desk.vC .pad { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.phone.desk .c-c { font-size: .9rem; } .phone.desk .c-bar { font-size: .68rem; }
+.phone.desk .sheet { left: auto; top: 0; bottom: 0; width: 430px; max-height: none; border-radius: 22px 0 0 22px; transform: translateX(110%); }
+.phone.desk.open .sheet { transform: none; box-shadow: -20px 0 50px -20px rgba(20, 20, 50, .5); }
+.phone.desk .sh-grab { display: none; } .phone.desk .sh-head { padding-top: 18px; }
+.col-r h5.lst { font-family: var(--font-display); color: var(--navy); font-size: .9rem; margin: 0 4px 10px; }
+.phone:not(.desk) .col-r h5.lst { margin-top: 16px; }
+.phone:not(.desk) .desk-only { display: none; }
+.phone.desk .c-list h5.lst { margin-top: 0; }
+</style>
+</head>
+<body>
+<div class="wrap top">
+  <h1>หน้าแรกคนขับ · 3 แบบให้เลือก</h1>
+  <p>ทุกแบบเปิดมาเห็นภาพรวมงานก่อน (วันนี้ / สัปดาห์ / เดือน) แต่ละรายการบอกแค่ สถานที่แบบสั้น · วันที่ · ไปกี่วัน · กลับวันไหน · สถานะ — กดที่รายการถึงจะเปิดรายละเอียดทั้งหมด พร้อมปุ่มออกเดินทาง / กลับถึง / นำทาง / โทรหาผู้ขอ · ลองกดในกรอบมือถือได้เลย</p>
+  <div class="jump"><a href="#A">แบบ A · รายการเรียงตามวัน</a><a href="#B">แบบ B · แถบวันที่ + ตั๋วงาน</a><a href="#C">แบบ C · ปฏิทิน/แถบเวลา</a></div>
+  <div class="dev-tg" data-all><button class="on" data-dev="m">ดูทุกแบบเป็นมือถือ</button><button data-dev="d">ดูทุกแบบเป็นคอมพิวเตอร์</button></div>
+</div>
+
+<div class="wrap">
+  <section class="sec" id="A">
+    <div class="phone" data-v="A"></div>
+    <div class="about">
+      <div class="dev-tg"><button class="on" data-dev="m">มือถือ</button><button data-dev="d">คอมพิวเตอร์</button></div><br>
+      <span class="badge">แบบ A</span>
+      <h2>รายการเรียงตามวัน (อ่านง่ายที่สุด)</h2>
+      <p>บนสุดเป็นการ์ดใหญ่ "งานถัดไป" ใต้ลงมาเป็นรายการจัดกลุ่มตามวัน — วันนี้ / พรุ่งนี้ / วันถัด ๆ ไป แต่ละแถวเป็นบรรทัดเดียวจบ</p>
+      <ul class="pros">
+        <li><b>ดีตรง:</b> เลื่อนลงอ่านต่อกันได้เหมือนรายการแชท คนขับที่ไม่ถนัดมือถือก็เข้าใจทันที</li>
+        <li><b>ดีตรง:</b> ตัวเลขสรุปช่วงที่เลือก (กี่งาน · กี่วันที่ต้องออก · ค้างคืนกี่คืน)</li>
+        <li><b>ดีตรง:</b> งานหลายวันบอกชัด "3 วัน · กลับ อา 15 พ.ย."</li>
+      </ul>
+      <ul class="cons"><li><b>ข้อจำกัด:</b> ไม่เห็นภาพว่าวันไหนว่าง (ต้องดูจากวันที่ที่ขาดหายไปเอง)</li></ul>
+    </div>
+  </section>
+
+  <section class="sec" id="B">
+    <div class="phone" data-v="B"></div>
+    <div class="about">
+      <div class="dev-tg"><button class="on" data-dev="m">มือถือ</button><button data-dev="d">คอมพิวเตอร์</button></div><br>
+      <span class="badge">แบบ B</span>
+      <h2>แถบวันที่ + ตั๋วงาน</h2>
+      <p>ด้านบนเป็นแถบวันที่เลื่อนซ้าย-ขวา มีจุดสีบอกวันที่มีงาน กดวันไหนก็กรองเฉพาะวันนั้น ใต้ลงมาเป็นการ์ดแบบตั๋ว: ช่องสีด้านซ้ายบอกวันที่ (งานหลายวันบอกช่วง 12–14) ตรงกลางบอก ออก → กลับ</p>
+      <ul class="pros">
+        <li><b>ดีตรง:</b> เห็นทันทีว่าวันไหนมีงาน วันไหนว่าง จากจุดบนแถบวันที่</li>
+        <li><b>ดีตรง:</b> การ์ดใหญ่ ตัววันที่ใหญ่ อ่านง่ายขณะยืนอยู่ข้างรถ</li>
+        <li><b>ดีตรง:</b> สีช่องวันที่ = สถานะ (ส้ม กำลังเดินทาง · น้ำเงิน รอออก · เทา เสร็จแล้ว)</li>
+      </ul>
+      <ul class="cons"><li><b>ข้อจำกัด:</b> มุมมองเดือนการ์ดจะยาว ต้องเลื่อนมากกว่าแบบ A</li></ul>
+    </div>
+  </section>
+
+  <section class="sec" id="C">
+    <div class="phone" data-v="C"></div>
+    <div class="about">
+      <div class="dev-tg"><button class="on" data-dev="m">มือถือ</button><button data-dev="d">คอมพิวเตอร์</button></div><br>
+      <span class="badge">แบบ C</span>
+      <h2>ปฏิทิน / แถบเวลา</h2>
+      <p>แต่ละช่วงใช้ภาพที่เหมาะต่างกัน — <b>วันนี้</b> เป็นแกนเวลาเป็นชั่วโมง · <b>สัปดาห์</b> เป็น 7 แถว งานหลายวันต่อเป็นแถบยาว · <b>เดือน</b> เป็นปฏิทินมีแถบสีพาดข้ามวัน กดวันไหนรายการวันนั้นขึ้นด้านล่าง</p>
+      <ul class="pros">
+        <li><b>ดีตรง:</b> เห็นภาพรวมทั้งเดือนในจอเดียว รู้ทันทีว่าช่วงไหนไม่ว่าง (เหมาะวางแผนลา/ธุระ)</li>
+        <li><b>ดีตรง:</b> งานค้างคืนเห็นเป็นแถบยาวต่อกัน ชัดว่าไปกี่วัน</li>
+      </ul>
+      <ul class="cons"><li><b>ข้อจำกัด:</b> ตัวหนังสือบนแถบในปฏิทินเดือนเล็ก ต้องกดวันเพื่ออ่านชื่อสถานที่เต็ม ๆ</li></ul>
+    </div>
+  </section>
+  <p class="foot">ข้อมูลในเดโมเป็นตัวอย่าง อิงจากวันที่ปัจจุบัน · เลือกแบบแล้วแจ้งได้ (ผสมกันได้ เช่น ใช้แบบ A แต่เพิ่มแถบวันที่ของแบบ B)</p>
+</div>
+
+<script>
+const ICON = {
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  l: '<path d="m15 18-6-6 6-6"/>', r: '<path d="m9 18 6-6-6-6"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  van: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62L18.3 9.38a1 1 0 0 0-.78-.38H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>', users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>', nav: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>', phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  fuel: '<path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M2 22h14"/><path d="M15 10h2a2 2 0 0 1 2 2v3a2 2 0 0 0 4 0V8l-3-3"/><path d="M7 7h4"/>',
+  gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>', home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>', clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'
+};
+const ic = n => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
+
+// ── ข้อมูลตัวอย่าง (อิงวันนี้) ──
+const T0 = new Date(); T0.setHours(0, 0, 0, 0);
+const at = (d, h, m = 0) => { const x = new Date(T0); x.setDate(x.getDate() + d); x.setHours(h, m, 0, 0); return x; };
+const JOBS = [
+  { short: 'กระทรวงศึกษาธิการ', full: 'กระทรวงศึกษาธิการ แขวงวัดโสมนัส เขตป้อมปราบศัตรูพ่าย กรุงเทพฯ', purpose: 'ยื่นเอกสารโครงการห้องเรียนพิเศษ', s: at(-12, 8), e: at(-12, 14), type: 'day', car: 'รถตู้ 01', pax: 'ครู 2', km: 104, req: 'ครูสุภาวดี ทองคำ', tel: '081-234-5678' },
+  { short: 'ม.มหิดล ศาลายา', full: 'มหาวิทยาลัยมหิดล ศาลายา อ.พุทธมณฑล จ.นครปฐม', purpose: 'อบรมครูวิทยาศาสตร์', s: at(-9, 7, 30), e: at(-9, 16), type: 'day', car: 'รถตู้ 01', pax: 'ครู 4', km: 76, req: 'ครูกนกวรรณ ศรีสุข', tel: '080-100-2000' },
+  { short: 'สนามบินดอนเมือง', full: 'ท่าอากาศยานดอนเมือง เขตดอนเมือง กรุงเทพฯ', purpose: 'ไปส่งนักเรียนแข่งขันต่างประเทศ', s: at(-5, 5), e: at(-5, 7, 30), type: 'oneway', car: 'รถตู้ 01', pax: 'ครู 1 · นักเรียน 6', km: 48, req: 'ครูชนิดา ลือชัย', tel: '089-555-1212' },
+  { short: 'สพม.ปทุมธานี', full: 'สำนักงานเขตพื้นที่การศึกษามัธยมศึกษาปทุมธานี ต.บางปรอก อ.เมือง จ.ปทุมธานี', purpose: 'ประชุมผู้บริหาร', s: at(-1, 8), e: at(-1, 12), type: 'day', car: 'รถตู้ 01', pax: 'ครู 3', km: 48, req: 'ครูประเสริฐ นิลสุวรรณ', tel: '086-777-0909' },
+  { short: 'ม.เกษตร บางเขน', full: 'มหาวิทยาลัยเกษตรศาสตร์ บางเขน แขวงลาดยาว เขตจตุจักร กรุงเทพฯ', purpose: 'ทัศนศึกษางานเกษตรแฟร์ ม.4', s: at(0, 7, 30), e: at(0, 15, 30), type: 'day', car: 'รถตู้ 02', pax: 'ครู 5 · นักเรียน 40', km: 88, req: 'ครูธนพล วงศ์ใหญ่', tel: '081-107-2013', others: 'รถบัสโดยสาร · นายบุญทัน', live: true },
+  { short: 'สถานีขนส่งหมอชิต', full: 'สถานีขนส่งผู้โดยสารกรุงเทพ (จตุจักร)', purpose: 'ไปรับวิทยากรจากเชียงใหม่', s: at(0, 17), e: at(0, 19, 30), type: 'oneway', car: 'รถตู้ 01', pax: '—', km: 62, req: 'ครูวิไลพร มณีรัตน์', tel: '083-222-4545' },
+  { short: 'อุทยานฯ เขาใหญ่', full: 'อุทยานแห่งชาติเขาใหญ่ อ.ปากช่อง จ.นครราชสีมา', purpose: 'ค่ายวิทยาศาสตร์ธรรมชาติ ม.5', s: at(2, 6), e: at(4, 18), type: 'overnight', car: 'รถตู้ 01', pax: 'ครู 3 · นักเรียน 8', km: 330, req: 'ครูปิยะนุช ใจดี', tel: '085-135-2065', others: 'รถโดยสาร 6 ล้อ · นายมานะชัย', lodge: 'บ้านพักอุทยาน โซนธนะรัชต์' },
+  { short: 'สวทช. คลองหลวง', full: 'อุทยานวิทยาศาสตร์ประเทศไทย (สวทช.) ต.คลองหนึ่ง อ.คลองหลวง จ.ปทุมธานี', purpose: 'ส่งผลงานโครงงานวิทยาศาสตร์', s: at(6, 8), e: at(6, 16), type: 'day', car: 'รถตู้ 01', pax: 'ครู 2 · นักเรียน 10', km: 62, req: 'ครูสมใจ รักวิทยา', tel: '082-888-1111' },
+  { short: 'ศูนย์ฯ สิริกิติ์', full: 'ศูนย์การประชุมแห่งชาติสิริกิติ์ เขตคลองเตย กรุงเทพฯ', purpose: 'งานมหกรรมวิทยาศาสตร์ (ไป-กลับทุกวัน)', s: at(8, 7), e: at(10, 17), type: 'daily', car: 'รถตู้ 01', pax: 'ครู 2 · นักเรียน 9', km: 116, req: 'ครูอรรถพล แก้วประเสริฐ', tel: '087-432-1000' },
+  { short: 'ม.ธรรมศาสตร์ รังสิต', full: 'มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต อ.คลองหลวง จ.ปทุมธานี', purpose: 'แข่งขันหุ่นยนต์ระดับภาค', s: at(15, 8), e: at(15, 17), type: 'day', car: 'รถตู้ 01', pax: 'ครู 2 · นักเรียน 6', km: 60, req: 'ครูณัฐวุฒิ พรหมมา', tel: '084-909-3030' },
+  { short: 'ค่ายลูกเสือ กาญจนบุรี', full: 'ค่ายลูกเสือวชิราวุธ อ.เมือง จ.กาญจนบุรี', purpose: 'เข้าค่ายลูกเสือ-เนตรนารี', s: at(20, 6), e: at(21, 17), type: 'overnight', car: 'รถตู้ 01', pax: 'ครู 2 · นักเรียน 10', km: 290, req: 'ครูชนิดา ลือชัย', tel: '089-555-1212', lodge: 'ที่พักในค่าย' }
+].map((j, i) => ({ ...j, id: 'VR-2569-' + String(140 + i).padStart(4, '0'), st: j.live ? 'live' : j.e < new Date() ? 'done' : 'ok' }));
+JOBS.sort((a, b) => a.s - b.s);
+const ST = { done: 'กลับแล้ว', live: 'กำลังเดินทาง', ok: 'รอออกเดินทาง' };
+const CLR = { done: 'var(--c-done)', live: 'var(--c-live)', ok: 'var(--c-ok)' };
+const TYPE = { day: 'ไป-กลับวันเดียว', oneway: 'ไปส่ง/ไปรับ อย่างเดียว', overnight: 'ค้างคืน', daily: 'ไป-กลับทุกวัน' };
+
+// ── ตัวช่วยวันที่ ──
+const day0 = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const addD = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const same = (a, b) => day0(a).getTime() === day0(b).getTime();
+const tm = d => d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+const dShort = d => d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' });
+const dLong = d => d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const wd = d => d.toLocaleDateString('th-TH', { weekday: 'short' });
+const mon = d => d.toLocaleDateString('th-TH', { month: 'short' });
+const nDays = j => Math.round((day0(j.e) - day0(j.s)) / 864e5) + 1;
+const nightN = j => j.type === 'overnight' ? nDays(j) - 1 : 0;
+const rel = d => { const n = Math.round((day0(d) - T0) / 864e5); return n === 0 ? 'วันนี้' : n === 1 ? 'พรุ่งนี้' : n === -1 ? 'เมื่อวาน' : ''; };
+const span = j => nDays(j) > 1 ? `${nDays(j)} วัน · กลับ ${dShort(j.e)}` : `วันเดียว · กลับ ${tm(j.e)} น.`;
+const weekStart = d => addD(day0(d), -day0(d).getDay());
+function range(mode, ref) {
+  if (mode === 'day') return [day0(ref), addD(day0(ref), 1)];
+  if (mode === 'week') { const s = weekStart(ref); return [s, addD(s, 7)]; }
+  const s = new Date(ref.getFullYear(), ref.getMonth(), 1); return [s, new Date(ref.getFullYear(), ref.getMonth() + 1, 1)];
+}
+const inR = (j, [a, b]) => j.s < b && j.e > a;
+const shiftRef = (mode, ref, k) => mode === 'day' ? addD(ref, k) : mode === 'week' ? addD(ref, 7 * k) : new Date(ref.getFullYear(), ref.getMonth() + k, 1);
+function rangeLabel(mode, ref) {
+  const [a, b] = range(mode, ref);
+  if (mode === 'day') return (rel(a) ? rel(a) + ' · ' : '') + dShort(a);
+  if (mode === 'week') return `${a.getDate()} ${mon(a)} – ${addD(b, -1).getDate()} ${mon(addD(b, -1))}`;
+  return a.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+}
+const counts = () => { const c = m => JOBS.filter(j => inR(j, range(m, new Date())) && j.st !== 'done').length; return { day: c('day'), week: c('week'), month: c('month') }; };
+
+// ── โครงหน้ามือถือ + หน้ารายละเอียด ──
+function shell(phone, inner) {
+  phone.innerHTML = `<div class="scr"><div class="app-bar"><span class="av">ส</span><div><b>นายสวง เพไร</b><small>${dLong(new Date())}</small></div><span class="bell">${ic('bell')}</span></div><div class="pad">${inner}</div></div>
+    <div class="sheet-bg" data-close></div><div class="sheet"></div>`;
+}
+function openSheet(phone, j) {
+  const sh = phone.querySelector('.sheet');
+  const act = j.st === 'live' ? `<button class="big">${ic('home')} กลับถึงโรงเรียนแล้ว</button>` : j.st === 'ok' ? `<button class="big go">${ic('nav')} ออกเดินทาง</button>` : `<div class="note">งานนี้กลับถึงโรงเรียนแล้ว · ${dShort(j.e)} ${tm(j.e)} น.</div>`;
+  sh.innerHTML = `<div class="sh-grab"></div>
+    <div class="sh-head"><button class="x" data-close>${ic('x')}</button><span class="st ${j.st}">${ST[j.st]}</span><h3>${j.short}</h3><p>${j.purpose}</p></div>
+    <div class="sh-body">
+      ${act}
+      <div class="btn2"><button>${ic('nav')}นำทาง</button><button>${ic('phone')}โทรหาผู้ขอ</button><button>${ic('fuel')}เติมน้ำมัน</button></div>
+      <div class="kv2"><div class="kv"><small>ออกจากโรงเรียน</small><b>${dShort(j.s)}<br>${tm(j.s)} น.</b></div><div class="kv"><small>กลับถึงโรงเรียน</small><b>${dShort(j.e)}<br>${tm(j.e)} น.</b></div></div>
+      <div class="kv"><small>ลักษณะการเดินทาง</small><b>${TYPE[j.type]} · ${nDays(j)} วัน${nightN(j) ? ` · ค้าง ${nightN(j)} คืน` : ''}</b></div>
+      ${j.lodge ? `<div class="kv"><small>ที่พัก</small><b>${j.lodge}</b></div>` : ''}
+      <div class="kv"><small>ปลายทาง</small><b>${j.full}</b><br><small>ระยะทางไป-กลับประมาณ ${j.km} กม.</small></div>
+      <div class="kv2"><div class="kv"><small>รถ</small><b>${j.car}</b></div><div class="kv"><small>ผู้เดินทาง</small><b>${j.pax}</b></div></div>
+      <div class="kv"><small>จุดนัดขึ้นรถ</small><b>หน้าอาคารอำนวยการ</b></div>
+      <div class="kv"><small>ผู้ขอใช้รถ</small><b>${j.req}</b> · <a href="#" onclick="return false">${j.tel}</a></div>
+      ${j.others ? `<div class="kv"><small>รถคันอื่นในทริปเดียวกัน</small><b>${j.others}</b></div>` : ''}
+      <div class="kv"><small>เลขที่คำขอ</small><b>${j.id}</b></div>
+    </div>`;
+  sh.scrollTop = 0; phone.classList.add('open');
+}
+function wire(phone, render) {
+  phone.addEventListener('click', e => {
+    if (e.target.closest('[data-close]')) { phone.classList.remove('open'); return; }
+    const j = e.target.closest('[data-j]'); if (j) { openSheet(phone, JOBS[+j.dataset.j]); return; }
+    const m = e.target.closest('[data-mode]'); if (m) { render({ mode: m.dataset.mode, ref: new Date() }); return; }
+    const s = e.target.closest('[data-shift]'); if (s) { render({ shift: +s.dataset.shift }); return; }
+    if (e.target.closest('[data-today]')) { render({ ref: new Date() }); return; }
+    const p = e.target.closest('[data-pick]'); if (p) { render({ pick: new Date(+p.dataset.pick) }); }
+  });
+}
+const segHTML = mode => { const c = counts(); return `<div class="seg">${[['day', 'วันนี้'], ['week', 'สัปดาห์'], ['month', 'เดือน']].map(([k, l]) => `<button class="${k === mode ? 'on' : ''}" data-mode="${k}">${l}<small>${c[k] ? `เหลือ ${c[k]} งาน` : 'ไม่มีงานค้าง'}</small></button>`).join('')}</div>`; };
+const navHTML = (mode, ref) => `<div class="nav-row"><button data-shift="-1">${ic('l')}</button><b>${rangeLabel(mode, ref)}</b><button data-shift="1">${ic('r')}</button></div>${same(range(mode, ref)[0], range(mode, new Date())[0]) ? '' : '<button class="today-btn" data-today>กลับมาช่วงปัจจุบัน</button>'}`;
+const idx = j => JOBS.indexOf(j);
+const emptyHTML = t => `<div class="empty">${ic('cal')}${t}</div>`;
+
+// ═════════ แบบ A ═════════
+function makeA(phone) {
+  const st = { mode: 'week', ref: new Date() };
+  const render = o => {
+    if (o) { if (o.mode) Object.assign(st, { mode: o.mode, ref: o.ref }); if (o.shift) st.ref = shiftRef(st.mode, st.ref, o.shift); if (o.ref && !o.mode) st.ref = o.ref; }
+    const R = range(st.mode, st.ref), list = JOBS.filter(j => inR(j, R));
+    const next = JOBS.find(j => j.st === 'live') || JOBS.find(j => j.st === 'ok');
+    const groups = {}; list.forEach(j => { const k = day0(j.s < R[0] ? R[0] : j.s).getTime(); (groups[k] = groups[k] || []).push(j); });
+    const outDays = new Set(); list.forEach(j => { for (let d = day0(j.s); d < j.e; d = addD(d, 1)) if (d >= R[0] && d < R[1]) outDays.add(d.getTime()); });
+    const nights = list.reduce((s, j) => s + nightN(j), 0);
+    shell(phone, `<div class="col-l">${next ? `<div class="a-next" data-j="${idx(next)}"><small>${next.st === 'live' ? '● กำลังเดินทางอยู่' : 'งานถัดไป · ' + (rel(next.s) || dShort(next.s))}</small><h3>${next.short}</h3>
+        <div class="row"><span>${ic('clock')} ${tm(next.s)} น.</span><span>${ic('cal')} ${span(next)}</span><span>${ic('van')} ${next.car}</span></div></div>` : ''}
+      <div style="height:14px"></div>${segHTML(st.mode)}${navHTML(st.mode, st.ref)}
+      <div class="a-sum"><div><b>${list.length}</b><small>งาน</small></div><div><b>${outDays.size}</b><small>วันที่ต้องออก</small></div><div><b>${nights}</b><small>ค้างคืน (คืน)</small></div></div></div>
+      <div class="col-r">${Object.keys(groups).sort().map(k => { const d = new Date(+k); return `<div class="a-day"><div class="a-dh ${same(d, T0) ? 'today' : ''}">${rel(d) || wd(d)} <small>${dShort(d)}</small></div>
+        ${groups[k].map(j => `<div class="a-item ${j.st}" style="--c:${CLR[j.st]}" data-j="${idx(j)}"><div class="t num">${j.s < R[0] ? '←' : tm(j.s)}<small>${j.s < R[0] ? 'ต่อเนื่อง' : 'น.'}</small></div>
+          <div style="min-width:0"><h4>${j.short}</h4><div class="m"><b>${span(j)}</b></div><div class="m">${j.car}${j.type === 'overnight' ? ' · ค้างคืน' : j.type === 'daily' ? ' · ไป-กลับทุกวัน' : j.type === 'oneway' ? ' · ไปส่ง/รับ' : ''}</div></div>
+          <div class="r"><span class="st ${j.st}">${ST[j.st]}</span>${ic('r')}</div></div>`).join('')}</div>`; }).join('') || emptyHTML('ช่วงนี้ไม่มีงาน')}</div>`);
+  };
+  wire(phone, render); render();
+}
+
+// ═════════ แบบ B ═════════
+function makeB(phone) {
+  const st = { mode: 'week', ref: new Date(), pick: null };
+  const render = o => {
+    if (o) { if (o.mode) Object.assign(st, { mode: o.mode, ref: o.ref, pick: null }); if (o.shift) { st.ref = shiftRef(st.mode, st.ref, o.shift); st.pick = null; } if (o.ref && !o.mode) { st.ref = o.ref; st.pick = null; } if (o.pick) st.pick = st.pick && same(st.pick, o.pick) ? null : o.pick; }
+    const R = range(st.mode, st.ref), days = []; for (let d = new Date(R[0]); d < R[1]; d = addD(d, 1)) days.push(d);
+    const onDay = d => JOBS.filter(j => inR(j, [d, addD(d, 1)]));
+    const list = JOBS.filter(j => inR(j, st.pick ? [st.pick, addD(st.pick, 1)] : R));
+    const km = list.reduce((s, j) => s + j.km, 0);
+    const strip = st.mode === 'day' ? '' : `<div class="b-strip">${days.map(d => `<div class="b-d ${same(d, T0) ? 'today' : ''} ${st.pick && same(d, st.pick) ? 'sel' : ''} ${[0, 6].includes(d.getDay()) ? 'we' : ''}" data-pick="${d.getTime()}"><small>${wd(d)}</small><b>${d.getDate()}</b><div class="dots">${onDay(d).slice(0, 3).map(j => `<i style="--c:${CLR[j.st]}"></i>`).join('')}</div></div>`).join('')}</div>`;
+    let lastMonth = '';
+    shell(phone, `<div class="col-l">${segHTML(st.mode)}${navHTML(st.mode, st.ref)}
+      <div class="b-kpi"><div><b>${list.length}</b><small>งาน${st.pick ? 'วันที่เลือก' : ''}</small></div><div><b>${list.filter(j => j.st !== 'done').length}</b><small>ยังไม่ได้ไป</small></div><div><b>${km}</b><small>กม. โดยประมาณ</small></div></div></div>
+      <div class="col-r">${strip}<div class="b-list">${list.map(j => { const multi = nDays(j) > 1; const mh = st.mode === 'month' && !st.pick && mon(j.s) + j.s.getDate() !== lastMonth ? '' : ''; lastMonth = mon(j.s) + j.s.getDate();
+        return `<div class="b-tk ${j.st}" style="--c:${CLR[j.st]}" data-j="${idx(j)}"><div class="dt"><small>${wd(j.s)}</small><b class="${multi ? 'rg' : ''}">${multi ? `${j.s.getDate()}–${j.e.getDate()}` : j.s.getDate()}</b><em>${mon(j.s)}${rel(j.s) ? ' · ' + rel(j.s) : ''}</em></div>
+          <div class="bd"><div class="hd"><h4>${j.short}</h4><span class="st ${j.st}">${ST[j.st]}</span></div>
+            <div class="when"><span>ออก <b>${tm(j.s)}</b></span><span class="ln"></span><span>กลับ <b>${multi ? wd(j.e) + ' ' + j.e.getDate() + ' · ' : ''}${tm(j.e)}</b></span></div>
+            <div class="meta"><span class="tag n">${ic('van')} ${j.car}</span><span class="tag">${multi ? `${nDays(j)} วัน${nightN(j) ? ' · ค้าง ' + nightN(j) + ' คืน' : ' · ไป-กลับทุกวัน'}` : TYPE[j.type]}</span></div></div></div>`; }).join('') || emptyHTML(st.pick ? 'วันนี้ว่าง ไม่มีงาน' : 'ช่วงนี้ไม่มีงาน')}</div></div>`);
+    // เลื่อนแถบวันที่ให้วันที่เลือก/วันนี้อยู่กลาง (เลื่อนเฉพาะแถบ ไม่เลื่อนทั้งหน้า)
+    const stripEl = phone.querySelector('.b-strip'), sel = phone.querySelector('.b-d.sel') || phone.querySelector('.b-d.today');
+    if (stripEl && sel) stripEl.scrollLeft = sel.offsetLeft - stripEl.offsetLeft - stripEl.clientWidth / 2 + sel.offsetWidth / 2;
+  };
+  wire(phone, render); render();
+}
+
+// ═════════ แบบ C ═════════
+function makeC(phone) {
+  const st = { mode: 'month', ref: new Date(), pick: new Date(T0) };
+  const render = o => {
+    if (o) { if (o.mode) Object.assign(st, { mode: o.mode, ref: o.ref, pick: new Date(T0) }); if (o.shift) st.ref = shiftRef(st.mode, st.ref, o.shift); if (o.ref && !o.mode) { st.ref = o.ref; st.pick = new Date(T0); } if (o.pick) st.pick = o.pick; }
+    const R = range(st.mode, st.ref);
+    const item = j => `<div class="c-it" style="--c:${CLR[j.st]}" data-j="${idx(j)}"><span class="bar"></span><div style="min-width:0"><h4>${j.short}</h4><small>${tm(j.s)} น. · ${span(j)} · ${j.car}</small></div><span class="r st ${j.st}">${ST[j.st]}</span></div>`;
+    let body = '';
+    if (st.mode === 'day') {
+      const list = JOBS.filter(j => inR(j, R)), H0 = 5, H1 = 22, PX = 36;
+      const y = d => (Math.max(H0, Math.min(H1, (d - R[0]) / 36e5)) - H0) * PX + 6;
+      body = `<div class="c-tl">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="c-hr"><small>${String(H0 + i).padStart(2, '0')}:00</small></div>`).join('')}
+        ${list.map(j => { const top = y(j.s), h = Math.max(40, y(j.e) - top); return `<div class="c-blk" style="--c:${CLR[j.st]};top:${top}px;height:${h}px" data-j="${idx(j)}"><b>${j.short}</b><small>${j.s < R[0] ? 'ต่อจากเมื่อวาน' : tm(j.s)} – ${j.e > R[1] ? 'ต่อ ' + dShort(j.e) : tm(j.e)}</small></div>`; }).join('')}
+        ${same(R[0], T0) ? `<div class="c-now" style="top:${y(new Date())}px"></div>` : ''}</div>${list.length ? '' : emptyHTML('วันนี้ไม่มีงาน')}`;
+    } else if (st.mode === 'week') {
+      const days = Array.from({ length: 7 }, (_, i) => addD(R[0], i));
+      body = `<div class="c-week">${days.map(d => { const js = JOBS.filter(j => inR(j, [d, addD(d, 1)]));
+        return `<div class="c-wr ${same(d, T0) ? 'today' : ''}"><div class="dn"><small>${wd(d)}</small><b>${d.getDate()}</b></div><div class="ln">${js.map(j => { const f = same(j.s, d), l = same(j.e, d), multi = nDays(j) > 1;
+          return `<div class="c-wb ${multi ? (f ? 'first' : l ? 'last' : 'mid') : ''}" style="--c:${CLR[j.st]}" data-j="${idx(j)}"><span>${f ? tm(j.s) + ' ' : multi ? '↳ ' : ''}${j.short}</span><em>${multi ? `วันที่ ${Math.round((d - day0(j.s)) / 864e5) + 1}/${nDays(j)}` : 'กลับ ' + tm(j.e)}</em></div>`; }).join('') || '<span class="c-free">ว่าง</span>'}</div></div>`; }).join('')}</div>`;
+    } else {
+      const first = R[0], s0 = addD(first, -first.getDay()), weeks = [];
+      for (let w = s0; w < R[1]; w = addD(w, 7)) weeks.push(w);
+      body = `<div class="c-cal"><div class="c-dow">${['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(x => `<span>${x}</span>`).join('')}</div>
+        ${weeks.map(w => { const we = addD(w, 7), js = JOBS.filter(j => inR(j, [w, we])), lanes = [];
+          const bars = js.map(j => { const a = Math.max(0, Math.round((day0(j.s) - w) / 864e5)), b = Math.min(6, Math.round((day0(j.e) - w) / 864e5)); let l = lanes.findIndex(x => x < a); if (l < 0) { l = lanes.length; lanes.push(-1); } lanes[l] = b; return { j, a, b, l }; });
+          const nl = Math.min(lanes.length, 3);
+          return `<div class="c-wk">${Array.from({ length: 7 }, (_, i) => { const d = addD(w, i); return `<div class="c-c ${d.getMonth() !== first.getMonth() ? 'out' : ''} ${same(d, T0) ? 'today' : ''} ${same(d, st.pick) ? 'sel' : ''}" data-pick="${d.getTime()}" style="min-height:${30 + nl * 18}px"><span>${d.getDate()}</span></div>`; }).join('')}
+            <div class="c-bars" style="position:absolute;left:0;right:0;top:30px">${bars.filter(x => x.l < 3).map(({ j, a, b, l }) => `<div class="c-bar ${day0(j.s) < w ? 'cl' : ''} ${day0(j.e) >= we ? 'cr' : ''}" style="--c:${CLR[j.st]};left:calc(${a} * 100% / 7 + 2px);width:calc(${b - a + 1} * 100% / 7 - 4px);top:${l * 18}px" data-j="${idx(j)}">${j.short}</div>`).join('')}</div></div>`; }).join('')}</div>
+`;
+    }
+    // คอลัมน์ขวา: เดือน = งานของวันที่กด · วัน/สัปดาห์ = รายการทั้งช่วง (บนมือถือแสดงเฉพาะแบบเดือน)
+    const side = st.mode === 'month'
+      ? `<div class="c-list"><h5 class="lst">${rel(st.pick) ? rel(st.pick) + ' · ' : ''}${dShort(st.pick)}</h5>${JOBS.filter(j => inR(j, [day0(st.pick), addD(day0(st.pick), 1)])).map(item).join('') || emptyHTML('วันนี้ว่าง ไม่มีงาน')}</div>`
+      : `<div class="c-list desk-only"><h5 class="lst">งานทั้งหมดในช่วงนี้</h5>${JOBS.filter(j => inR(j, R)).map(item).join('') || emptyHTML('ช่วงนี้ไม่มีงาน')}</div>`;
+    shell(phone, `<div class="col-l">${segHTML(st.mode)}${navHTML(st.mode, st.ref)}${body}</div><div class="col-r">${side}</div>`);
+  };
+  wire(phone, render); render();
+}
+
+// ── สลับมุมมอง มือถือ / คอมพิวเตอร์ (รายแบบ หรือทุกแบบพร้อมกัน) ──
+function setDev(sec, dev) {
+  sec.classList.toggle('wide', dev === 'd');
+  const ph = sec.querySelector('.phone'); ph.classList.toggle('desk', dev === 'd'); ph.classList.remove('open');
+  sec.querySelectorAll('.dev-tg button').forEach(b => b.classList.toggle('on', b.dataset.dev === dev));
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.dev-tg button'); if (!b) return;
+  if (b.closest('[data-all]')) { document.querySelectorAll('.sec').forEach(s => setDev(s, b.dataset.dev)); b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }
+  else setDev(b.closest('.sec'), b.dataset.dev);
+});
+document.querySelector('[data-v="C"]').classList.add('vC');
+
+makeA(document.querySelector('[data-v="A"]'));
+makeB(document.querySelector('[data-v="B"]'));
+makeC(document.querySelector('[data-v="C"]'));
+</script>
+</body>
+</html>

@@ -163,6 +163,73 @@
       ${today.map(j => jobCard(j)).join('') || `<div class="card">${UI.empty('วันนี้ไม่มีงาน', 'checkCircle')}</div>`}`;
   }
 
+  // ───────── หน้าแรกคนขับ (แบบ A): งานถัดไป + ภาพรวม วันนี้/สัปดาห์/เดือน เรียงตามวัน ─────────
+  const RANGES = { day: 'วันนี้', week: 'สัปดาห์', month: 'เดือน' };
+  function rangeOf(mode, ref) {
+    if (mode === 'day') return [dStart(ref), addD(dStart(ref), 1)];
+    if (mode === 'week') { const s = weekOf(ref); return [s, addD(s, 7)]; }
+    return [new Date(ref.getFullYear(), ref.getMonth(), 1), new Date(ref.getFullYear(), ref.getMonth() + 1, 1)];
+  }
+  const inRange = (j, [a, b]) => new Date(j.r.startAt) < b && new Date(j.r.endAt) > a;
+  const shiftRange = (mode, ref, k) => mode === 'day' ? addD(ref, k) : mode === 'week' ? addD(ref, 7 * k) : new Date(ref.getFullYear(), ref.getMonth() + k, 1);
+  const relDay = d => { const n = Math.round((dStart(d) - dStart(new Date())) / 864e5); return n === 0 ? 'วันนี้' : n === 1 ? 'พรุ่งนี้' : n === -1 ? 'เมื่อวาน' : ''; };
+  const dShort = d => new Date(d).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' });
+  const nDays = r => Math.round((dStart(r.endAt) - dStart(r.startAt)) / 864e5) + 1;
+  const isDone = j => j.a.status === 'returned' || j.r.status === 'closed';
+  const tone = j => j.a.status === 'ontrip' ? 'live' : isDone(j) ? 'done' : 'ok';
+  const TONE_C = { live: 'var(--dh-live)', ok: 'var(--dh-ok)', done: 'var(--dh-done)' };
+  const jobHref = j => `#/driver/${j.r.id}/${j.i}`;
+  function rangeLabel(mode, ref) {
+    const [a, b] = rangeOf(mode, ref), last = addD(b, -1);
+    if (mode === 'day') return (relDay(a) ? relDay(a) + ' · ' : '') + dShort(a);
+    if (mode === 'week') return `${fmt.dayMonth(a)} – ${fmt.dayMonth(last)}`;
+    return a.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+  }
+  // แถวงาน 1 รายการ: ช่องซ้าย = เวลาออก–กลับ (ช่องเดียว) · กลาง = สถานที่ + ไปกี่วัน · ขวา = สถานะ
+  function dhRow(j, from) {
+    const { r, a } = j, s = new Date(r.startAt), e = new Date(r.endAt), multi = nDays(r) > 1, cont = s < from, t = S.tripType(r);
+    const time = cont ? `<b>ต่อ</b><em>ถึง ${multi ? fmt.dayMonth(e) : fmt.time(e)}</em>`
+      : `<b>${fmt.time(s).replace(' น.', '')}</b><em>${multi ? `ถึง ${e.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' })}` : `ถึง ${fmt.time(e).replace(' น.', '')}`}</em>`;
+    const kind = t === 'overnight' ? 'ค้างคืน' : t === 'daily' ? 'ไป-กลับทุกวัน' : t === 'oneway' ? 'ไปส่ง/ไปรับ' : '';
+    return `<a class="dh-row ${tone(j)}" style="--c:${TONE_C[tone(j)]}" href="${jobHref(j)}">
+      <span class="dh-t num">${time}</span>
+      <span class="dh-m"><b>${esc(S.destName(r))}</b><small>${multi ? `${nDays(r)} วัน · ${fmt.dayMonth(s)} – ${fmt.dayMonth(e)}` : 'ไป-กลับวันเดียว'}${kind && t !== 'day' ? ` · ${kind}` : ''}</small><small>${icon(kindIcon((S.vehicle(a.vehicleId) || {}).kind))} ${esc(C.vName(a.vehicleId))}</small></span>
+      <span class="dh-s"><span class="pill tone-${tone(j) === 'live' ? 'live pulse' : tone(j)}">${S.ASSIGN[a.status]}</span>${icon('chevR')}</span></a>`;
+  }
+  function overview(jobs, { mode, ref, link }) {
+    const R = rangeOf(mode, ref), list = jobs.filter(j => inRange(j, R));
+    const now = new Date(), today0 = dStart(now);
+    const live = jobs.find(j => j.a.status === 'ontrip');
+    const next = live || jobs.find(j => j.a.status === 'assigned' && new Date(j.r.endAt) >= now);
+    const late = jobs.filter(j => j.a.status === 'assigned' && new Date(j.r.startAt) < today0);
+    const left = m => jobs.filter(j => inRange(j, rangeOf(m, now)) && !isDone(j)).length;
+    const groups = new Map();
+    list.forEach(j => { const k = fmt.localDate(new Date(j.r.startAt) < R[0] ? R[0] : new Date(j.r.startAt)); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(j); });
+    const atNow = rangeOf(mode, now)[0].getTime() === R[0].getTime();
+    const doneN = list.filter(isDone).length;
+    const nextCard = next ? (() => { const r = next.r, multi = nDays(r) > 1, onTrip = next.a.status === 'ontrip';
+      const startSoon = !onTrip && UI.sameDay(r.startAt, now);
+      return `<div class="dh-next ${onTrip ? 'live' : ''}">
+        <a class="dh-next-main" href="${jobHref(next)}"><small>${onTrip ? '● กำลังเดินทางอยู่' : 'งานถัดไป · ' + (relDay(r.startAt) || dShort(r.startAt))}</small><h3>${esc(S.destName(r))}</h3>
+          <div class="dh-chips"><span>${icon('clock')} ${fmt.time(r.startAt).replace(' น.', '')} – ${multi ? dShort(r.endAt) + ' ' : ''}${fmt.time(r.endAt)}</span>${multi ? `<span>${icon('calendar')} ${nDays(r)} วัน</span>` : ''}<span>${icon('van')} ${esc(C.vName(next.a.vehicleId))}</span></div></a>
+        ${onTrip ? `<button class="btn btn-ok" data-go="returned" data-r="${r.id}" data-i="${next.i}">${icon('home')} กลับถึงโรงเรียนแล้ว</button>` : startSoon ? `<button class="btn btn-gold" data-go="ontrip" data-r="${r.id}" data-i="${next.i}">${icon('navigation')} ออกเดินทาง</button>` : ''}
+      </div>`; })() : '';
+    return `<div class="dh-grid">
+      <div class="dh-side">
+        ${nextCard}
+        ${late.length ? `<div class="dh-late">${icon('alert')}<div><b>ยังไม่ได้กดสถานะ ${late.length} งาน</b><small>เลยวันเดินทางแล้ว กดเข้าไปกด "ออกเดินทาง / กลับถึง" ให้เรียบร้อย</small>${late.map(j => `<a href="${jobHref(j)}">${dShort(j.r.startAt)} · ${esc(S.destName(j.r))}</a>`).join('')}</div></div>` : ''}
+        <div class="seg dh-seg">${Object.entries(RANGES).map(([k, l]) => { const n = left(k); return `<a href="${link({ r: k, date: '' })}"><button class="${k === mode ? 'on' : ''}" tabindex="-1">${l}<small>${n ? `เหลือ ${n} งาน` : 'ไม่มีงานค้าง'}</small></button></a>`; }).join('')}</div>
+        <div class="dh-nav"><a class="icon-btn" href="${link({ r: mode, date: fmt.localDate(shiftRange(mode, ref, -1)) })}" aria-label="ก่อนหน้า">${icon('chevL')}</a>
+          <div><b>${rangeLabel(mode, ref)}</b><span class="dh-count"><em class="num">${list.length}</em> งาน${doneN ? ` · เสร็จแล้ว ${doneN}` : ''}</span></div>
+          <a class="icon-btn" href="${link({ r: mode, date: fmt.localDate(shiftRange(mode, ref, 1)) })}" aria-label="ถัดไป">${icon('chevR')}</a></div>
+        ${atNow ? '' : `<a class="dh-back" href="${link({ r: mode, date: '' })}">กลับมาช่วงปัจจุบัน</a>`}
+      </div>
+      <div class="dh-list">${[...groups.entries()].map(([k, js]) => { const d = UI.dayOf(k), rel = relDay(d);
+        return `<div class="dh-day"><h4 class="${rel === 'วันนี้' ? 'today' : ''}">${rel || d.toLocaleDateString('th-TH', { weekday: 'long' })} <small>${dShort(d)}</small></h4>${js.map(j => dhRow(j, R[0])).join('')}</div>`; }).join('')
+        || `<div class="card dh-empty">${UI.empty(mode === 'day' ? 'วันนี้ไม่มีงาน' : 'ช่วงนี้ไม่มีงาน', 'checkCircle')}</div>`}</div>
+    </div>`;
+  }
+
   Pages.driverHome = ({ query }) => {
     const me = S.me;
     let d = S.driverOfUser(me);
@@ -170,13 +237,9 @@
     if (adminView) d = S.driver(query.d) || S.db.drivers[0];
     if (!d) return { html: `<div class="drv">${UI.empty('บัญชีนี้ยังไม่ได้ผูกกับรายชื่อพนักงานขับรถ กรุณาติดต่อแอดมิน', 'user')}</div>`, layout: 'driver' };
     const jobs = myJobs(d.id);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const ontrip = jobs.filter(j => j.a.status === 'ontrip');
-    const todayJobs = jobs.filter(j => j.a.status === 'assigned' && UI.sameDay(j.r.startAt, new Date()));
-    const next = jobs.filter(j => j.a.status === 'assigned' && new Date(j.r.startAt) > new Date(today.getTime() + 864e5 - 1)).slice(0, 10);
-    const late = jobs.filter(j => j.a.status === 'assigned' && new Date(j.r.startAt) < today);
-    const past = jobs.filter(j => j.a.status === 'returned').slice(-8).reverse();
-    const sec = (t, list, ic) => list.length ? `<h3 style="margin:24px 4px 12px;display:flex;gap:8px;align-items:center;color:var(--navy)">${icon(ic)} ${t} <span class="pill tone-ok">${list.length}</span></h3>${list.map(j => jobCard(j)).join('')}` : '';
+    const mode = RANGES[query.r] ? query.r : 'week';
+    const ref = query.date ? UI.dayOf(query.date) : new Date();
+    const linkL = o => { const p = { ...(adminView ? { d: d.id } : {}), r: mode, ...o }; Object.keys(p).forEach(k => { if (!p[k]) delete p[k]; }); return '#/driver?' + new URLSearchParams(p); };
     const tab = query.tab === 'cal' ? 'cal' : 'list';
     const view = query.view === 'week' ? 'week' : 'month';
     const sel = UI.dayOf(query.date);
@@ -184,17 +247,11 @@
     const tabs = `<div class="seg" style="margin-top:16px;display:flex"><a href="#/driver${adminView ? `?d=${d.id}` : ''}" style="flex:1"><button class="${tab === 'list' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('list')} งานของฉัน</button></a><a href="${link({})}" style="flex:1"><button class="${tab === 'cal' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('calendar')} ปฏิทินงาน</button></a></div>`;
     return {
       layout: 'driver',
-      html: `<div class="drv">
+      html: `<div class="drv ${tab === 'list' ? 'drv-wide' : ''}">
         ${adminView ? `<div class="note-box navy" style="margin-bottom:14px">${icon('shield')}<div>มุมมองแอดมิน — เลือกคนขับ: <select class="input" style="width:auto;display:inline-block;padding:6px 10px" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select> · <a class="link" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div>` : ''}
-        <div class="drv-hello">${UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
+        <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
         ${tabs}
-        ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : `
-        ${sec('กำลังเดินทาง', ontrip, 'activity')}
-        ${sec('งานวันนี้', todayJobs, 'clock')}
-        ${sec('ค้างกดสถานะ (เลยกำหนดแล้ว)', late, 'alert')}
-        ${sec('งานที่จะมาถึง', next, 'calendar')}
-        ${!ontrip.length && !todayJobs.length && !next.length && !late.length ? `<div class="card" style="margin-top:20px">${UI.empty('ยังไม่มีงานที่ได้รับมอบหมาย', 'checkCircle')}</div>` : ''}
-        ${sec('งานที่เสร็จแล้วล่าสุด', past, 'check')}`}
+        ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
       </div>`,
       mount: bindJobs
     };

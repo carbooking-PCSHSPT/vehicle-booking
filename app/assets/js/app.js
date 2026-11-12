@@ -535,7 +535,7 @@ const App = (() => {
             </div>
           </div>
           <div class="dd" data-open="false">
-            <button class="user-chip" data-dd aria-expanded="false" aria-label="เมนูผู้ใช้">${UI.avatar(me.name || me.email, back ? 'gold' : '')}<span class="u-name">${esc((me.name || me.email).split(' ')[0])}</span>${icon('chev', 'chev')}</button>
+            <button class="user-chip" data-dd aria-expanded="false" aria-label="เมนูผู้ใช้">${(() => { const dv = Store.driverOfUser(me); return dv && dv.photo ? `<span class="avatar ph">${UI.img(dv.photo, dv.name)}</span>` : UI.avatar(me.name || me.email, back ? 'gold' : ''); })()}<span class="u-name">${esc((me.name || me.email).split(' ')[0])}</span>${icon('chev', 'chev')}</button>
             <div class="dd-panel right" style="min-width:270px">
               <div class="dd-head" style="display:block"><strong>${esc(me.name || '-')}</strong><small>${esc(Store.isUsernameEmail(me.email) ? 'ชื่อผู้ใช้: ' + Store.usernameOf(me.email) : me.email)}</small><small>${(me.roles || []).map(r => Store.ROLES[r]).join(' · ')}</small></div>
               <a href="#/profile"><span class="dd-ic">${icon('user')}</span><span><strong>โปรไฟล์ของฉัน</strong></span></a>
@@ -631,7 +631,7 @@ const App = (() => {
     if (same) scrollTo(0, y); else scrollTo(0, 0);
     const root = $('#view') || app();
     if (view.mount) { try { view.mount(root, ctx); } catch (e) { console.error(e); } }
-    UI.hydrate(root); UI.animate(root, { quiet: same });
+    UI.hydrate(root); UI.animate(root, { quiet: same }); if ($('#nav')) UI.hydrate($('#nav'));
     if (view.tick) view.tick();   // นาฬิกาแสดงทันที ไม่ว่างรอ 1 วินาที
     // กดเลือกวันในปฏิทิน → เลื่อนลงไปที่รายการของวันนั้น
     if (query.pick) { const l = document.getElementById('list'); if (l) setTimeout(() => scrollTo({ top: l.getBoundingClientRect().top + scrollY - 90, behavior: 'smooth' }), 60); }
@@ -666,7 +666,7 @@ const App = (() => {
       render();
     }, 120);
   }
-  function refreshNav() { const nav = $('#nav'); if (!nav) return; const { path } = parseHash(); const t = document.createElement('div'); t.innerHTML = navHTML(path); nav.replaceWith(t.firstElementChild); onScroll(); }
+  function refreshNav() { const nav = $('#nav'); if (!nav) return; const { path } = parseHash(); const t = document.createElement('div'); t.innerHTML = navHTML(path); nav.replaceWith(t.firstElementChild); onScroll(); UI.hydrate($('#nav') || document); }
   function onScroll() { const nav = $('#nav'); if (nav) nav.classList.toggle('scrolled', scrollY > 10); }
 
   // ป๊อปอัปประเมินคนขับ เมื่อทริปของผู้ใช้กลับถึงแล้ว
