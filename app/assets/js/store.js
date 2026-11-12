@@ -191,7 +191,10 @@ const Store = (() => {
   const quickHours = () => (db.settings.quickLeadHours != null ? +db.settings.quickLeadHours : 2);
   // คำขอที่ค้างบันทึกข้อความ: แอดมินบันทึกแทน (เร่งด่วน) · ไม่ใช่งานประจำ · ยังไม่มีไฟล์แนบ · ไม่ได้ยกเลิก/ไม่อนุมัติ
   // (คำขอที่ครูส่งเองต้องแนบตั้งแต่ตอนส่งอยู่แล้ว)
-  const needsMemo = r => !!r && !!r.emergency && !isQuickCat(r.category) && !(r.attachments || []).length && !['cancelled', 'rejected'].includes(r.status);
+  const needsMemo = r => !!r && !!r.emergency && !isQuickCat(r.category) && !(r.attachments || []).length && !r.memoWaived && !['cancelled', 'rejected'].includes(r.status);
+  // จับคู่ชื่อที่แอดมินพิมพ์เอง กับบัญชีผู้ใช้ (ตัดคำนำหน้าและช่องว่าง) — ใช้ติดตามบันทึกข้อความค้าง
+  const nameKey = s => String(s || '').replace(/\s+/g, '').replace(/^(นางสาว|น\.ส\.|นาย|นาง|ดร\.|ว่าที่ร้อยตรี|ว่าที่ร\.ต\.)/, '');
+  const userByName = n => { const k = nameKey(n); if (k.length < 3) return null; const m = db.users.filter(u => nameKey(u.name) === k); return m.length === 1 ? m[0] : null; };
   const memoDebts = email => email ? db.requests.filter(r => r.requester && r.requester.email === email && needsMemo(r)).sort((a, b) => a.startAt.localeCompare(b.startAt)) : [];
   const catName = r => { if (!r || !r.category) return 'ไม่ระบุ'; if (r.category === 'other') return r.categoryOther ? `อื่น ๆ: ${r.categoryOther}` : 'อื่น ๆ'; const c = catOf(r.category); return c ? c.name : 'ไม่ระบุ'; };
   const seatsOf = list => (list || []).reduce((s, a) => s + (+(vehicle(a.vehicleId) || {}).seats || 0), 0);
@@ -227,13 +230,13 @@ const Store = (() => {
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
       depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน',
-      memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว'
+      memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว', memowaive: 'แอดมินยกเว้นบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้'
     };
     db.requests.forEach(r => {
       (r.history || []).forEach(h => {
         if (h.by === me.email) return;
         let mine = false, link = '';
-        if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
+        if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
         if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen });
@@ -807,7 +810,7 @@ const Store = (() => {
     categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
     TRIP, tripType, windows, tripTag, paxText,
-    DEFAULT_QUICK, isQuickCat, quickHours, needsMemo, memoDebts,
+    DEFAULT_QUICK, isQuickCat, quickHours, needsMemo, memoDebts, userByName,
     notifications, markSeen, pendingRatings,
     // ข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน): หน้าที่ต้องใช้ข้อมูลตั้งแต่วันที่ from เรียกฟังก์ชันนี้ตอนสร้างหน้า
     // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง
@@ -887,6 +890,18 @@ const Store = (() => {
         return r;
       });
     },
+    // แอดมินยกเว้นบันทึกข้อความ (เช่น ผู้อำนวยการสั่งการด้วยวาจา / บุคคลภายนอก) — ต้องระบุเหตุผล
+    async waiveMemo(id, note) {
+      needAdmin();
+      note = String(note || '').trim();
+      if (!note) throw new Error('กรุณาระบุเหตุผลที่ยกเว้น');
+      return mutateReq(id, r => {
+        if (!needsMemo(r)) throw new Error('คำขอนี้ไม่ได้ค้างบันทึกข้อความ');
+        r.memoWaived = { by: me.email, byName: me.name || me.email, at: nowISO(), note };
+        r.history.push(H('memowaive', note));
+        return r;
+      });
+    },
     async cancelRequest(id, reason) {
       const check = r => {
         if (!r) throw new Error('ไม่พบคำขอ');
@@ -935,9 +950,10 @@ const Store = (() => {
       const x = cleanReqInput(input);
       checkCat(x);
       if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
+      if (!requester.email) { const u = userByName(requester.name); if (u) requester = { ...requester, email: u.email, dept: requester.dept || u.dept || '', phone: requester.phone || u.phone || '' }; }
       const id = await A.nextId(x.startAt);
       x.attachments = await A.upload(x.attachments, MEMO(id));
-      const r = { id, createdAt: nowISO(), ...x, requester: { email: requester.email || '', name: requester.name, dept: requester.dept || '', phone: requester.phone || '' }, status: 'pending', emergency: true, createdBy: me.email, history: [H('emergency', 'บันทึกโดยแอดมิน (กรณีเร่งด่วน)')], decision: null, assignments: [], expenses: [] };
+      const r = { id, createdAt: nowISO(), ...x, requester: { email: requester.email || '',name: requester.name, dept: requester.dept || '', phone: requester.phone || '' }, status: 'pending', emergency: true, createdBy: me.email, history: [H('emergency', 'บันทึกโดยแอดมิน (กรณีเร่งด่วน)')], decision: null, assignments: [], expenses: [] };
       if (assignments && assignments.length) {
         r.assignments = assignments.map(a => ({ vehicleId: a.vehicleId, driverId: a.driverId || '', note: String(a.note || '').trim(), status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false }));
         r.status = 'approved'; r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note: String(note || '').trim() };

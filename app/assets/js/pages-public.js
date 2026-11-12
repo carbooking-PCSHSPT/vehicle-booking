@@ -80,7 +80,8 @@
           <div class="hero-cta reveal" style="--d:.3s">${(() => {
             const mine = logged ? S.myRequests().filter(r => ['pending', 'revise', 'approved', 'ontrip'].includes(r.status)).length : 0;
             const tile = (cls, href, ic, t, sub, badge = '') => `<a class="cta-tile ${cls}" href="${href}"><span class="ci">${icon(ic)}</span><span class="ct"><b>${t}</b><small>${sub}</small></span>${badge}${icon('chevR', 'go')}</a>`;
-            return tile('t-primary', '#/request', 'filePlus', 'ขอใช้รถ', 'ส่งคำขอใหม่')
+            const debt = logged ? S.memoDebts(S.me.email).length : 0;
+            return tile('t-primary', '#/request', 'filePlus', 'ขอใช้รถ', debt ? 'ค้างบันทึกข้อความ — แนบก่อน' : 'ส่งคำขอใหม่', debt ? `<span class="cnt" title="ค้างบันทึกข้อความ">${debt}</span>` : '')
               + tile('t-gold', '#/schedule', 'calendar', 'ตารางรถว่าง', 'ดูว่ารถว่างวันไหน')
               + tile('t-plain', '#/my', 'clipboard', 'การขอใช้รถของฉัน', 'ติดตามสถานะคำขอ', mine ? `<span class="cnt" title="คำขอที่ยังไม่เสร็จ">${mine}</span>` : '');
           })()}</div>
@@ -268,11 +269,57 @@
   }
   Pages._catPicker = { html: catPicker, bind: bindCatPicker };
 
-  // ตัวเลือกเวลา ทุก 30 นาที (ถ้าค่าเดิมไม่ตรงช่วง เช่น 13:20 ก็ยังแสดงให้เลือกค้างไว้)
-  function timeOptions(sel) {
-    const ts = []; for (let m = 0; m < 1440; m += 30) ts.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
-    if (sel && !ts.includes(sel)) { ts.push(sel); ts.sort(); }
-    return ts.map(t => `<option value="${t}" ${t === sel ? 'selected' : ''}>${t} น.</option>`).join('');
+  // ── เลือกเวลา: ชั่วโมงแยกตามช่วงวัน + นาทีทีละ 5 + พิมพ์เองได้ · บอกช่วงเวลา (เช้า/บ่าย/ค่ำ) กันเลือกผิด ──
+  const pad2 = n => String(n).padStart(2, '0');
+  const period = t => { const h = +String(t || '').slice(0, 2); return h < 4 ? 'กลางดึก' : h < 6 ? 'เช้ามืด' : h < 12 ? 'เช้า' : h < 13 ? 'เที่ยง' : h < 16 ? 'บ่าย' : h < 19 ? 'เย็น' : 'ค่ำ'; };
+  const oddTime = t => { const h = +String(t || '').slice(0, 2); return h < 5 || h >= 21; };
+  const parseTime = s => {
+    const m = String(s || '').trim().replace(/\s*น\.?$/, '').match(/^(\d{1,2})(?:[:.\s]?(\d{2}))?$/);
+    if (!m || +m[1] > 23 || +(m[2] || 0) > 59) return null;
+    return `${pad2(+m[1])}:${pad2(+(m[2] || 0))}`;
+  };
+  function timeField(id, val) {
+    return `<input type="hidden" id="${id}" value="${val}"><button type="button" class="tp-btn${oddTime(val) ? ' odd' : ''}" data-tp="${id}"><b class="tp-v">${val}</b><span class="tp-n">น.</span><small class="tp-p">${period(val)}</small>${icon('clock')}</button>`;
+  }
+  const syncTimeBtn = (root, id) => {
+    const inp = root.querySelector('#' + id), b = root.querySelector(`[data-tp="${id}"]`); if (!inp || !b) return;
+    b.querySelector('.tp-v').textContent = inp.value; b.querySelector('.tp-p').textContent = period(inp.value); b.classList.toggle('odd', oddTime(inp.value));
+  };
+  function pickTime(cur, title) {
+    let [h, m] = String(cur || '08:00').split(':').map(Number);
+    const G = [['เช้า', 6, 11], ['บ่าย – เย็น', 12, 17], ['ค่ำ', 18, 23], ['กลางดึก – เช้ามืด', 0, 5]];
+    const body = `<div class="tp-pick">
+      <div class="tp-show"><b id="tpV"></b> น. <span id="tpP"></span></div>
+      <div class="tp-lab">ชั่วโมง</div>
+      ${G.map(([n, a, b]) => `<div class="tp-g"><small>${n}</small><div class="tp-grid">${Array.from({ length: b - a + 1 }, (_, i) => a + i).map(x => `<button type="button" data-h="${x}">${pad2(x)}</button>`).join('')}</div></div>`).join('')}
+      <div class="tp-lab">นาที</div>
+      <div class="tp-grid">${Array.from({ length: 12 }, (_, i) => i * 5).map(x => `<button type="button" data-m="${x}">${pad2(x)}</button>`).join('')}</div>
+      <div class="field tp-own"><label for="tpIn">หรือพิมพ์เวลาเอง (24 ชม. เช่น บ่าย 4 โมง = 16.00)</label><input id="tpIn" inputmode="decimal" placeholder="เช่น 13.20" autocomplete="off"></div>
+    </div>`;
+    return UI.modal({
+      title: `${icon('clock')} ${esc(title)}`, body,
+      actions: [{ label: 'ยกเลิก', value: null }, { label: 'ตกลง', kind: 'btn-primary', onClick: el => {
+        const typed = el.querySelector('#tpIn').value.trim();
+        if (typed && !parseTime(typed)) { UI.toast('รูปแบบเวลาไม่ถูกต้อง — พิมพ์เช่น 08.30 หรือ 16.00', 'error'); return false; }
+        return `${pad2(h)}:${pad2(m)}`;
+      } }],
+      onOpen(el) {
+        const draw = () => {
+          const t = `${pad2(h)}:${pad2(m)}`;
+          el.querySelector('#tpV').textContent = t; el.querySelector('#tpP').textContent = period(t);
+          el.querySelector('.tp-show').classList.toggle('odd', oddTime(t));
+          el.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', +b.dataset.h === h));
+          el.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', +b.dataset.m === m));
+        };
+        el.addEventListener('click', e => {
+          const hb = e.target.closest('[data-h]'), mb = e.target.closest('[data-m]');
+          if (hb) h = +hb.dataset.h; if (mb) m = +mb.dataset.m;
+          if (hb || mb) { el.querySelector('#tpIn').value = ''; draw(); }
+        });
+        el.querySelector('#tpIn').addEventListener('input', e => { const t = parseTime(e.target.value); if (t) { [h, m] = t.split(':').map(Number); draw(); } });
+        draw();
+      }
+    });
   }
   // ═════════ ฟอร์มขอใช้รถ (ใช้ร่วมกับแอดมินบันทึกเร่งด่วน) ═════════
   function requestFormHTML(r, { admin = false, copies = [] } = {}) {
@@ -301,16 +348,17 @@
           <div class="dt-box"><div class="dt-head">${icon('navigation')} <span data-lbl="out">ออกเดินทาง</span></div>
             <div class="dt-row">
               <div class="field"><label for="dDate">วันที่ <b class="req">*</b></label><input type="date" id="dDate" value="${fmt.localDate(v.startAt)}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
-              <div class="field"><label for="sTime" data-lbl="sTime">เวลาออก <b class="req">*</b></label><select id="sTime">${timeOptions(v.startAt ? fmt.time(v.startAt) : '08:00')}</select></div>
+              <div class="field"><label data-lbl="sTime">เวลาออก <b class="req">*</b></label>${timeField('sTime', v.startAt ? fmt.time(v.startAt) : '08:00')}</div>
             </div><small class="dt-th" id="dTh"></small></div>
           <div class="dt-box"><div class="dt-head">${icon('home')} <span data-lbl="back">กลับถึงโรงเรียน</span></div>
             <div class="dt-row">
               <div class="field" id="rDateF"><label for="rDate" data-lbl="rDate">วันที่กลับ <b class="req">*</b></label><input type="date" id="rDate" value="${fmt.localDate(v.endAt)}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
-              <div class="field"><label for="eTime" data-lbl="eTime">เวลากลับถึง <b class="req">*</b></label><select id="eTime">${timeOptions(v.endAt ? fmt.time(v.endAt) : '16:00')}</select></div>
+              <div class="field"><label data-lbl="eTime">เวลากลับถึง <b class="req">*</b></label>${timeField('eTime', v.endAt ? fmt.time(v.endAt) : '16:00')}</div>
             </div><small class="dt-th" id="rTh"></small></div>
         </div>
         <div class="field" id="lodgeF" hidden style="margin-top:14px"><label>${icon('moon')} สถานที่พัก (ค้างคืน)</label><input name="lodging" value="${esc(v.lodging || '')}" placeholder="เช่น โรงแรม/ที่พักของหน่วยงานผู้จัด"></div>
         <div class="trip-sum" id="dayInfo"></div>
+        <div class="note-box warn-y" id="timeWarn" hidden style="margin-top:10px"></div>
         <div class="note-box navy" id="onewayNote" hidden style="margin-top:12px">${icon('info')}<div><b>ต้องไปรับกลับในภายหลัง?</b> ให้ส่งคำขออีก 1 รายการสำหรับเที่ยวรับ (ใช้ "คัดลอกจากคำขอเดิม" ด้านบนได้ ไม่ต้องกรอกใหม่) เพื่อให้แอดมินจัดรถได้ถูกช่วงเวลา และรถว่างให้งานอื่นระหว่างรอ</div></div>
         ${!admin ? `<p class="hint" id="leadHint" style="margin-top:10px" data-normal="ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ออกเดินทางได้ตั้งแต่ ${esc(fmt.dateMid(minD))}) · กรณีเร่งด่วนโทรหาแอดมิน" data-quick="งานประจำ (${esc(S.categories().filter(c => S.isQuickCat(c.id)).map(c => c.name).join(' / '))}) ขอในวันเดียวกันได้ แต่ต้องก่อนเวลาออกอย่างน้อย ${S.quickHours()} ชั่วโมง · ด่วนกว่านี้โทรหาแอดมิน"></p>` : ''}</div>
       <div class="form-section"><h3><span class="n">4</span>ผู้เดินทาง</h3>
@@ -373,6 +421,10 @@
       form.querySelector('[name=endAt]').value = rd && e ? `${rd}T${e}` : '';
       el('dTh').textContent = d ? fmt.dateLong(UI.dayOf(d)) : '';
       el('rTh').textContent = multi(t) && rd ? fmt.dateLong(UI.dayOf(rd)) : '';
+      // เวลาผิดปกติ (ก่อนตี 5 / หลัง 3 ทุ่ม) → เตือนให้ตรวจสอบ (มักเกิดจากสับสนเช้า-บ่าย)
+      const w = [[s, 'เวลาออก'], [e, 'เวลากลับ']].filter(([x]) => oddTime(x)).map(([x, n]) => `${n} <b>${x} น.</b> (${period(x)})`);
+      el('timeWarn').hidden = !w.length;
+      el('timeWarn').innerHTML = w.length ? `${icon('alert')}<div>${w.join(' และ ')} — กรุณาตรวจสอบว่าถูกต้อง · ระบบใช้เวลาแบบ 24 ชั่วโมง เช่น บ่ายสี่โมง = <b>16:00 น.</b></div>` : '';
       const box = el('dayInfo'), bad = msg => { box.className = 'trip-sum bad'; box.innerHTML = `${icon('alert')} ${msg}`; };
       if (!d || !rd) { box.className = 'trip-sum'; box.innerHTML = `${icon('calendar')} เลือกวันที่และเวลา`; return; }
       const a = new Date(`${d}T${s}`), b = new Date(`${rd}T${e}`), n = fmt.days(a, b);
@@ -391,9 +443,17 @@
     ['dDate', 'rDate', 'sTime', 'eTime'].forEach(id => el(id).addEventListener('change', () => {
       if (id === 'dDate') syncTrip();
       // เลือกเวลาออกหลังเวลากลับ (วันเดียวกัน) → เลื่อนเวลากลับให้ +6 ชม. อัตโนมัติ
-      if (id === 'sTime' && !multi(tripOf()) && el('eTime').value <= el('sTime').value) { const [h, m] = el('sTime').value.split(':').map(Number); const t = Math.min(23 * 60 + 30, h * 60 + m + 360); el('eTime').value = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+      if (id === 'sTime' && !multi(tripOf()) && el('eTime').value <= el('sTime').value) { const [h, m] = el('sTime').value.split(':').map(Number); const t = Math.min(23 * 60 + 30, h * 60 + m + 360); el('eTime').value = `${pad2(Math.floor(t / 60))}:${pad2(t % 60)}`; syncTimeBtn(root, 'eTime'); }
       drawDays();
     }));
+    root.addEventListener('click', async e => {
+      const b = e.target.closest('[data-tp]'); if (!b) return;
+      const id = b.dataset.tp, L = LBL[tripOf()];
+      const v = await pickTime(el(id).value, `${L[id]} · ${L[id === 'sTime' ? 'out' : 'back']}`);
+      if (!v || v === el(id).value) return;
+      el(id).value = v; syncTimeBtn(root, id);
+      el(id).dispatchEvent(new Event('change', { bubbles: true }));
+    });
     form.addEventListener('change', e => { if (e.target.name === 'tripType') { syncTrip(); drawDays(); } });
     syncTrip();
     // ── หมวดงานประจำ: ไม่ต้องแนบบันทึกข้อความ + ขอในวันได้ ──
@@ -445,6 +505,19 @@
     };
   }
   Pages._requestForm = { html: requestFormHTML, bind: bindRequestForm };
+  function confirmDateTime(data) {
+    const a = new Date(data.startAt), b = new Date(data.endAt), t = data.tripType || 'day';
+    const tm = d => { const x = fmt.time(d); return `<span class="t${oddTime(x) ? ' odd' : ''}">${x} น. <em>${period(x)}</em></span>`; };
+    const row = (lbl, d, ic) => `<div class="dc-row"><span class="dc-ic">${icon(ic)}</span><div><small>${lbl}</small><b>${esc(fmt.dateLong(d))}</b></div>${tm(d)}</div>`;
+    const days = fmt.days(a, b);
+    const body = `<div class="dt-confirm">
+      <div class="dc-trip">${icon(S.TRIP[t].icon)} <b>${esc(S.TRIP[t].label)}</b>${t === 'overnight' ? ` · ${days} วัน ${days - 1} คืน` : t === 'daily' ? ` · ${days} วัน (ออก-กลับ ตามเวลานี้ทุกวัน)` : ''}</div>
+      ${row(t === 'daily' ? 'วันแรก · ออกจากโรงเรียน' : 'ออกจากโรงเรียน', a, 'navigation')}
+      ${row(t === 'daily' ? 'วันสุดท้าย · กลับถึงโรงเรียน' : 'กลับถึงโรงเรียน', b, 'home')}
+      ${oddTime(fmt.time(a)) || oddTime(fmt.time(b)) ? `<div class="note-box warn-y" style="margin-top:4px">${icon('alert')}<div>มีเวลาที่อยู่ช่วง<b>กลางคืน/เช้ามืด</b> — ถ้าตั้งใจเป็นช่วงบ่าย ให้กด "กลับไปแก้" (เช่น บ่ายสี่โมง = 16:00 น.)</div></div>` : ''}
+    </div>`;
+    return UI.modal({ title: 'ตรวจสอบวันและเวลาก่อนส่ง', body, actions: [{ label: 'กลับไปแก้', value: false }, { label: 'ถูกต้อง ส่งคำขอ', kind: 'btn-primary', icon: 'send', value: true }] }).then(v => v === true);
+  }
 
   Pages.requestForm = ({ params, query }) => {
     const editing = params.id ? S.request(params.id) : null;
@@ -476,11 +549,14 @@
       mount(root) {
         const F = bindRequestForm(root, init);
         $('#copyBtn', root)?.addEventListener('click', () => { const r = S.request($('#copyFrom', root).value); if (r) { F.fill(r); UI.toast('คัดลอกข้อมูลแล้ว — กรุณาระบุวันเวลาและแนบบันทึกข้อความใหม่', 'info'); } });
-        $('#rf', root).addEventListener('submit', e => {
+        $('#rf', root).addEventListener('submit', async e => {
           e.preventDefault();
+          const btn = e.target.querySelector('[type=submit]');
           let data; try { data = F.read(); } catch (err) { return UI.toast(err.message, 'error'); }
           if (!S.isQuickCat(data.category) && !data.attachments.length) return UI.toast('กรุณาแนบบันทึกข้อความขออนุญาตใช้รถ', 'error');
-          UI.busy(e.target.querySelector('[type=submit]'), () => editing ? S.updateRequest(editing.id, data) : S.submitRequest(data))
+          // ยืนยันวันเวลาอีกครั้งก่อนส่ง (สำคัญมาก — กันเลือกวัน/เวลาผิด)
+          if (!(await confirmDateTime(data))) return;
+          UI.busy(btn, () => editing ? S.updateRequest(editing.id, data) : S.submitRequest(data))
             .then(r => { UI.toast(editing ? 'บันทึกแล้ว' : `ส่งคำขอ ${r.id} แล้ว รอแอดมินตรวจสอบ`); App.go(`#/my/${r.id}`); }).catch(() => {});
         });
       }
@@ -660,7 +736,7 @@
           ${r.note ? `<dt>หมายเหตุ</dt><dd>${esc(r.note)}</dd>` : ''}
         </dl>
         <div class="divider"></div><div class="label">${icon('paperclip')} บันทึกข้อความขออนุญาตใช้รถ</div>
-        <div class="thumbs">${(r.attachments || []).map(a => UI.thumb(a)).join('') || (S.needsMemo(r) ? `<span class="pill tone-bad">ค้างบันทึกข้อความ</span>${S.isAdmin(S.me) && location.hash.startsWith('#/admin') ? ` <a class="btn btn-ghost btn-xs" href="#/my/${r.id}">${icon('upload')} แนบแทนผู้ขอ</a>` : ''}` : S.isQuickCat(r.category) ? '<span class="hint">ไม่ต้องแนบ (งานประจำ)</span>' : '<span class="hint">ไม่มีไฟล์แนบ</span>')}</div>
+        <div class="thumbs">${(r.attachments || []).map(a => UI.thumb(a)).join('') || (S.needsMemo(r) ? `<span class="pill tone-bad">ค้างบันทึกข้อความ</span>${S.isAdmin(S.me) && location.hash.startsWith('#/admin') ? ` <a class="btn btn-ghost btn-xs" href="#/my/${r.id}">${icon('upload')} แนบแทนผู้ขอ</a>` : ''}` : r.memoWaived ? `<span class="hint">${icon('shield')} แอดมินยกเว้น — ${esc(r.memoWaived.note)} (${esc(r.memoWaived.byName)})</span>` : S.isQuickCat(r.category) ? '<span class="hint">ไม่ต้องแนบ (งานประจำ)</span>' : '<span class="hint">ไม่มีไฟล์แนบ</span>')}</div>
       </div>`;
   }
   Pages._requestInfo = requestInfo;
@@ -690,7 +766,7 @@
         ${S.needsMemo(r) && (mine || S.isAdmin(S.me)) ? `<div class="card memo-late" style="margin-bottom:18px"><div class="card-head"><h3>${icon('filePlus')} แนบบันทึกข้อความตามหลัง</h3><span class="pill tone-bad">ค้างบันทึกข้อความ</span></div>
           <p class="hint" style="margin-bottom:12px">คำขอนี้แอดมินบันทึกแทนให้กรณีเร่งด่วน — ${mine ? 'ต้องแนบบันทึกข้อความที่มีลายเซ็นผู้อำนวยการ (หรือผู้รักษาราชการแทน) ก่อน จึงจะขอใช้รถครั้งต่อไปได้' : 'ผู้ขอยังไม่ได้แนบ แอดมินแนบแทนได้'} · ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</p>
           ${C.filePicker('memoLate', [], { label: 'เลือกไฟล์บันทึกข้อความ', pdf: true })}
-          <button class="btn btn-primary" id="memoSave" style="margin-top:12px">${icon('upload')} บันทึกไฟล์แนบ</button></div>` : ''}
+          <div class="row" style="margin-top:12px"><button class="btn btn-primary" id="memoSave">${icon('upload')} บันทึกไฟล์แนบ</button>${S.isAdmin(S.me) ? `<button class="btn btn-ghost" id="memoWaive" title="ใช้เมื่อจะไม่มีบันทึกข้อความแน่นอน เช่น ผู้อำนวยการสั่งการด้วยวาจา">${icon('shield')} ยกเว้น (ไม่ต้องแนบ)</button>` : ''}</div></div>` : ''}
         ${rates.length && mine ? `<div class="note-box" style="margin-bottom:18px">${icon('star')}<div>รถกลับถึงแล้ว — ช่วยประเมินคนขับ ${rates.map(x => `<a class="btn btn-gold btn-xs" href="#/rate/${r.id}/${x.i}">${esc(C.dName(x.a.driverId))}</a>`).join(' ')}</div></div>` : ''}
         <div class="detail-grid">
           ${requestInfo(r)}
@@ -708,6 +784,10 @@
             UI.busy(e.currentTarget, () => S.attachMemo(r.id, files)).then(() => UI.toast('แนบบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้แล้ว')).catch(() => {});
           });
         }
+        $('#memoWaive', root)?.addEventListener('click', async () => {
+          const res = await UI.confirm(`ยกเว้นบันทึกข้อความของ ${r.id} ใช่ไหม? ผู้ขอจะขอใช้รถครั้งต่อไปได้ทันที และระบบจะบันทึกชื่อผู้ยกเว้นไว้`, { title: 'ยกเว้นบันทึกข้อความ', ok: 'ยกเว้น', input: { label: 'เหตุผล (เช่น ผู้อำนวยการสั่งการด้วยวาจา)', required: true } });
+          if (res && res.value) S.waiveMemo(r.id, res.value).then(() => UI.toast('ยกเว้นแล้ว')).catch(e => UI.toast(e.message, 'error'));
+        });
         $('#cancelBtn', root)?.addEventListener('click', async () => {
           const res = await UI.confirm('ต้องการยกเลิกคำขอใช้รถนี้ใช่ไหม?', { title: 'ยกเลิกคำขอ', ok: 'ยกเลิกคำขอ', danger: true, input: { label: 'เหตุผลที่ยกเลิก', required: true } });
           if (res && res.value) S.cancelRequest(r.id, res.value).then(() => UI.toast('ยกเลิกคำขอแล้ว')).catch(e => UI.toast(e.message, 'error'));

@@ -306,6 +306,7 @@
               <div class="field"><label>ฝ่าย / กลุ่มสาระ</label><input name="reqDept" id="reqDept"></div>
               <div class="field"><label>เบอร์โทร</label><input name="reqPhone" id="reqPhone"></div>
             </div>
+            <p class="hint" id="nameLink" hidden style="margin-top:8px"></p>
             <div class="note-box red" id="debtWarn" hidden style="margin-top:12px">${icon('alert')}<div><b>ผู้ขอคนนี้ยังค้างบันทึกข้อความ:</b> <span></span> — แอดมินบันทึกต่อได้ แต่ควรติดตามให้แนบก่อน</div></div></div>
           ${Pages._requestForm.html(null, { admin: true })}
           <div class="form-section"><h3><span class="n">7</span>มอบหมายรถและคนขับ <span class="hint" style="font-weight:400">(ไม่เลือก = บันทึกเป็น "รอตรวจสอบ")</span></h3>
@@ -327,7 +328,17 @@
           P = bindVehiclePicker(root, pax);
         };
         form.addEventListener('change', e => { if (e.target.name === 'tripType' || ['dDate', 'rDate', 'sTime', 'eTime'].includes(e.target.id)) setTimeout(drawPick, 10); if (/teachers|students|others/.test(e.target.name) && P) P.meter(); });
-        $('#reqEmail', root).addEventListener('change', e => { const u = S.user(e.target.value); const debts = u ? S.memoDebts(u.email) : []; $('#debtWarn', root).hidden = !debts.length; $('#debtWarn', root).querySelector('span').textContent = debts.map(r => r.id).join(', '); if (u) { form.reqName.value = u.name || ''; form.reqDept.value = u.dept || ''; form.reqPhone.value = u.phone || ''; if (!form.contactPhone.value) form.contactPhone.value = u.phone || ''; } });
+        const showDebts = u => { const debts = u ? S.memoDebts(u.email) : []; $('#debtWarn', root).hidden = !debts.length; $('#debtWarn', root).querySelector('span').textContent = debts.map(r => r.id).join(', '); };
+        // พิมพ์ชื่อเอง → จับคู่กับบัญชีผู้ใช้ให้อัตโนมัติ (ถ้าไม่พบ ระบบติดตามบันทึกข้อความค้างของคนนี้ไม่ได้)
+        const linkName = () => {
+          const el = $('#nameLink', root), n = form.reqName.value.trim();
+          if (form.reqEmail.value || !n) { el.hidden = true; if (!form.reqEmail.value) showDebts(null); return; }
+          const u = S.userByName(n); el.hidden = false;
+          el.innerHTML = u ? `${icon('check')} ตรงกับบัญชี <b>${esc(u.name)}</b> — ระบบจะผูกคำขอกับบัญชีนี้` : `${icon('alert')} <b style="color:var(--bad)">ไม่พบชื่อนี้ในรายชื่อผู้ใช้</b> — ถ้าไม่แนบบันทึกข้อความ ระบบจะติดตาม/บล็อกการขอครั้งต่อไปไม่ได้ ควรเลือกจากรายชื่อด้านซ้าย`;
+          showDebts(u);
+        };
+        form.reqName.addEventListener('input', linkName);
+        $('#reqEmail', root).addEventListener('change', e => { const u = S.user(e.target.value); showDebts(u); if (u) { form.reqName.value = u.name || ''; form.reqDept.value = u.dept || ''; form.reqPhone.value = u.phone || ''; if (!form.contactPhone.value) form.contactPhone.value = u.phone || ''; } linkName(); });
         form.addEventListener('submit', e => {
           e.preventDefault();
           let data; try { data = F.read(); } catch (err) { return UI.toast(err.message, 'error'); }
