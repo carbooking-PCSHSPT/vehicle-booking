@@ -129,10 +129,10 @@
           <thead><tr><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
           <tbody>${list.map(r => `<tr class="click" data-href="#/admin/requests/${r.id}">
             <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
-            <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${r.overnight ? '<small>ค้างคืน</small>' : ''}</td>
+            <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${S.tripTag(r) ? `<small>${S.tripTag(r).text}</small>` : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
             <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
-            <td>${S.passengers(r)} คน<small>ครู ${r.teachers} · นร. ${r.students}</small></td>
+            <td>${S.passengers(r)} คน<small>ครู ${r.teachers} · นร. ${r.students}${+r.others ? ` · อื่น ${r.others}` : ''}</small></td>
             <td>${(r.assignments || []).map(a => `${esc(C.vName(a.vehicleId))}<small>${esc(C.dName(a.driverId))}</small>`).join('') || '<small>—</small>'}</td>
             <td>${C.statusPill(r)}</td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการ', 'clipboard')}</td></tr>`}</tbody>
         </table></div></div>`,
@@ -151,7 +151,7 @@
     const sel = new Map((current || []).map(a => [a.vehicleId, a]));
     const vs = S.db.vehicles.slice().sort((a, b) => (sel.has(b.id) - sel.has(a.id)) || (a.order || 0) - (b.order || 0));
     return `<div class="av-pick" id="avPick">${vs.map(v => {
-      const c = r.startAt ? S.vehicleConflicts(v.id, r.startAt, r.endAt, r.id) : [];
+      const c = r.startAt ? S.vehicleConflicts(v.id, r.startAt, r.endAt, r.id, S.windows(r)) : [];
       const a = sel.get(v.id) || {};
       const busy = c.length > 0;
       const dId = a.driverId || v.driverId || '';
@@ -159,7 +159,7 @@
       return `<div class="av-row ${sel.has(v.id) ? 'on' : ''} ${busy && !sel.has(v.id) ? 'busy' : ''} ${extra ? 'extra' : ''}" data-v="${v.id}" ${extra ? 'hidden' : ''}>
         <input type="checkbox" ${sel.has(v.id) ? 'checked' : ''} aria-label="เลือก ${esc(v.name)}">
         <div><b>${icon(kindIcon(v.kind))} ${esc(v.name)}</b><small>${esc(v.plate)} · <b style="display:inline">${v.seats}</b> ที่นั่ง</small>${busy ? `<small class="bad">${icon('alert')} ${c.map(x => x.maint ? esc(x.dest) : `ไม่ว่าง: ${x.id} ${esc(S.destName(x))}`).join(', ')}</small>` : '<small style="color:var(--ok)">ว่างในช่วงเวลานี้</small>'}</div>
-        <select data-drv aria-label="คนขับ"><option value="">— เลือกคนขับ —</option>${S.db.drivers.filter(d => d.active !== false).map(d => { const dc = r.startAt ? S.driverConflicts(d.id, r.startAt, r.endAt, r.id) : []; return `<option value="${d.id}" ${d.id === dId ? 'selected' : ''}>${esc(d.name)}${dc.length ? ' (ติดงาน ' + dc.map(x => x.id).join(',') + ')' : ''}</option>`; }).join('')}</select>
+        <select data-drv aria-label="คนขับ"><option value="">— เลือกคนขับ —</option>${S.db.drivers.filter(d => d.active !== false).map(d => { const dc = r.startAt ? S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) : []; return `<option value="${d.id}" ${d.id === dId ? 'selected' : ''}>${esc(d.name)}${dc.length ? ' (ติดงาน ' + dc.map(x => x.id).join(',') + ')' : ''}</option>`; }).join('')}</select>
         <input type="text" data-note placeholder="หมายเหตุถึงผู้ขอ เช่น คันนี้นั่งได้ ${v.seats} คน" value="${esc(a.note || '')}">
         <span></span>
       </div>`;
@@ -240,8 +240,8 @@
             if (action === 'approve') {
               if (!assignments.length) return UI.toast('กรุณาเลือกรถอย่างน้อย 1 คัน', 'error');
               const miss = assignments.filter(a => !a.driverId).length;
-              const conf = assignments.flatMap(a => S.vehicleConflicts(a.vehicleId, r.startAt, r.endAt, r.id));
-              const dconf = assignments.flatMap(a => a.driverId ? S.driverConflicts(a.driverId, r.startAt, r.endAt, r.id) : []);
+              const conf = assignments.flatMap(a => S.vehicleConflicts(a.vehicleId, r.startAt, r.endAt, r.id, S.windows(r)));
+              const dconf = assignments.flatMap(a => a.driverId ? S.driverConflicts(a.driverId, r.startAt, r.endAt, r.id, S.windows(r)) : []);
               const warn = [miss ? `ยังไม่ระบุคนขับ ${miss} คัน` : '', conf.length ? 'มีรถที่ชนเวลากับงานอื่น/ซ่อมบำรุง' : '', dconf.length ? 'มีคนขับที่ติดงานอื่นในช่วงเวลานี้' : '', S.seatsOf(assignments) < S.passengers(r) ? 'ที่นั่งรวมน้อยกว่าจำนวนผู้เดินทาง' : ''].filter(Boolean);
               if (warn.length && !(await UI.confirm(`<b>โปรดตรวจสอบ:</b><br>• ${warn.join('<br>• ')}<br><br>ต้องการบันทึกต่อหรือไม่?`, { title: 'คำเตือน', ok: 'บันทึกต่อ' }))) return;
             } else if (!note) return UI.toast(action === 'reject' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติในช่องหมายเหตุ' : 'กรุณาระบุสิ่งที่ต้องการให้แก้ไขในช่องหมายเหตุ', 'error');
@@ -658,7 +658,7 @@
     const avgR = arr => arr.length ? arr.reduce((s, x) => s + Object.values(x.scores).reduce((a, b) => a + b, 0) / 4, 0) / arr.length : 0;
     const K = {
       req: reqs.length, ok: done.length, rej: reqs.filter(r => r.status === 'rejected').length, cancel: reqs.filter(r => r.status === 'cancelled').length,
-      km: sum(asg, x => x.km), pax: sum(done, r => S.passengers(r)), stu: sum(done, r => r.students), tea: sum(done, r => r.teachers),
+      km: sum(asg, x => x.km), pax: sum(done, r => S.passengers(r)), stu: sum(done, r => r.students), tea: sum(done, r => r.teachers), oth: sum(done, r => +r.others || 0),
       fuel: costBy('fuel'), other: costBy('toll') + costBy('parking') + costBy('other'), liters: sum(exps, x => x.e.liters), repair: sum(repairs, x => x.rp.cost)
     };
     // รายเดือน
@@ -689,7 +689,7 @@
         <div class="kpis">
           <div class="kpi"><span class="k-ic">${icon('clipboard')}</span><b class="num">${K.req}<em>คำขอ</em></b><span class="l">อนุมัติ ${K.ok} · ไม่อนุมัติ ${K.rej} · ยกเลิก ${K.cancel}</span></div>
           <div class="kpi" style="--kb:var(--gold-50);--kc:var(--gold-700)"><span class="k-ic">${icon('gauge')}</span><b class="num">${fmt.num(K.km)}<em>กม.</em></b><span class="l">ระยะทางรวม · ${asg.length} เที่ยวรถ</span></div>
-          <div class="kpi" style="--kb:#e0f2fe;--kc:#0369a1"><span class="k-ic">${icon('users')}</span><b class="num">${fmt.num(K.pax)}<em>คน</em></b><span class="l">ครู ${fmt.num(K.tea)} · นักเรียน ${fmt.num(K.stu)}</span></div>
+          <div class="kpi" style="--kb:#e0f2fe;--kc:#0369a1"><span class="k-ic">${icon('users')}</span><b class="num">${fmt.num(K.pax)}<em>คน</em></b><span class="l">ครู ${fmt.num(K.tea)} · นักเรียน ${fmt.num(K.stu)}${K.oth ? ` · อื่น ${fmt.num(K.oth)}` : ''}</span></div>
           <div class="kpi" style="--kb:#fde2e2;--kc:#b91c1c"><span class="k-ic">${icon('coins')}</span><b class="num">${fmt.money(K.fuel + K.other + K.repair)}<em>฿</em></b><span class="l">น้ำมัน ${fmt.money(K.fuel)} · อื่น ๆ ${fmt.money(K.other)} · ซ่อม ${fmt.money(K.repair)}</span></div>
         </div>
         <div class="split" style="margin-top:18px">
@@ -724,7 +724,7 @@
         bindPeriod(root, '#/admin/stats', query);
         $('#pdf', root).addEventListener('click', () => window.print());
         $('#xls', root).addEventListener('click', () => UI.exportSheets(`สถิติการใช้รถ-${per.label}`, [
-          { name: 'สรุป', head: ['รายการ', 'ค่า'], rows: [['ช่วงเวลา', per.label], ['คำขอทั้งหมด', K.req], ['อนุมัติ', K.ok], ['ไม่อนุมัติ', K.rej], ['ยกเลิก', K.cancel], ['ระยะทางรวม (กม.)', K.km], ['ผู้เดินทาง', K.pax], ['ครู', K.tea], ['นักเรียน', K.stu], ['ค่าน้ำมัน', K.fuel], ['ค่าใช้จ่ายอื่น', K.other], ['ค่าซ่อม', K.repair], ['น้ำมัน (ลิตร)', K.liters], ['คะแนนคนขับเฉลี่ย', +avgR(ratings).toFixed(2)]] },
+          { name: 'สรุป', head: ['รายการ', 'ค่า'], rows: [['ช่วงเวลา', per.label], ['คำขอทั้งหมด', K.req], ['อนุมัติ', K.ok], ['ไม่อนุมัติ', K.rej], ['ยกเลิก', K.cancel], ['ระยะทางรวม (กม.)', K.km], ['ผู้เดินทาง', K.pax], ['ครู', K.tea], ['นักเรียน', K.stu], ['บุคคลอื่น', K.oth], ['ค่าน้ำมัน', K.fuel], ['ค่าใช้จ่ายอื่น', K.other], ['ค่าซ่อม', K.repair], ['น้ำมัน (ลิตร)', K.liters], ['คะแนนคนขับเฉลี่ย', +avgR(ratings).toFixed(2)]] },
           { name: 'รายเดือน', head: ['เดือน', 'เที่ยว', 'กม.', 'ค่าใช้จ่าย'], rows: byMonth.map(x => [x.label, x.trips, x.km, x.cost]) },
           { name: 'แยกตามหมวดงาน', head: ['หมวดงาน', 'ครั้ง', 'เที่ยวรถ', 'กม.', 'ผู้เดินทาง', 'ค่าน้ำมัน', 'ค่าใช้จ่ายอื่น'], rows: byCat.map(x => [x.name, x.n, x.vt, x.km, x.pax, x.fuel, x.other]) },
           { name: 'หมวดงาน×รถ', head: ['หมวดงาน', ...matVeh.map(v => v.name), 'รวม'], rows: matrix.map(m => [m.c.name, ...m.cells, m.cells.reduce((a, b) => a + b, 0)]) },

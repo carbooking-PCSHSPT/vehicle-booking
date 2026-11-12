@@ -28,6 +28,8 @@ const C = (() => {
   const dPhone = id => { const d = S().driver(id); return d ? d.phone : ''; };
 
   // บัตรคำขอแบบรายการ
+  // ป้ายลักษณะการเดินทาง (ค้างคืน / ไป-กลับทุกวัน / ไปส่ง-รับอย่างเดียว)
+  const tripTagHTML = (r, style = '') => { const t = S().tripTag(r); return t ? `<span class="tag ${t.cls}" ${style ? `style="${style}"` : ''}>${icon(t.icon)}${t.text}</span>` : ''; };
   function reqCard(r, href) {
     const d = new Date(r.startAt);
     const vs = (r.assignments || []).map(a => vName(a.vehicleId)).join(', ');
@@ -39,7 +41,7 @@ const C = (() => {
           <div class="meta">
             <span>${icon('flag')}${esc(r.purpose)}</span>
             <span>${icon('clock')}${fmt.range(r.startAt, r.endAt)}</span>
-            <span>${icon('users')}ครู ${r.teachers} · นักเรียน ${r.students}</span>
+            <span>${icon('users')}${S().paxText(r)}</span>${tripTagHTML(r)}
             ${vs ? `<span>${icon('van')}${esc(vs)}</span>` : ''}
           </div>
         </div>
@@ -66,12 +68,12 @@ const C = (() => {
           </div>
           <h4>${esc(S().destName(r))}</h4>
           <p class="pl">${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม. ไป-กลับ` : ''} · ${esc(r.purpose)}</p>
-          <div class="tags">${r.overnight ? `<span class="tag night">${icon('moon')}ค้างคืน ${fmt.days(r.startAt, r.endAt)} วัน</span>` : ''}${(r.assignments || []).length > 1 ? `<span class="tag navy">${icon('van')}${r.assignments.length} คัน</span>` : ''}</div>
+          <div class="tags">${tripTagHTML(r)}${(r.assignments || []).length > 1 ? `<span class="tag navy">${icon('van')}${r.assignments.length} คัน</span>` : ''}</div>
         </div>
         <div class="pass-stub">
           <div class="full"><small>ผู้ขอใช้รถ</small><span>${esc(r.requester.name)}</span></div>
           <div><small>ครู</small><span>${r.teachers} คน</span></div>
-          <div><small>นักเรียน</small><span>${r.students} คน</span></div>
+          <div><small>นักเรียน</small><span>${r.students} คน</span></div> ${+r.others ? `<div><small>บุคคลอื่น</small><span>${r.others} คน</span></div>` : ''}
           <div class="full"><small>รถ</small><span>${(r.assignments || []).length ? r.assignments.map(a => `${esc(vName(a.vehicleId))} · ${esc(vPlate(a.vehicleId))}`).join('<br>') : (r.status === 'pending' ? 'รอแอดมินจัดรถ' : '—')}</span></div>
           <div class="full"><small>คนขับ</small><span>${(r.assignments || []).length ? r.assignments.map(a => `${esc(dName(a.driverId))}${dPhone(a.driverId) ? ` · <a href="tel:${esc(dPhone(a.driverId))}">${esc(dPhone(a.driverId))}</a>` : ''}`).join('<br>') : '—'}</span></div>
         </div>
@@ -101,9 +103,9 @@ const C = (() => {
         <div class="tix-body">
           <h3>${esc(S().destName(r))}</h3>
           <p class="pl">${icon('pin')} ${esc((r.destinations[0] || {}).province || (r.destinations[0] || {}).address || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม. ไป-กลับ` : ''}</p>
-          ${r.overnight ? `<span class="tag night" style="margin-top:8px">${icon('moon')} ค้างคืน ${fmt.days(r.startAt, r.endAt)} วัน</span>` : ''}
+          ${tripTagHTML(r, 'margin-top:8px')}
           <div class="tix-purpose">${esc(r.purpose)}</div>
-          <div class="tix-ppl"><span>${icon('teacher')} ครู <b>${r.teachers}</b></span><span>${icon('student')} นักเรียน <b>${r.students}</b></span></div>
+          <div class="tix-ppl"><span>${icon('teacher')} ครู <b>${r.teachers}</b></span><span>${icon('student')} นักเรียน <b>${r.students}</b></span>${+r.others ? `<span>${icon('users')} บุคคลอื่น <b>${r.others}</b></span>` : ''}</div>
           <div class="tix-grid">
             <div><small>ผู้ขอใช้รถ</small>${esc(r.requester.name)}</div>
             <div><small>รถ${as.length > 1 ? ` (${as.length} คัน)` : ''}</small>${as.length ? as.map(a => `${esc(vName(a.vehicleId))} · ${esc(vPlate(a.vehicleId))}`).join('<br>') : (r.status === 'pending' ? 'รอแอดมินจัดรถ' : '—')}</div>
@@ -203,9 +205,9 @@ const C = (() => {
       return pre + `<tr class="bd-row ${st[0]} ${href ? 'link' : ''}" ${href ? `data-href="${href}"` : ''}>
         <td><span class="flip">${flip(st0, k)}</span>${UI.sameDay(st0, day) ? '' : `<small>${fmt.dayMonth(st0)}</small>`}</td>
         <td><span class="flip">${flip(en, k)}</span>${UI.sameDay(en, day) ? '' : `<small>${fmt.dayMonth(en)}</small>`}</td>
-        <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${r.overnight ? ` · ค้างคืน ${fmt.days(r.startAt, r.endAt)} วัน` : ''}</small><small>${esc(r.purpose)}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
+        <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${S().tripTag(r) ? ` · ${S().tripTag(r).text}` : ''}</small><small>${esc(r.purpose)}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
         <td>${esc(r.requester.name)}</td>
-        <td><span class="bd-ppl"><span>${icon('teacher')}${r.teachers}</span><span>${icon('student')}${r.students}</span></span></td>
+        <td><span class="bd-ppl"><span>${icon('teacher')}${r.teachers}</span><span>${icon('student')}${r.students}</span>${+r.others ? `<span title="บุคคลอื่น">${icon('users')}${r.others}</span>` : ''}</span></td>
         <td>${as.length ? as.map(a => `${esc(vName(a.vehicleId))}<small>${esc(vPlate(a.vehicleId))}</small>`).join('') : '<span class="bd-wait">รอแอดมินจัดรถ</span>'}</td>
         <td>${as.length ? as.map(a => `${esc(dName(a.driverId))}${dPhone(a.driverId) ? `<small><a href="tel:${esc(dPhone(a.driverId))}">${esc(dPhone(a.driverId))}</a></small>` : ''}`).join('') : '—'}</td>
         <td><span class="bd-st ${st[0]}"><span>${st[1]}<em>${st[2]}</em></span></span></td></tr>`;
@@ -386,7 +388,7 @@ const App = (() => {
         <div class="footer-top">
           <div class="footer-brand"><img src="images/logo.png" alt="" width="260" height="392">
             <div><strong>ระบบยานพาหนะ</strong><span>${esc(s.division)}<br>${esc(s.schoolName)}</span></div></div>
-          <ul class="footer-links"><li><a href="#/request">ขอใช้รถ</a></li><li><a href="#/schedule">ตารางรถ</a></li><li><a href="#/vehicles">ข้อมูลรถ</a></li><li><a href="#/my">การขอใช้รถของฉัน</a></li><li><a href="#/contact">ติดต่อเรา</a></li></ul>
+          <ul class="footer-links"><li><a href="#/request">ขอใช้รถ</a></li><li><a href="#/schedule">ตารางรถ</a></li><li><a href="#/vehicles">ข้อมูลรถ</a></li><li><a href="#/my">คำขอของฉัน</a></li><li><a href="#/contact">ติดต่อเรา</a></li></ul>
         </div>
         ${ViewMode.pickerHTML('in-footer')}
         <div class="footer-bottom"><span><span class="line"></span>© ${new Date().getFullYear() + 543} ${esc(s.division)}</span><span>${esc(s.schoolNameEn)}</span></div>

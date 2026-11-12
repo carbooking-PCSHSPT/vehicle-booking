@@ -102,6 +102,37 @@ const Store = (() => {
   // ───────── ตัวช่วยเรื่องคำขอ ─────────
   const overlap = (a1, a2, b1, b2) => new Date(a1) < new Date(b2) && new Date(b1) < new Date(a2);
   const blocking = r => r.status === 'approved' || r.status === 'ontrip';
+  // ลักษณะการเดินทาง
+  const TRIP = {
+    day: { label: 'ไป-กลับวันเดียว', icon: 'route', hint: 'ออกและกลับถึงโรงเรียนภายในวันเดียว' },
+    oneway: { label: 'ไปส่ง หรือไปรับ อย่างเดียว', icon: 'arrowUR', hint: 'รถไปส่ง/ไปรับแล้วกลับโรงเรียนเลย ไม่รอคณะ' },
+    overnight: { label: 'ไปหลายวัน ค้างคืน', icon: 'moon', hint: 'รถและคนขับอยู่กับคณะตลอด ค้างคืนที่ปลายทาง' },
+    daily: { label: 'ไปหลายวัน ไป-กลับทุกวัน', icon: 'refresh', hint: 'ไม่ค้างคืน รถออกและกลับโรงเรียนทุกวัน ตามเวลาเดียวกัน' }
+  };
+  const tripType = r => TRIP[r.tripType] ? r.tripType : (sameDay(r.startAt, r.endAt) ? 'day' : 'overnight');
+  // ช่วงเวลาที่รถ/คนขับไม่ว่าง: ไป-กลับทุกวัน = แยกเป็นรายวัน (กลางคืนรถว่าง) · แบบอื่น = ช่วงเดียวตั้งแต่ออกจนกลับ
+  function windows(r) {
+    const s = new Date(r.startAt), e = new Date(r.endAt);
+    if (tripType(r) !== 'daily' || sameDay(s, e)) return [[s, e]];
+    const out = [], d = new Date(s); d.setHours(0, 0, 0, 0);
+    while (d <= e && out.length < 400) {
+      const a = new Date(d), b = new Date(d);
+      a.setHours(s.getHours(), s.getMinutes(), 0, 0); b.setHours(e.getHours(), e.getMinutes(), 0, 0);
+      if (b > a) out.push([a, b]);
+      d.setDate(d.getDate() + 1);
+    }
+    return out.length ? out : [[s, e]];
+  }
+  const hitsAny = (ws, r) => windows(r).some(([a, b]) => ws.some(([c, d]) => overlap(a, b, c, d)));
+  const paxText = r => `ครู ${+r.teachers || 0} · นักเรียน ${+r.students || 0}${+r.others ? ` · บุคคลอื่น ${+r.others}` : ''}`;
+  // ป้ายสั้นสำหรับการ์ด/ตาราง (ไป-กลับวันเดียวไม่ต้องมีป้าย)
+  function tripTag(r) {
+    const t = tripType(r), n = Math.round((new Date(new Date(r.endAt).toDateString()) - new Date(new Date(r.startAt).toDateString())) / 864e5) + 1;
+    if (t === 'overnight') return { cls: 'night', icon: 'moon', text: `ค้างคืน ${n} วัน ${n - 1} คืน` };
+    if (t === 'daily') return { cls: 'navy', icon: 'refresh', text: `ไป-กลับทุกวัน ${n} วัน` };
+    if (t === 'oneway') return { cls: '', icon: 'arrowUR', text: 'ไปส่ง/รับอย่างเดียว' };
+    return null;
+  }
   function rollup(r) {
     if (!['approved', 'ontrip', 'returned'].includes(r.status)) return r.status;
     const a = r.assignments || [];
@@ -110,22 +141,23 @@ const Store = (() => {
     if (a.every(x => x.status === 'returned')) return 'returned';
     return a.some(x => x.status === 'returned') ? 'ontrip' : 'approved';
   }
-  function vehicleConflicts(vehicleId, start, end, exceptId) {
-    const out = [];
+  // ws (ไม่บังคับ) = ช่วงเวลาของคำขอที่กำลังจัด จาก windows(r) — ใช้แทน start/end เมื่อเป็นแบบไป-กลับทุกวัน
+  function vehicleConflicts(vehicleId, start, end, exceptId, ws) {
+    const out = [], mine = ws || [[start, end]];
     db.requests.forEach(r => {
       if (r.id === exceptId || !blocking(r)) return;
-      (r.assignments || []).forEach(a => { if (a.vehicleId === vehicleId && a.status !== 'returned' && overlap(start, end, r.startAt, r.endAt)) out.push(r); });
+      (r.assignments || []).forEach(a => { if (a.vehicleId === vehicleId && a.status !== 'returned' && hitsAny(mine, r)) out.push(r); });
     });
     const v = vehicle(vehicleId);
-    if (v && v.maint && v.maint.active && overlap(start, end, v.maint.from || '1970-01-01', v.maint.to || '2999-01-01')) out.push({ id: 'MAINT', dest: v.maint.note || 'ซ่อมบำรุง', maint: true });
+    if (v && v.maint && v.maint.active && mine.some(([a, b]) => overlap(a, b, v.maint.from || '1970-01-01', v.maint.to || '2999-01-01'))) out.push({ id: 'MAINT', dest: v.maint.note || 'ซ่อมบำรุง', maint: true });
     if (v && v.bookable === false) out.push({ id: 'OFF', dest: 'งดให้บริการ', maint: true });
     return out;
   }
-  function driverConflicts(driverId, start, end, exceptId) {
-    const out = [];
+  function driverConflicts(driverId, start, end, exceptId, ws) {
+    const out = [], mine = ws || [[start, end]];
     db.requests.forEach(r => {
       if (r.id === exceptId || !blocking(r)) return;
-      (r.assignments || []).forEach(a => { if (a.driverId === driverId && a.status !== 'returned' && overlap(start, end, r.startAt, r.endAt)) out.push(r); });
+      (r.assignments || []).forEach(a => { if (a.driverId === driverId && a.status !== 'returned' && hitsAny(mine, r)) out.push(r); });
     });
     return out;
   }
@@ -723,7 +755,12 @@ const Store = (() => {
     destinations: (x.destinations || []).map(d => ({ id: d.id || uid('pl'), name: d.name, address: d.address || '', province: d.province || '', lat: d.lat ?? null, lng: d.lng ?? null, km: +d.km || 0, mins: +d.mins || 0 })),
     totalKm: +x.totalKm || 0, totalMins: +x.totalMins || 0,
     startAt: new Date(x.startAt).toISOString(), endAt: new Date(x.endAt).toISOString(),
-    overnight: !sameDay(x.startAt, x.endAt), lodging: String(x.lodging || '').trim(),
+    ...(() => {
+      const one = sameDay(x.startAt, x.endAt);
+      // วันเดียว: ไป-กลับ หรือ ไปส่ง/รับอย่างเดียว · หลายวัน: ค้างคืน หรือ ไป-กลับทุกวัน
+      const t = one ? (x.tripType === 'oneway' ? 'oneway' : 'day') : (x.tripType === 'daily' ? 'daily' : 'overnight');
+      return { tripType: t, overnight: t === 'overnight', lodging: t === 'overnight' ? String(x.lodging || '').trim() : '' };
+    })(),
     teachers: +x.teachers || 0, students: +x.students || 0, others: +x.others || 0, passengerNames: String(x.passengerNames || '').trim(),
     pickup: String(x.pickup || '').trim(), contactPhone: String(x.contactPhone || '').trim(), note: String(x.note || '').trim(), attachments: x.attachments || []
   });
@@ -748,6 +785,7 @@ const Store = (() => {
     vehicle, driver, user, request, has, isAdmin, isSuper, isExec, isDriver, isBack, driverOfUser, emailOf, usernameOf, isUsernameEmail,
     categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
+    TRIP, tripType, windows, tripTag, paxText,
     notifications, markSeen, pendingRatings,
     // ข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน): หน้าที่ต้องใช้ข้อมูลตั้งแต่วันที่ from เรียกฟังก์ชันนี้ตอนสร้างหน้า
     // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง

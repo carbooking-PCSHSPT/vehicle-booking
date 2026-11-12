@@ -1018,6 +1018,84 @@ html.lt640 { --nav-h: 66px; }
 .lt640 .local-badge { left: 10px; bottom: 10px; padding: 6px 8px 6px 12px; font-size: 0; gap: 6px; }
 .lt640 .local-badge .i { width: 16px; height: 16px; }
 .lt640 .local-badge button { font-size: .7rem; }
+/* ───────── หน้าแรก: ปุ่มเมนูหลัก (ขอใช้รถ · ตารางรถว่าง · การขอใช้รถของฉัน) ───────── */
+.hero-cta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-width: 640px; }
+.cta-tile { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px 14px 14px 14px; border-radius: 20px; border: 1px solid transparent; font-family: var(--font-display); transition: transform .2s, box-shadow .2s; }
+.cta-tile:hover { transform: translateY(-3px); }
+.cta-tile .ci { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; flex: none; background: rgba(255, 255, 255, .18); }
+.cta-tile .ci .i { width: 22px; height: 22px; }
+.cta-tile .ct { display: grid; min-width: 0; line-height: 1.3; }
+.cta-tile .ct b { font-weight: 600; font-size: 1rem; }
+.cta-tile .ct small { font-size: .76rem; opacity: .8; font-weight: 400; }
+.cta-tile .go { width: 18px; height: 18px; margin-left: auto; opacity: .6; flex: none; }
+.cta-tile .cnt { position: absolute; top: -7px; right: -7px; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 99px; background: #e2552b; color: #fff; font-size: .78rem; font-weight: 600; display: grid; place-items: center; border: 2px solid var(--cream); }
+.cta-tile.t-primary { background: var(--navy); color: #fff; box-shadow: 0 16px 30px -16px rgba(36, 48, 122, .8); }
+.cta-tile.t-gold { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #2a1f05; box-shadow: 0 16px 30px -16px rgba(201, 150, 43, .9); }
+.cta-tile.t-gold .ci { background: rgba(255, 255, 255, .35); }
+.cta-tile.t-plain { background: var(--paper); color: var(--navy); border-color: var(--navy-100); box-shadow: 0 16px 30px -20px rgba(36, 48, 122, .45); }
+.cta-tile.t-plain .ci { background: var(--navy-50); }
+/* คอม: ปุ่มหลักเต็มแถว + 2 ปุ่มรองข้างล่าง · แท็บเล็ต (หน้าแรกคอลัมน์เดียว): 3 ปุ่มเรียงแถวเดียว */
+html:not(.lt1060) .hero-cta { grid-template-columns: 1fr 1fr; max-width: 560px; }
+html:not(.lt1060) .cta-tile.t-primary { grid-column: 1 / -1; padding: 16px 18px; }
+html:not(.lt1060) .cta-tile.t-primary .ct b { font-size: 1.15rem; }
+.lt1060 .hero-cta { max-width: none; }
+.lt640 .hero-cta { grid-template-columns: 1fr 1fr; gap: 10px; }
+.lt640 .cta-tile.t-primary { grid-column: 1 / -1; padding: 16px; }
+.lt640 .cta-tile.t-primary .ct b { font-size: 1.12rem; }
+.lt640 .cta-tile:not(.t-primary) { flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; }
+.lt640 .cta-tile:not(.t-primary) .go { position: absolute; top: 16px; right: 12px; }
+/* ลักษณะการเดินทาง + เลือกวันที่/เวลาแยกกัน (ฟอร์มขอใช้รถ) */
+.trip-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.trip-opt { position: relative; cursor: pointer; }
+.trip-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.trip-opt > span { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: start; height: 100%; padding: 12px 14px; border-radius: 16px; border: 1.5px solid var(--line); background: var(--paper); transition: border-color .2s, background .2s; }
+.trip-opt > span .i { grid-row: span 2; width: 22px; height: 22px; margin-top: 2px; color: var(--gold-700); }
+.trip-opt b { font-family: var(--font-display); font-weight: 500; font-size: .94rem; color: var(--ink); }
+.trip-opt small { color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.trip-opt input:checked + span { border-color: var(--navy); background: var(--navy-50); box-shadow: 0 0 0 3px rgba(36, 48, 122, .1); }
+.trip-opt input:checked + span .i, .trip-opt input:checked + span b { color: var(--navy); }
+.trip-opt input:focus-visible + span { outline: 2px solid var(--navy); outline-offset: 2px; }
+.dt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.dt-box { padding: 14px; border-radius: 18px; background: var(--cream); border: 1px solid var(--line); min-width: 0; }
+.dt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-family: var(--font-display); font-weight: 600; color: var(--navy); }
+.dt-head .i { color: var(--gold-700); }
+.dt-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; }
+.dt-row .field input, .dt-row .field select { min-height: 48px; font-size: 1rem; background: var(--paper); }
+.dt-th { display: block; margin-top: 8px; color: var(--navy); font-family: var(--font-display); font-size: .84rem; min-height: 1.2em; }
+.trip-sum { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--navy-50); color: var(--ink-2); font-size: .92rem; }
+.trip-sum .i { margin-top: 3px; color: var(--navy); }
+.trip-sum.bad { background: #fef2f2; color: var(--bad); } .trip-sum.bad .i { color: var(--bad); }
+.form-section[data-trip="day"] #rDateF, .form-section[data-trip="oneway"] #rDateF { display: none; }
+.lt1060 .dt-grid { grid-template-columns: 1fr; }
+.lt640 .trip-pick { grid-template-columns: 1fr; gap: 8px; }
+.lt640 .trip-opt > span { padding: 10px 12px; }
+.lt640 .dt-row { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 8px; }
+.lt640 .dt-box { padding: 12px; }
+.lt640 .dt-row .field select, .lt640 .dt-row .field input { padding-left: 10px; padding-right: 8px; }
+.dt-row .field > label { white-space: nowrap; }
+.dt-row .field, .dt-row .field input, .dt-row .field select { min-width: 0; max-width: 100%; }
+.form-section[data-trip="day"] .dt-box:last-child .dt-row, .form-section[data-trip="oneway"] .dt-box:last-child .dt-row { grid-template-columns: minmax(0, 1fr); max-width: 260px; }
+/* ติดต่อเรา: ผังคณะทำงานบนมือถือ แถวละ 2 คน (หัวหน้าสูงสุดเต็มแถว) */
+.lt640 .org { gap: 18px; }
+.lt640 .org-level { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lt640 .org-level + .org-level::before { top: -18px; height: 14px; }
+.lt640 .person { width: auto; min-width: 0; padding: 16px 10px; overflow-wrap: anywhere; }
+.lt640 .person.l1 { grid-column: 1 / -1; width: min(100%, 300px); justify-self: center; }
+.lt640 .person .ph { width: 68px; height: 68px; margin-bottom: 8px; }
+.lt640 .person .pos { font-size: .78rem; }
+.lt640 .org-level > .person:last-child:nth-child(odd):not(.l1) { grid-column: 1 / -1; width: calc(50% - 5px); justify-self: center; }
+/* คำแนะนำไฟล์คมชัด */
+.clear-tips ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+/* ส่วนท้าย: ลิงก์เมนูเรียงแถวเดียว */
+.footer-links { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.footer-links::-webkit-scrollbar { display: none; }
+.footer-links li { flex: none; }
+.lt640 .footer-top { gap: 20px; }
+.lt640 .footer-links { width: 100%; justify-content: space-between; gap: 6px 14px; font-size: .88rem; }
+/* เมนูแจ้งเตือน/ผู้ใช้บนจอแคบ: กางเต็มความกว้างใต้แถบเมนู ไม่ล้นจอ */
+.lt640 .nav-actions .dd { position: static; }
+.lt640 .nav-actions .dd-panel.right { position: absolute; top: calc(100% + 2px); left: 10px; right: 10px; width: auto; min-width: 0 !important; max-height: calc(100vh - var(--nav-h) - 20px); overflow: auto; }
+
 /* ───────── ปรับให้ใช้บนมือถือ/แท็บเล็ตสะดวก ───────── */
 .toolbar .search-in .input { padding-left: 40px; }
 /* ตาราง 4 คอลัมน์ขึ้นไป (ui.js stackTables) → จอแคบกว่า 900px แสดงเป็นการ์ดทีละแถว (มือถือ 2 ช่อง/แถว · แท็บเล็ตแนวตั้ง 3 ช่อง/แถว) */

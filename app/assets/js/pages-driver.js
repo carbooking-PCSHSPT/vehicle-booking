@@ -37,7 +37,7 @@
           <div class="field"><label>วิธีชำระ</label><select name="pay">${Object.entries(S.PAY).map(([k, l]) => `<option value="${k}" ${k === e.pay ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
           <div class="field"><label>หมายเหตุ</label><input name="note" value="${esc(e.note || '')}"></div>
         </div>
-        ${C.filePicker('exPh', e.photos || [], { label: 'ถ่ายรูป / แนบบิล', capture: false, hint: 'รูปใบเสร็จ/บิลน้ำมัน (กดเพื่อถ่ายรูปจากมือถือได้)' })}
+        ${C.filePicker('exPh', e.photos || [], { label: 'ถ่ายรูป / แนบบิล', capture: false, hint: 'ถ่ายใบเสร็จให้ตรง เต็มใบ ในที่สว่าง — ต้องอ่านยอดเงิน จำนวนลิตร และวันที่ได้ชัดเจน' })}
       </form>`,
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', icon: 'check', onClick: async el => {
         const f = UI.formData(el.querySelector('#exF'));
@@ -93,11 +93,11 @@
           <div><small>รถ</small><b>${esc(v.name || '-')}</b><br>${esc(v.plate || '')}</div>
           <div><small>เวลา</small>${fmt.range(r.startAt, r.endAt)}</div>
           <div><small>จุดนัดขึ้นรถ</small>${esc(r.pickup || '-')}</div>
-          <div><small>ผู้เดินทาง</small>ครู ${r.teachers} · นักเรียน ${r.students}${r.others ? ` · อื่น ๆ ${r.others}` : ''}</div>
+          <div><small>ผู้เดินทาง</small>${S.paxText(r)}</div>
           <div class="full"><small>ผู้ขอใช้รถ</small>${esc(r.requester.name)} · <a class="link" href="tel:${esc(r.contactPhone || r.requester.phone)}">${esc(r.contactPhone || r.requester.phone || '')}</a></div>
           ${(r.destinations || []).length ? `<div class="full"><small>ปลายทาง</small>${r.destinations.map(d => `${esc(d.name)}${d.address ? ` <span class="muted">(${esc(d.address)})</span>` : ''}`).join('<br>')}${r.totalKm ? `<br><span class="muted">ระยะทางรวมประมาณ ${fmt.num(r.totalKm, 0)} กม.</span>` : ''}</div>` : ''}
           ${a.note ? `<div class="full" style="background:var(--gold-50)"><small>หมายเหตุจากแอดมิน</small>${esc(a.note)}</div>` : ''}
-          ${r.overnight ? `<div class="full"><small>ค้างคืน</small>${fmt.days(r.startAt, r.endAt)} วัน${r.lodging ? ' · ' + esc(r.lodging) : ''}</div>` : ''}
+          ${S.tripTag(r) ? `<div class="full"><small>ลักษณะการเดินทาง</small>${S.tripTag(r).text}${S.tripType(r) === 'daily' ? ` · ออก ${fmt.time(r.startAt)} กลับ ${fmt.time(r.endAt)} น. ทุกวัน` : ''}${r.lodging ? ' · ที่พัก ' + esc(r.lodging) : ''}</div>` : ''}
           ${others.length ? `<div class="full"><small>รถคันอื่นในทริปเดียวกัน</small>${others.map(o => `${esc(C.vName(o.vehicleId))} · ${esc(C.dName(o.driverId))}`).join('<br>')}</div>` : ''}
           ${a.odoStart != null || a.odoEnd != null ? `<div class="full"><small>เลขไมล์</small>${a.odoStart != null ? fmt.num(a.odoStart) : '—'} → ${a.odoEnd != null ? fmt.num(a.odoEnd) : '—'}${a.odoStart != null && a.odoEnd != null ? ` <b>(${fmt.num(a.odoEnd - a.odoStart)} กม.)</b>` : ''}</div>` : ''}
           ${mine.length ? `<div class="full"><small>ค่าใช้จ่ายที่บันทึก</small>${mine.map(e => `${S.EXPENSE[e.type]} ${fmt.money(e.amount)} บ.${e.liters ? ` (${e.liters} ล.)` : ''}`).join('<br>')}</div>` : ''}

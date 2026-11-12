@@ -77,10 +77,13 @@
           <div class="eyebrow reveal">${esc(s.division)}</div>
           <h1 class="reveal" style="--d:.08s"><span>ระบบยานพาหนะ</span><span class="m">ขอรถส่วนกลาง<svg viewBox="0 0 300 20" preserveAspectRatio="none"><path d="M4 14 C 60 4, 120 18, 180 8 S 270 6, 296 12"/></svg></span></h1>
           <p class="lead reveal" style="--d:.16s">บริการรถตู้ รถบัส ให้แก่คุณครูและบุคลากรทุกท่านในโรงเรียน</p>
-          <div class="hero-cta reveal" style="--d:.3s">
-            <a class="btn btn-primary" href="#/request">${icon('filePlus')}ขอใช้รถ</a>
-            <a class="btn btn-gold" href="#/schedule">${icon('calendar')}ตารางรถว่าง</a>
-          </div>
+          <div class="hero-cta reveal" style="--d:.3s">${(() => {
+            const mine = logged ? S.myRequests().filter(r => ['pending', 'revise', 'approved', 'ontrip'].includes(r.status)).length : 0;
+            const tile = (cls, href, ic, t, sub, badge = '') => `<a class="cta-tile ${cls}" href="${href}"><span class="ci">${icon(ic)}</span><span class="ct"><b>${t}</b><small>${sub}</small></span>${badge}${icon('chevR', 'go')}</a>`;
+            return tile('t-primary', '#/request', 'filePlus', 'ขอใช้รถ', 'ส่งคำขอใหม่')
+              + tile('t-gold', '#/schedule', 'calendar', 'ตารางรถว่าง', 'ดูว่ารถว่างวันไหน')
+              + tile('t-plain', '#/my', 'clipboard', 'การขอใช้รถของฉัน', 'ติดตามสถานะคำขอ', mine ? `<span class="cnt" title="คำขอที่ยังไม่เสร็จ">${mine}</span>` : '');
+          })()}</div>
           <div class="stats-inline reveal" style="--d:.38s">${logged ? `
             <div><b class="num" data-count="${vs.length}">0</b><small>คันพร้อมให้บริการ</small></div>
             <div><b class="num" data-count="${month.length}">0</b><small>การเดินทางเดือนนี้</small></div>
@@ -265,6 +268,12 @@
   }
   Pages._catPicker = { html: catPicker, bind: bindCatPicker };
 
+  // ตัวเลือกเวลา ทุก 30 นาที (ถ้าค่าเดิมไม่ตรงช่วง เช่น 13:20 ก็ยังแสดงให้เลือกค้างไว้)
+  function timeOptions(sel) {
+    const ts = []; for (let m = 0; m < 1440; m += 30) ts.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+    if (sel && !ts.includes(sel)) { ts.push(sel); ts.sort(); }
+    return ts.map(t => `<option value="${t}" ${t === sel ? 'selected' : ''}>${t} น.</option>`).join('');
+  }
   // ═════════ ฟอร์มขอใช้รถ (ใช้ร่วมกับแอดมินบันทึกเร่งด่วน) ═════════
   function requestFormHTML(r, { admin = false, copies = [] } = {}) {
     const lead = +S.db.settings.leadDays || 0;
@@ -285,13 +294,25 @@
         <button type="button" class="btn btn-ghost" id="addDest" style="margin-top:12px">${icon('plus')} เพิ่มสถานที่${Maps.enabled ? ' (ค้นหา/ปักหมุด)' : ''}</button>
         <p class="hint" id="kmInfo" style="margin-top:10px"></p></div>
       <div class="form-section"><h3><span class="n">3</span>วันและเวลา</h3>
-        <div class="grid2">
-          <div class="field"><label>ออกเดินทาง <b class="req">*</b></label><input name="startAt" type="datetime-local" required value="${fmt.local(v.startAt)}" ${!admin ? `min="${fmt.local(minD)}"` : ''}></div>
-          <div class="field"><label>กลับถึงโรงเรียน <b class="req">*</b></label><input name="endAt" type="datetime-local" required value="${fmt.local(v.endAt)}"></div>
-          <div class="field full" id="lodgeF" hidden><label>${icon('moon')} ค้างคืน — สถานที่พัก</label><input name="lodging" value="${esc(v.lodging || '')}" placeholder="เช่น โรงแรม/ที่พักของหน่วยงานผู้จัด"></div>
+        <div class="field"><label>ลักษณะการเดินทาง <b class="req">*</b></label>
+          <div class="trip-pick">${Object.entries(S.TRIP).map(([k, t]) => `<label class="trip-opt"><input type="radio" name="tripType" value="${k}" ${k === (v.startAt ? S.tripType(v) : (v.tripType || 'day')) ? 'checked' : ''}><span>${icon(t.icon)}<b>${t.label}</b><small>${t.hint}</small></span></label>`).join('')}</div></div>
+        <input type="hidden" name="startAt" value="${fmt.local(v.startAt)}"><input type="hidden" name="endAt" value="${fmt.local(v.endAt)}">
+        <div class="dt-grid">
+          <div class="dt-box"><div class="dt-head">${icon('navigation')} <span data-lbl="out">ออกเดินทาง</span></div>
+            <div class="dt-row">
+              <div class="field"><label for="dDate">วันที่ <b class="req">*</b></label><input type="date" id="dDate" value="${fmt.localDate(v.startAt)}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
+              <div class="field"><label for="sTime" data-lbl="sTime">เวลาออก <b class="req">*</b></label><select id="sTime">${timeOptions(v.startAt ? fmt.time(v.startAt) : '08:00')}</select></div>
+            </div><small class="dt-th" id="dTh"></small></div>
+          <div class="dt-box"><div class="dt-head">${icon('home')} <span data-lbl="back">กลับถึงโรงเรียน</span></div>
+            <div class="dt-row">
+              <div class="field" id="rDateF"><label for="rDate" data-lbl="rDate">วันที่กลับ <b class="req">*</b></label><input type="date" id="rDate" value="${fmt.localDate(v.endAt)}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
+              <div class="field"><label for="eTime" data-lbl="eTime">เวลากลับถึง <b class="req">*</b></label><select id="eTime">${timeOptions(v.endAt ? fmt.time(v.endAt) : '16:00')}</select></div>
+            </div><small class="dt-th" id="rTh"></small></div>
         </div>
-        ${!admin ? `<p class="hint" style="margin-top:8px">${icon('info')} ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ออกเดินทางได้ตั้งแต่ ${fmt.dateMid(minD)}) · กรณีเร่งด่วนติดต่อแอดมิน</p>` : ''}
-        <p class="hint" id="dayInfo"></p></div>
+        <div class="field" id="lodgeF" hidden style="margin-top:14px"><label>${icon('moon')} สถานที่พัก (ค้างคืน)</label><input name="lodging" value="${esc(v.lodging || '')}" placeholder="เช่น โรงแรม/ที่พักของหน่วยงานผู้จัด"></div>
+        <div class="trip-sum" id="dayInfo"></div>
+        <div class="note-box navy" id="onewayNote" hidden style="margin-top:12px">${icon('info')}<div><b>ต้องไปรับกลับในภายหลัง?</b> ให้ส่งคำขออีก 1 รายการสำหรับเที่ยวรับ (ใช้ "คัดลอกจากคำขอเดิม" ด้านบนได้ ไม่ต้องกรอกใหม่) เพื่อให้แอดมินจัดรถได้ถูกช่วงเวลา และรถว่างให้งานอื่นระหว่างรอ</div></div>
+        ${!admin ? `<p class="hint" style="margin-top:10px">${icon('info')} ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ออกเดินทางได้ตั้งแต่ ${fmt.dateMid(minD)}) · กรณีเร่งด่วนติดต่อแอดมิน</p>` : ''}</div>
       <div class="form-section"><h3><span class="n">4</span>ผู้เดินทาง</h3>
         <div class="grid3">
           <div class="field"><label>จำนวนครู/บุคลากร <b class="req">*</b></label><input name="teachers" type="number" min="0" required value="${v.teachers ?? 1}"></div>
@@ -304,6 +325,8 @@
         <div class="seat-meter" id="paxInfo" style="margin-top:14px"></div></div>
       <div class="form-section"><h3><span class="n">5</span>บันทึกข้อความขออนุญาตใช้รถ</h3>
         <div class="note-box" style="margin-bottom:12px">${icon('info')}<div>แนบรูปหรือไฟล์ PDF ของบันทึกข้อความขออนุญาตใช้รถ ที่มี<b>ลายเซ็นผู้อำนวยการโรงเรียน</b> (หรือผู้รักษาราชการแทน) แอดมินจะตรวจสอบก่อนอนุมัติ</div></div>
+        <div class="note-box red clear-tips" style="margin-bottom:12px">${icon('camera')}<div><b>ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</b> ถ้าไม่ชัดแอดมินจะส่งกลับให้แก้ไข
+          <ul><li>ใช้ไฟล์ <b>PDF จากเครื่องสแกน</b> หรือแอปสแกนเอกสาร ดีที่สุด</li><li>ถ้าถ่ายรูป: วางกระดาษบนพื้นเรียบ ถ่าย<b>ตรง ๆ เต็มหน้า</b> ในที่สว่าง ไม่มีเงาบัง ไม่เบลอ</li><li>ต้องเห็น <b>เลขที่หนังสือ วันที่ และลายเซ็น</b> ชัดเจน · ถ้ามีหลายหน้า แนบให้ครบทุกหน้า</li></ul></div></div>
         ${C.filePicker('att', v.attachments || [], { label: 'แนบบันทึกข้อความ', pdf: true })}</div>
       <div class="form-section"><h3><span class="n">6</span>หมายเหตุเพิ่มเติม</h3>
         <div class="field"><textarea name="note" rows="3" placeholder="เช่น มีสัมภาระ/อุปกรณ์แข่งขันจำนวนมาก, ต้องการแวะรับวิทยากร">${esc(v.note || '')}</textarea></div></div>`;
@@ -319,15 +342,58 @@
       if (dests.length) { $('#kmInfo', root).textContent = 'กำลังคำนวณระยะทางรวม…'; total = await Maps.tripTotal(dests); $('#kmInfo', root).innerHTML = `${icon('route')} ระยะทางรวมไป-กลับ ${total.estimated ? 'ประมาณ ' : ''}<b>${fmt.num(total.km, 1)} กม.</b>${total.mins ? ` · เวลาเดินทางเที่ยวเดียว ~${fmt.dur(total.mins * 6e4)}` : ''}`; }
       else $('#kmInfo', root).textContent = '';
     };
-    const drawDays = () => {
-      const a = form.querySelector('[name=startAt]').value, b = form.querySelector('[name=endAt]').value;
-      const lodge = $('#lodgeF', root);
-      if (a && b && new Date(b) > new Date(a)) {
-        const days = fmt.days(a, b), over = days > 1;
-        lodge.hidden = !over;
-        $('#dayInfo', root).innerHTML = `${icon('calendar')} รวม <b>${days} วัน</b>${over ? ` · ค้างคืน ${days - 1} คืน` : ' · ไป-กลับวันเดียว'}`;
-      } else { lodge.hidden = true; $('#dayInfo', root).textContent = a && b ? 'เวลากลับต้องหลังเวลาออกเดินทาง' : ''; }
+    // ── วันและเวลา: เลือกวันที่กับเวลาแยกกัน แล้วรวมเป็น startAt / endAt ──
+    const el = id => root.querySelector('#' + id);
+    const tripOf = () => (form.querySelector('[name=tripType]:checked') || {}).value || 'day';
+    const multi = t => t === 'overnight' || t === 'daily';
+    const LBL = {
+      day: { out: 'ออกจากโรงเรียน', back: 'กลับถึงโรงเรียน', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
+      oneway: { out: 'รถออกจากโรงเรียน', back: 'รถกลับถึงโรงเรียน (ประมาณ)', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
+      overnight: { out: 'วันแรก · ออกจากโรงเรียน', back: 'วันสุดท้าย · กลับถึงโรงเรียน', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
+      daily: { out: 'วันแรก · ออกทุกวันเวลา', back: 'วันสุดท้าย · กลับทุกวันเวลา', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันสุดท้าย' }
     };
+    const addDays = (ymd, n) => { const d = UI.dayOf(ymd); d.setDate(d.getDate() + n); return fmt.localDate(d); };
+    const syncTrip = () => {
+      const t = tripOf(), L = LBL[t];
+      root.querySelectorAll('[data-lbl]').forEach(x => { const req = x.tagName === 'LABEL' ? ' <b class="req">*</b>' : ''; x.innerHTML = esc(L[x.dataset.lbl]) + req; });
+      el('rDateF').hidden = !multi(t);
+      const d = el('dDate').value;
+      if (!multi(t)) el('rDate').value = d;
+      else if (d && (!el('rDate').value || el('rDate').value <= d)) el('rDate').value = addDays(d, 1);
+      if (d) el('rDate').min = multi(t) ? addDays(d, 1) : d;
+      el('lodgeF').hidden = t !== 'overnight';
+      el('onewayNote').hidden = t !== 'oneway';
+      el('dayInfo').closest('.form-section').dataset.trip = t;
+    };
+    const drawDays = () => {
+      const t = tripOf(), d = el('dDate').value, rd = multi(t) ? el('rDate').value : d, s = el('sTime').value, e = el('eTime').value;
+      form.querySelector('[name=startAt]').value = d && s ? `${d}T${s}` : '';
+      form.querySelector('[name=endAt]').value = rd && e ? `${rd}T${e}` : '';
+      el('dTh').textContent = d ? fmt.dateLong(UI.dayOf(d)) : '';
+      el('rTh').textContent = multi(t) && rd ? fmt.dateLong(UI.dayOf(rd)) : '';
+      const box = el('dayInfo'), bad = msg => { box.className = 'trip-sum bad'; box.innerHTML = `${icon('alert')} ${msg}`; };
+      if (!d || !rd) { box.className = 'trip-sum'; box.innerHTML = `${icon('calendar')} เลือกวันที่และเวลา`; return; }
+      const a = new Date(`${d}T${s}`), b = new Date(`${rd}T${e}`), n = fmt.days(a, b);
+      if (multi(t) && n < 2) return bad('ไปหลายวัน — วันกลับต้องเป็นวันถัดไปขึ้นไป');
+      if (t === 'daily' && e <= s) return bad('เวลากลับแต่ละวันต้องหลังเวลาออก');
+      if (b <= a) return bad('เวลากลับต้องหลังเวลาออกเดินทาง');
+      box.className = 'trip-sum';
+      const hrs = fmt.dur(b - a);
+      box.innerHTML = {
+        day: `${icon('route')} <b>ไป-กลับวันเดียว</b> · ${s}–${e} น. (รวม ${hrs})`,
+        oneway: `${icon('arrowUR')} <b>ไปส่ง/ไปรับอย่างเดียว</b> · รถออก ${s} น. กลับถึงประมาณ ${e} น.`,
+        overnight: `${icon('moon')} <b>รวม ${n} วัน ค้างคืน ${n - 1} คืน</b> · ออก ${fmt.dayMonth(a)} ${s} น. → กลับ ${fmt.dayMonth(b)} ${e} น.`,
+        daily: `${icon('refresh')} <b>ไป-กลับทุกวัน ${n} วัน</b> (${fmt.dayMonth(a)} – ${fmt.dayMonth(b)}) · ออก ${s} น. กลับ ${e} น. ทุกวัน · ไม่ค้างคืน`
+      }[t];
+    };
+    ['dDate', 'rDate', 'sTime', 'eTime'].forEach(id => el(id).addEventListener('change', () => {
+      if (id === 'dDate') syncTrip();
+      // เลือกเวลาออกหลังเวลากลับ (วันเดียวกัน) → เลื่อนเวลากลับให้ +6 ชม. อัตโนมัติ
+      if (id === 'sTime' && !multi(tripOf()) && el('eTime').value <= el('sTime').value) { const [h, m] = el('sTime').value.split(':').map(Number); const t = Math.min(23 * 60 + 30, h * 60 + m + 360); el('eTime').value = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+      drawDays();
+    }));
+    form.addEventListener('change', e => { if (e.target.name === 'tripType') { syncTrip(); drawDays(); } });
+    syncTrip();
     const drawPax = () => {
       const n = ['teachers', 'students', 'others'].reduce((s, k) => s + (+form.querySelector(`[name=${k}]`).value || 0), 0);
       const van = S.db.vehicles.find(v => v.kind === 'van'), bus = S.db.vehicles.find(v => v.kind === 'bus');
@@ -339,10 +405,7 @@
       const ed = e.target.closest('[data-ed]'); if (ed) { const p = await Maps.pick(dests[+ed.dataset.ed]); if (p) { dests[+ed.dataset.ed] = p; drawDests(); } }
       const del = e.target.closest('[data-del]'); if (del) { dests.splice(+del.dataset.del, 1); drawDests(); }
     });
-    form.addEventListener('input', e => { if (/startAt|endAt/.test(e.target.name)) drawDays(); if (/teachers|students|others/.test(e.target.name)) drawPax(); });
-    form.addEventListener('change', e => {
-      if (e.target.name === 'startAt') { const en = form.querySelector('[name=endAt]'); if (!en.value || new Date(en.value) <= new Date(e.target.value)) { const d = new Date(e.target.value); d.setHours(d.getHours() + 6); en.value = fmt.local(d); drawDays(); } }
-    });
+    form.addEventListener('input', e => { if (/teachers|students|others/.test(e.target.name)) drawPax(); });
     drawDests(); drawDays(); drawPax();
     bindCatPicker(root);
     return {
@@ -352,7 +415,9 @@
         if (f.category === 'other' && !String(f.categoryOther || '').trim()) throw new Error('กรุณาระบุหมวดงาน (อื่น ๆ)');
         if (!f.purpose.trim()) throw new Error('กรุณาระบุวัตถุประสงค์');
         if (!dests.length) throw new Error('กรุณาเลือกสถานที่ปลายทางอย่างน้อย 1 แห่ง');
-        if (!f.startAt || !f.endAt) throw new Error('กรุณาระบุวันเวลาออกเดินทางและกลับ');
+        drawDays();
+        if (!f.startAt || !f.endAt) throw new Error('กรุณาเลือกวันที่ออกเดินทาง' + (multi(tripOf()) ? 'และวันกลับ' : ''));
+        if (el('dayInfo').classList.contains('bad')) throw new Error(el('dayInfo').textContent.trim());
         if ((+f.teachers || 0) + (+f.students || 0) + (+f.others || 0) <= 0) throw new Error('กรุณาระบุจำนวนผู้เดินทาง');
         if (!String(f.contactPhone || '').trim()) throw new Error('กรุณาระบุเบอร์ติดต่อ');
         return { ...f, destinations: dests, totalKm: total.km, totalMins: total.mins, attachments: getFiles() };
@@ -360,6 +425,8 @@
       fill(src) {
         ['purpose', 'project', 'teachers', 'students', 'others', 'passengerNames', 'pickup', 'contactPhone', 'lodging', 'note'].forEach(k => { const el = form.querySelector(`[name=${k}]`); if (el && src[k] != null) el.value = src[k]; });
         dests = (src.destinations || []).map(d => ({ ...d })); drawDests(); drawPax();
+        const tt = form.querySelector(`[name=tripType][value="${src.startAt ? S.tripType(src) : src.tripType}"]`);
+        if (tt) { tt.checked = true; syncTrip(); drawDays(); }
         if (src.category) { const rb = form.querySelector(`[name=category][value="${src.category}"]`); if (rb) { rb.checked = true; rb.dispatchEvent(new Event('change', { bubbles: true })); } const o = form.querySelector('[name=categoryOther]'); if (o) o.value = src.categoryOther || ''; }
       }
     };
@@ -558,11 +625,11 @@
         <dl class="kv">
           <dt>หมวดงาน</dt><dd>${esc(S.catName(r))}</dd>
           <dt>วัตถุประสงค์</dt><dd>${esc(r.purpose)}</dd>${r.project ? `<dt>ชื่องาน/โครงการ</dt><dd>${esc(r.project)}</dd>` : ''}
-          <dt>วันเวลา</dt><dd>${fmt.range(r.startAt, r.endAt)} <span class="muted">(${fmt.days(r.startAt, r.endAt)} วัน${r.overnight ? ' · ค้างคืน' : ''})</span></dd>
+          <dt>วันเวลา</dt><dd>${fmt.range(r.startAt, r.endAt)} <span class="muted">(${S.tripTag(r) ? S.tripTag(r).text : 'ไป-กลับวันเดียว'})</span>${r.lodging ? `<br><small class="muted">ที่พัก: ${esc(r.lodging)}</small>` : ''}</dd>
           ${r.overnight && r.lodging ? `<dt>ที่พัก</dt><dd>${esc(r.lodging)}</dd>` : ''}
           <dt>สถานที่</dt><dd>${(r.destinations || []).map((d, i) => `<div>${r.destinations.length > 1 ? `${i + 1}. ` : ''}<b>${esc(d.name)}</b><br><small class="muted">${esc(d.address || d.province || '')}${d.km ? ` · ${d.km} กม. จากโรงเรียน` : ''}</small></div>`).join('')}</dd>
           <dt>ระยะทางรวม</dt><dd>${r.totalKm ? `${fmt.num(r.totalKm, 1)} กม. (ไป-กลับ)` : '-'}</dd>
-          <dt>ผู้เดินทาง</dt><dd>ครู ${r.teachers} · นักเรียน ${r.students}${r.others ? ` · อื่น ๆ ${r.others}` : ''} <span class="muted">(รวม ${S.passengers(r)} คน)</span></dd>
+          <dt>ผู้เดินทาง</dt><dd>${S.paxText(r)} <span class="muted">(รวม ${S.passengers(r)} คน)</span></dd>
           ${r.passengerNames ? `<dt>รายชื่อ</dt><dd style="white-space:pre-line">${esc(r.passengerNames)}</dd>` : ''}
           <dt>จุดนัดขึ้นรถ</dt><dd>${esc(r.pickup || '-')}</dd>
           <dt>ผู้ขอใช้รถ</dt><dd>${esc(r.requester.name)} <small class="muted">· ${esc(r.requester.dept || '')}</small></dd>
