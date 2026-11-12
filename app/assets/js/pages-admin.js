@@ -13,7 +13,7 @@
   Pages._adminShell = (path, html) => {
     const me = S.me, admin = S.isAdmin(me);
     const pending = S.db.requests.filter(r => r.status === 'pending').length;
-    const L = (h, ic, t, cnt) => `<a href="#${h}" class="${path === h || (h !== '/admin' && path.startsWith(h)) ? 'on' : ''}">${icon(ic)}${t}${cnt ? `<span class="cnt">${cnt}</span>` : ''}</a>`;
+    const L = (h, ic, t, cnt) => `<a href="#${h}" title="${t}" class="${path === h || (h !== '/admin' && path.startsWith(h)) ? 'on' : ''}">${icon(ic)}${t}${cnt ? `<span class="cnt">${cnt}</span>` : ''}</a>`;
     return `<div class="admin">
       <aside class="side no-print">
         ${admin ? `<h5>งานประจำวัน</h5>${L('/admin', 'grid', 'ภาพรวม')}${L('/admin/requests', 'clipboard', 'คำขอใช้รถ', pending)}${L('/admin/new', 'alert', 'บันทึกคำขอเร่งด่วน')}${L('/admin/roster', 'calendar', 'ตารางงานคนขับ')}${L('/driver', 'wheel', 'มุมมองคนขับ')}
@@ -128,7 +128,7 @@
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
           <tbody>${list.map(r => `<tr class="click" data-href="#/admin/requests/${r.id}">
-            <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
+            <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
             <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${S.tripTag(r) ? `<small>${S.tripTag(r).text}</small>` : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
             <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
@@ -191,11 +191,18 @@
     const canReassign = ['approved', 'ontrip'].includes(r.status);
     const exp = r.expenses || [];
     const expTotal = exp.reduce((s, e) => s + (+e.amount || 0), 0);
+    // บันทึกข้อความแสดงคู่กับข้อมูลคำขอ (คอม: แบ่งจอซ้าย-ขวา · แท็บเล็ต/มือถือ: ปุ่มลอยเปิดแผ่นเอกสารจากด้านล่าง)
+    const docs = r.attachments || [];
+    let dvOpen = true; try { dvOpen = localStorage.getItem('vb-dv') !== '0'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
     return {
       layout: 'admin', live: false,
       html: `<a class="crumb" href="#/admin/requests">${icon('arrowL')} รายการคำขอ</a>
         ${head(`${r.id}${r.emergency ? ' · เร่งด่วน' : ''}`, esc(S.destName(r)), `ส่งเมื่อ ${fmt.dt(r.createdAt)} · ${esc(r.requester.name)}`,
-          `${['pending', 'revise', 'approved'].includes(r.status) ? `<a class="btn btn-ghost btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขข้อมูล</a>` : ''}${['pending', 'revise', 'approved'].includes(r.status) && r.assignments.every(a => a.status === 'assigned') ? `<button class="btn btn-ghost btn-sm" id="aCancel">${icon('xCircle')} ยกเลิก</button>` : ''}${r.status === 'returned' ? `<button class="btn btn-ok btn-sm" id="aClose">${icon('check')} ปิดงาน</button>` : ''}${r.status === 'closed' ? `<button class="btn btn-ghost btn-sm" id="aReopen">${icon('refresh')} เปิดงานอีกครั้ง</button>` : ''}`)}
+          `${docs.length ? `<button class="btn btn-ghost btn-sm dv-toggle" id="dvToggle" aria-pressed="${dvOpen}">${icon('file')} <span>${dvOpen ? 'ซ่อนบันทึกข้อความ' : 'แสดงบันทึกข้อความคู่กัน'}</span></button>` : ''}${['pending', 'revise', 'approved'].includes(r.status) ? `<a class="btn btn-ghost btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขข้อมูล</a>` : ''}${['pending', 'revise', 'approved'].includes(r.status) && r.assignments.every(a => a.status === 'assigned') ? `<button class="btn btn-ghost btn-sm" id="aCancel">${icon('xCircle')} ยกเลิก</button>` : ''}${r.status === 'returned' ? `<button class="btn btn-ok btn-sm" id="aClose">${icon('check')} ปิดงาน</button>` : ''}${r.status === 'closed' ? `<button class="btn btn-ghost btn-sm" id="aReopen">${icon('refresh')} เปิดงานอีกครั้ง</button>` : ''}`)}
+        <div class="rq-split ${docs.length ? 'has-doc' : ''} ${docs.length && dvOpen ? 'dv-open' : ''}">
+        ${docs.length ? `<div class="rq-doc">${C.docSlot()}</div>
+          <button type="button" class="dv-fab no-print" id="dvFab">${icon('file')} บันทึกข้อความ${docs.length > 1 ? ` (${docs.length})` : ''}</button>` : ''}
+        <div class="rq-main">
         <div style="margin-bottom:18px">${Pages._decisionBox(r)}</div>
         ${canDecide || canReassign ? `
         <div class="req-top">${Pages._requestInfo(r)}</div>
@@ -227,10 +234,33 @@
             </div>` : ''}
             <div class="card"><div class="card-head"><h3>${icon('activity')} ความเคลื่อนไหว</h3></div>${C.history(r)}</div>
           </div>
-        </div>`,
+        </div>
+        </div></div>`,
       mount(root) {
         const P = (canDecide || canReassign) ? bindVehiclePicker(root, () => S.passengers(r)) : null;
         Pages._catPicker.bind(root, 'dcat');
+        const DVA = docs.length ? C.mountDocViewer(root, docs, r.id + '|' + docs.join(',')) : null;
+        const split = root.querySelector('.rq-split');
+        const sheetMode = () => document.documentElement.classList.contains('lt1000');
+        root.addEventListener('click', e => {
+          if (e.target.closest('#dvToggle')) {
+            const on = !split.classList.contains('dv-open');
+            split.classList.toggle('dv-open', on);
+            try { localStorage.setItem('vb-dv', on ? '1' : '0'); } catch (err) { /* ไม่บันทึกก็ได้ */ }
+            const b = $('#dvToggle', root); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = on ? 'ซ่อนบันทึกข้อความ' : 'แสดงบันทึกข้อความคู่กัน';
+            if (on && sheetMode()) document.documentElement.classList.add('dv-sheet');
+            return;
+          }
+          if (e.target.closest('#dvFab')) { document.documentElement.classList.add('dv-sheet'); return; }
+          // กดรูปย่อบันทึกข้อความ → เปิดในช่องเอกสารข้าง ๆ แทนการเปิดแท็บใหม่
+          const th = e.target.closest('[data-view]');
+          if (th && DVA && docs.includes(th.dataset.view)) {
+            e.preventDefault(); e.stopPropagation();
+            DVA.show(docs.indexOf(th.dataset.view));
+            if (sheetMode()) document.documentElement.classList.add('dv-sheet');
+            else if (!split.classList.contains('dv-open')) $('#dvToggle', root).click();
+          }
+        });
         root.addEventListener('click', async e => {
           const dec = e.target.closest('[data-dec]');
           if (dec) {
@@ -275,7 +305,8 @@
               <div class="field"><label>ชื่อผู้ขอ <b class="req">*</b></label><input name="reqName" id="reqName"></div>
               <div class="field"><label>ฝ่าย / กลุ่มสาระ</label><input name="reqDept" id="reqDept"></div>
               <div class="field"><label>เบอร์โทร</label><input name="reqPhone" id="reqPhone"></div>
-            </div></div>
+            </div>
+            <div class="note-box red" id="debtWarn" hidden style="margin-top:12px">${icon('alert')}<div><b>ผู้ขอคนนี้ยังค้างบันทึกข้อความ:</b> <span></span> — แอดมินบันทึกต่อได้ แต่ควรติดตามให้แนบก่อน</div></div></div>
           ${Pages._requestForm.html(null, { admin: true })}
           <div class="form-section"><h3><span class="n">7</span>มอบหมายรถและคนขับ <span class="hint" style="font-weight:400">(ไม่เลือก = บันทึกเป็น "รอตรวจสอบ")</span></h3>
             <div id="pickBox"><p class="hint">ระบุวันเวลาก่อน แล้วระบบจะแสดงรถที่ว่าง</p></div>
@@ -291,11 +322,12 @@
           const a = form.startAt.value, b = form.endAt.value;
           if (!a || !b || new Date(b) <= new Date(a)) return;
           const keep = P ? P.read() : [];
-          $('#pickBox', root).innerHTML = vehiclePickerHTML({ id: '__new', startAt: new Date(a).toISOString(), endAt: new Date(b).toISOString() }, keep);
+          const tripType = (form.querySelector('[name=tripType]:checked') || {}).value;
+          $('#pickBox', root).innerHTML = vehiclePickerHTML({ id: '__new', tripType, startAt: new Date(a).toISOString(), endAt: new Date(b).toISOString() }, keep);
           P = bindVehiclePicker(root, pax);
         };
-        form.addEventListener('change', e => { if (/startAt|endAt/.test(e.target.name)) setTimeout(drawPick, 10); if (/teachers|students|others/.test(e.target.name) && P) P.meter(); });
-        $('#reqEmail', root).addEventListener('change', e => { const u = S.user(e.target.value); if (u) { form.reqName.value = u.name || ''; form.reqDept.value = u.dept || ''; form.reqPhone.value = u.phone || ''; if (!form.contactPhone.value) form.contactPhone.value = u.phone || ''; } });
+        form.addEventListener('change', e => { if (e.target.name === 'tripType' || ['dDate', 'rDate', 'sTime', 'eTime'].includes(e.target.id)) setTimeout(drawPick, 10); if (/teachers|students|others/.test(e.target.name) && P) P.meter(); });
+        $('#reqEmail', root).addEventListener('change', e => { const u = S.user(e.target.value); const debts = u ? S.memoDebts(u.email) : []; $('#debtWarn', root).hidden = !debts.length; $('#debtWarn', root).querySelector('span').textContent = debts.map(r => r.id).join(', '); if (u) { form.reqName.value = u.name || ''; form.reqDept.value = u.dept || ''; form.reqPhone.value = u.phone || ''; if (!form.contactPhone.value) form.contactPhone.value = u.phone || ''; } });
         form.addEventListener('submit', e => {
           e.preventDefault();
           let data; try { data = F.read(); } catch (err) { return UI.toast(err.message, 'error'); }
@@ -680,6 +712,11 @@
     const matrix = byCat.map(c => ({ c, cells: matVeh.map(v => asg.filter(x => x.a.vehicleId === v.id && (x.r.category || '') === c.k).length) }));
     const otherTexts = group(done.filter(r => r.category === 'other'), r => r.categoryOther || '(ไม่ได้ระบุ)').map(([k, rs]) => ({ k, n: rs.length })).sort((a, b) => b.n - a.n);
     const byPurpose = group(done, r => r.purpose).map(([k, rs]) => ({ k, n: rs.length })).sort((a, b) => b.n - a.n).slice(0, 10);
+    // ── คำขอด่วน: แอดมินบันทึกแทน (เร่งด่วน) · งานประจำที่ขอภายในวันเดียวกัน · ค้างบันทึกข้อความ ──
+    const quickSameDay = r => S.isQuickCat(r.category) && fmt.localDate(r.createdAt) === fmt.localDate(r.startAt);
+    const urgent = reqs.filter(r => r.status !== 'cancelled' && (r.emergency || quickSameDay(r)));
+    const byUrgent = group(urgent, r => r.requester.name).map(([k, rs]) => ({ k, dept: rs[0].requester.dept, em: rs.filter(r => r.emergency).length, sd: rs.filter(quickSameDay).length, debt: rs.filter(S.needsMemo).length })).sort((a, b) => (b.em + b.sd) - (a.em + a.sd) || b.debt - a.debt).slice(0, 20);
+    const debtsAll = S.db.requests.filter(S.needsMemo);
     const tbl = (h, rows, foot) => `<div class="tbl-wrap"><table class="tbl" style="min-width:520px"><thead><tr>${h.map((x, i) => `<th class="${i ? 'r' : ''}">${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${h.length}">${UI.empty('ไม่มีข้อมูล')}</td></tr>`}</tbody>${foot ? `<tfoot><tr>${foot.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr></tfoot>` : ''}</table></div>`;
     const data = { byMonth, byVehicle, byDriver, byDept, K, byProv };
     return {
@@ -715,6 +752,9 @@
           <div class="card"><div class="card-head"><h3>${icon('users')} แยกตามฝ่าย / กลุ่มสาระ</h3></div>${tbl(['ฝ่าย', 'ครั้ง', 'ผู้เดินทาง', 'กม.', 'ค่าใช้จ่าย'], byDept.map(x => [esc(x.k), x.n, fmt.num(x.pax), fmt.num(x.km), fmt.money(x.cost)]))}</div>
           <div class="card"><div class="card-head"><h3>${icon('user')} ผู้ขอใช้รถบ่อยที่สุด</h3></div>${tbl(['ผู้ขอ', 'ครั้ง', 'กม.'], byPerson.map(x => [`${esc(x.k)}<small>${esc(x.dept || '')}</small>`, x.n, fmt.num(x.km)]))}</div>
         </div>
+        <div class="card" style="margin-top:18px"><div class="card-head"><h3>${icon('alert')} คำขอด่วน และการค้างบันทึกข้อความ</h3><span class="hint">เร่งด่วน ${urgent.filter(r => r.emergency).length} · งานประจำขอในวัน ${urgent.filter(quickSameDay).length} · ค้างบันทึกข้อความตอนนี้ ${debtsAll.length} รายการ</span></div>
+          ${tbl(['ผู้ขอ', 'เร่งด่วน (แอดมินบันทึกแทน)', 'งานประจำขอในวัน', 'รวม', 'ค้างบันทึกข้อความ'], byUrgent.map(x => [`${esc(x.k)}<small>${esc(x.dept || '')}</small>`, x.em, x.sd, `<b>${x.em + x.sd}</b>`, x.debt ? `<span class="pill tone-bad">${x.debt}</span>` : '-']))}
+          ${debtsAll.length ? `<p class="hint" style="margin-top:10px">${icon('info')} ค้างบันทึกข้อความ: ${debtsAll.map(r => `<a class="link" href="#/admin/requests/${r.id}">${r.id}</a> (${esc(r.requester.name)})`).join(' · ')}</p>` : ''}</div>
         <div class="grid cols-3" style="margin-top:18px">
           <div class="card"><div class="card-head"><h3>${icon('pin')} ปลายทางยอดนิยม</h3></div>${tbl(['สถานที่', 'ครั้ง'], byDest.map(x => [`${esc(x.k)}<small>${esc(x.prov)}</small>`, x.n]))}</div>
           <div class="card"><div class="card-head"><h3>${icon('map')} จังหวัด</h3></div><div class="chart-box sm"><canvas id="chProv"></canvas></div></div>
@@ -766,6 +806,7 @@
             <div class="field"><label>ฝ่าย</label><input name="division" value="${esc(s.division)}"></div>
             <div class="field"><label>งาน</label><input name="unit" value="${esc(s.unit)}"></div>
             <div class="field"><label>ต้องขอใช้รถล่วงหน้าอย่างน้อย (วัน)</label><input name="leadDays" type="number" min="0" value="${s.leadDays}"></div>
+            <div class="field"><label>งานประจำ: ขอก่อนเวลาออกอย่างน้อย (ชั่วโมง)</label><input name="quickLeadHours" type="number" min="0" step="0.5" value="${S.quickHours()}"><span class="hint">ใช้กับหมวดที่ติ๊ก "งานประจำ" ด้านล่าง — ขอในวันได้ ไม่ต้องแนบบันทึกข้อความ</span></div>
           </div></div>
           <div class="form-section"><h3>${icon('flag')} หมวดงาน <span class="hint" style="font-weight:400">(ใช้ในแบบฟอร์มขอใช้รถและสถิติ · หมวดที่เคยใช้แล้วซ่อนได้แต่ลบไม่ได้)</span></h3>
             <div class="stack" id="catList">${cats.map((c, i) => { const n = S.db.requests.filter(r => r.category === c.id).length; return `<div class="cat-row ${c.active === false ? 'off' : ''}" data-ci2="${i}">
@@ -773,6 +814,7 @@
               <div><input type="text" data-ck="name" value="${esc(c.name)}" aria-label="ชื่อหมวด"><small class="hint">${c.fixed ? 'หมวดพิเศษ: ผู้ขอต้องพิมพ์ระบุเอง · ' : ''}ใช้แล้ว ${n} ครั้ง</small></div>
               <select data-ck="icon" aria-label="ไอคอน">${S.CAT_ICONS.map(ic => `<option value="${ic}" ${ic === c.icon ? 'selected' : ''}>ไอคอน: ${ic}</option>`).join('')}</select>
               <label class="check"><input type="checkbox" data-ck="active" ${c.active !== false ? 'checked' : ''}> แสดง</label>
+              <label class="check" title="ขอในวันได้ ไม่ต้องแนบบันทึกข้อความ"><input type="checkbox" data-ck="quick" ${S.isQuickCat(c.id) ? 'checked' : ''} ${c.id === 'other' ? 'disabled' : ''}> งานประจำ</label>
               <div class="row" style="gap:4px;flex-wrap:nowrap"><button type="button" class="icon-btn sm" data-cmv="${i}" data-dir="-1" aria-label="เลื่อนขึ้น" ${i === 0 ? 'disabled' : ''}><span style="display:inline-flex;transform:rotate(180deg)">${icon('chev')}</span></button><button type="button" class="icon-btn sm" data-cmv="${i}" data-dir="1" aria-label="เลื่อนลง" ${i === cats.length - 1 ? 'disabled' : ''}>${icon('chev')}</button>${!n && !c.fixed ? `<button type="button" class="icon-btn sm" data-cdel="${i}" aria-label="ลบ">${icon('trash')}</button>` : ''}</div>
             </div>`; }).join('')}</div>
             <button type="button" class="btn btn-ghost btn-sm" id="addCat" style="margin-top:12px">${icon('plus')} เพิ่มหมวดงาน</button></div>
@@ -808,8 +850,8 @@
         const collect = () => {
           const f = UI.formData($('#sf', root));
           const committee = $$('[data-ci]', root).map(row => { const i = +row.dataset.ci; const o = { ...(cm[i] || { id: 'c' + Date.now() + i }) }; $$('[data-k]', row).forEach(el => { o[el.dataset.k] = el.dataset.k === 'level' ? +el.value : el.value; }); o.photo = (photoGetters[i] ? photoGetters[i]() : [])[0] || ''; return o; });
-          const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.order = i; return c; });
-          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactPhone: f.contactPhone, contactLine: f.contactLine, contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories };
+          const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.quick = c.id !== 'other' && row.querySelector('[data-ck=quick]').checked; c.order = i; return c; });
+          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactPhone: f.contactPhone, contactLine: f.contactLine, contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories };
         };
         const saveCats = async mut => { const x = collect(); mut(x.categories); x.categories.forEach((c, i) => { c.order = i; }); await S.saveSettings(x); App.render(); };
         root.addEventListener('click', async e => {

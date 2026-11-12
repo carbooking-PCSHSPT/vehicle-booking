@@ -312,7 +312,7 @@
         <div class="field" id="lodgeF" hidden style="margin-top:14px"><label>${icon('moon')} สถานที่พัก (ค้างคืน)</label><input name="lodging" value="${esc(v.lodging || '')}" placeholder="เช่น โรงแรม/ที่พักของหน่วยงานผู้จัด"></div>
         <div class="trip-sum" id="dayInfo"></div>
         <div class="note-box navy" id="onewayNote" hidden style="margin-top:12px">${icon('info')}<div><b>ต้องไปรับกลับในภายหลัง?</b> ให้ส่งคำขออีก 1 รายการสำหรับเที่ยวรับ (ใช้ "คัดลอกจากคำขอเดิม" ด้านบนได้ ไม่ต้องกรอกใหม่) เพื่อให้แอดมินจัดรถได้ถูกช่วงเวลา และรถว่างให้งานอื่นระหว่างรอ</div></div>
-        ${!admin ? `<p class="hint" style="margin-top:10px">${icon('info')} ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ออกเดินทางได้ตั้งแต่ ${fmt.dateMid(minD)}) · กรณีเร่งด่วนติดต่อแอดมิน</p>` : ''}</div>
+        ${!admin ? `<p class="hint" id="leadHint" style="margin-top:10px" data-normal="ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ออกเดินทางได้ตั้งแต่ ${esc(fmt.dateMid(minD))}) · กรณีเร่งด่วนโทรหาแอดมิน" data-quick="งานประจำ (${esc(S.categories().filter(c => S.isQuickCat(c.id)).map(c => c.name).join(' / '))}) ขอในวันเดียวกันได้ แต่ต้องก่อนเวลาออกอย่างน้อย ${S.quickHours()} ชั่วโมง · ด่วนกว่านี้โทรหาแอดมิน"></p>` : ''}</div>
       <div class="form-section"><h3><span class="n">4</span>ผู้เดินทาง</h3>
         <div class="grid3">
           <div class="field"><label>จำนวนครู/บุคลากร <b class="req">*</b></label><input name="teachers" type="number" min="0" required value="${v.teachers ?? 1}"></div>
@@ -323,10 +323,12 @@
           <div class="field"><label>เบอร์ติดต่อระหว่างเดินทาง <b class="req">*</b></label><input name="contactPhone" type="tel" required value="${esc(v.contactPhone || (S.me || {}).phone || '')}"></div>
         </div>
         <div class="seat-meter" id="paxInfo" style="margin-top:14px"></div></div>
-      <div class="form-section"><h3><span class="n">5</span>บันทึกข้อความขออนุญาตใช้รถ</h3>
+      <div class="form-section"><h3><span class="n">5</span>บันทึกข้อความขออนุญาตใช้รถ <span class="hint" id="memoOpt" style="font-weight:400" hidden>(ไม่บังคับ)</span></h3>
+        <div class="note-box green" id="quickMemo" hidden style="margin-bottom:12px">${icon('checkCircle')}<div><b>หมวดงานนี้เป็นงานประจำ ไม่ต้องแนบบันทึกข้อความ</b> (ถ้ามีเอกสารประกอบ แนบได้)</div></div>
+        <div id="memoNeed">
         <div class="note-box" style="margin-bottom:12px">${icon('info')}<div>แนบรูปหรือไฟล์ PDF ของบันทึกข้อความขออนุญาตใช้รถ ที่มี<b>ลายเซ็นผู้อำนวยการโรงเรียน</b> (หรือผู้รักษาราชการแทน) แอดมินจะตรวจสอบก่อนอนุมัติ</div></div>
         <div class="note-box red clear-tips" style="margin-bottom:12px">${icon('camera')}<div><b>ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</b> ถ้าไม่ชัดแอดมินจะส่งกลับให้แก้ไข
-          <ul><li>ใช้ไฟล์ <b>PDF จากเครื่องสแกน</b> หรือแอปสแกนเอกสาร ดีที่สุด</li><li>ถ้าถ่ายรูป: วางกระดาษบนพื้นเรียบ ถ่าย<b>ตรง ๆ เต็มหน้า</b> ในที่สว่าง ไม่มีเงาบัง ไม่เบลอ</li><li>ต้องเห็น <b>เลขที่หนังสือ วันที่ และลายเซ็น</b> ชัดเจน · ถ้ามีหลายหน้า แนบให้ครบทุกหน้า</li></ul></div></div>
+          <ul><li>ใช้ไฟล์ <b>PDF จากเครื่องสแกน</b> หรือแอปสแกนเอกสาร ดีที่สุด</li><li>ถ้าถ่ายรูป: วางกระดาษบนพื้นเรียบ ถ่าย<b>ตรง ๆ เต็มหน้า</b> ในที่สว่าง ไม่มีเงาบัง ไม่เบลอ</li><li>ต้องเห็น <b>เลขที่หนังสือ วันที่ และลายเซ็น</b> ชัดเจน · ถ้ามีหลายหน้า แนบให้ครบทุกหน้า</li></ul></div></div></div>
         ${C.filePicker('att', v.attachments || [], { label: 'แนบบันทึกข้อความ', pdf: true })}</div>
       <div class="form-section"><h3><span class="n">6</span>หมายเหตุเพิ่มเติม</h3>
         <div class="field"><textarea name="note" rows="3" placeholder="เช่น มีสัมภาระ/อุปกรณ์แข่งขันจำนวนมาก, ต้องการแวะรับวิทยากร">${esc(v.note || '')}</textarea></div></div>`;
@@ -394,6 +396,17 @@
     }));
     form.addEventListener('change', e => { if (e.target.name === 'tripType') { syncTrip(); drawDays(); } });
     syncTrip();
+    // ── หมวดงานประจำ: ไม่ต้องแนบบันทึกข้อความ + ขอในวันได้ ──
+    const dMin0 = el('dDate').getAttribute('min');
+    const isQuick = () => S.isQuickCat((form.querySelector('[name=category]:checked') || {}).value);
+    const syncCat = () => {
+      const q = isQuick();
+      el('quickMemo').hidden = !q; el('memoNeed').hidden = q; el('memoOpt').hidden = !q;
+      const lh = el('leadHint'); if (lh) lh.innerHTML = `${icon('info')} ${esc(q ? lh.dataset.quick : lh.dataset.normal)}`;
+      if (dMin0) el('dDate').min = q ? fmt.localDate(new Date()) : dMin0;
+    };
+    form.addEventListener('change', e => { if (e.target.name === 'category') syncCat(); });
+    syncCat();
     const drawPax = () => {
       const n = ['teachers', 'students', 'others'].reduce((s, k) => s + (+form.querySelector(`[name=${k}]`).value || 0), 0);
       const van = S.db.vehicles.find(v => v.kind === 'van'), bus = S.db.vehicles.find(v => v.kind === 'bus');
@@ -427,7 +440,7 @@
         dests = (src.destinations || []).map(d => ({ ...d })); drawDests(); drawPax();
         const tt = form.querySelector(`[name=tripType][value="${src.startAt ? S.tripType(src) : src.tripType}"]`);
         if (tt) { tt.checked = true; syncTrip(); drawDays(); }
-        if (src.category) { const rb = form.querySelector(`[name=category][value="${src.category}"]`); if (rb) { rb.checked = true; rb.dispatchEvent(new Event('change', { bubbles: true })); } const o = form.querySelector('[name=categoryOther]'); if (o) o.value = src.categoryOther || ''; }
+        if (src.category) { const rb = form.querySelector(`[name=category][value="${src.category}"]`); if (rb) { rb.checked = true; rb.dispatchEvent(new Event('change', { bubbles: true })); syncCat(); } const o = form.querySelector('[name=categoryOther]'); if (o) o.value = src.categoryOther || ''; }
       }
     };
   }
@@ -438,6 +451,16 @@
     if (params.id && !editing) return { html: `<div class="page container">${UI.empty('ไม่พบคำขอนี้')}</div>` };
     if (editing && editing.requester.email !== S.me.email && !S.isAdmin(S.me)) return { html: `<div class="page container">${UI.empty('ไม่มีสิทธิ์แก้ไขคำขอนี้', 'lock')}</div>` };
     if (editing && !['pending', 'revise'].includes(editing.status) && !S.isAdmin(S.me)) return { html: `<div class="page container">${UI.empty('คำขอนี้แก้ไขไม่ได้แล้ว', 'lock')}</div>` };
+    // ค้างบันทึกข้อความ → ต้องแนบให้ครบก่อน จึงขอใช้รถครั้งต่อไปได้
+    const debts = editing ? [] : S.memoDebts(S.me.email);
+    if (debts.length) return {
+      html: `<div class="page"><div class="container" style="max-width:760px">
+        <a class="crumb" href="#/">${icon('arrowL')} หน้าแรก</a>
+        <div class="page-head"><div><div class="eyebrow">ขอใช้รถ</div><h1>ยังขอใช้รถครั้งใหม่ไม่ได้</h1><p>มีคำขอที่แอดมินบันทึกแทนให้ (กรณีเร่งด่วน) และยังไม่ได้แนบบันทึกข้อความ</p></div></div>
+        <div class="note-box red" style="margin-bottom:18px">${icon('alert')}<div>กรุณา<b>แนบบันทึกข้อความขออนุญาตใช้รถ</b>ของคำขอด้านล่างให้ครบก่อน แล้วจะขอใช้รถครั้งต่อไปได้ทันที</div></div>
+        <div class="stack">${debts.map(r => `<a class="memo-debt" href="#/my/${r.id}"><span class="md-ic">${icon('filePlus')}</span><span style="min-width:0"><b>${r.id} · ${esc(S.destName(r))}</b><small>${fmt.range(r.startAt, r.endAt)} · ${esc(r.purpose)}</small></span><span class="btn btn-primary btn-sm">แนบบันทึกข้อความ ${icon('chevR')}</span></a>`).join('')}</div>
+      </div></div>`
+    };
     const copies = S.myRequests().filter(r => r.id !== (editing || {}).id).slice(0, 30);
     const src = query.copy ? S.request(query.copy) : null;
     const init = editing || (src ? { ...src, startAt: '', endAt: '', attachments: [] } : null);
@@ -456,7 +479,7 @@
         $('#rf', root).addEventListener('submit', e => {
           e.preventDefault();
           let data; try { data = F.read(); } catch (err) { return UI.toast(err.message, 'error'); }
-          if (!data.attachments.length) return UI.toast('กรุณาแนบบันทึกข้อความขออนุญาตใช้รถ', 'error');
+          if (!S.isQuickCat(data.category) && !data.attachments.length) return UI.toast('กรุณาแนบบันทึกข้อความขออนุญาตใช้รถ', 'error');
           UI.busy(e.target.querySelector('[type=submit]'), () => editing ? S.updateRequest(editing.id, data) : S.submitRequest(data))
             .then(r => { UI.toast(editing ? 'บันทึกแล้ว' : `ส่งคำขอ ${r.id} แล้ว รอแอดมินตรวจสอบ`); App.go(`#/my/${r.id}`); }).catch(() => {});
         });
@@ -625,7 +648,7 @@
         <dl class="kv">
           <dt>หมวดงาน</dt><dd>${esc(S.catName(r))}</dd>
           <dt>วัตถุประสงค์</dt><dd>${esc(r.purpose)}</dd>${r.project ? `<dt>ชื่องาน/โครงการ</dt><dd>${esc(r.project)}</dd>` : ''}
-          <dt>วันเวลา</dt><dd>${fmt.range(r.startAt, r.endAt)} <span class="muted">(${S.tripTag(r) ? S.tripTag(r).text : 'ไป-กลับวันเดียว'})</span>${r.lodging ? `<br><small class="muted">ที่พัก: ${esc(r.lodging)}</small>` : ''}</dd>
+          <dt>วันเวลา</dt><dd>${fmt.range(r.startAt, r.endAt)} <span class="muted">(${S.tripTag(r) ? S.tripTag(r).text : 'ไป-กลับวันเดียว'})</span></dd>
           ${r.overnight && r.lodging ? `<dt>ที่พัก</dt><dd>${esc(r.lodging)}</dd>` : ''}
           <dt>สถานที่</dt><dd>${(r.destinations || []).map((d, i) => `<div>${r.destinations.length > 1 ? `${i + 1}. ` : ''}<b>${esc(d.name)}</b><br><small class="muted">${esc(d.address || d.province || '')}${d.km ? ` · ${d.km} กม. จากโรงเรียน` : ''}</small></div>`).join('')}</dd>
           <dt>ระยะทางรวม</dt><dd>${r.totalKm ? `${fmt.num(r.totalKm, 1)} กม. (ไป-กลับ)` : '-'}</dd>
@@ -637,7 +660,7 @@
           ${r.note ? `<dt>หมายเหตุ</dt><dd>${esc(r.note)}</dd>` : ''}
         </dl>
         <div class="divider"></div><div class="label">${icon('paperclip')} บันทึกข้อความขออนุญาตใช้รถ</div>
-        <div class="thumbs">${(r.attachments || []).map(a => UI.thumb(a)).join('') || '<span class="hint">ไม่มีไฟล์แนบ</span>'}</div>
+        <div class="thumbs">${(r.attachments || []).map(a => UI.thumb(a)).join('') || (S.needsMemo(r) ? `<span class="pill tone-bad">ค้างบันทึกข้อความ</span>${S.isAdmin(S.me) && location.hash.startsWith('#/admin') ? ` <a class="btn btn-ghost btn-xs" href="#/my/${r.id}">${icon('upload')} แนบแทนผู้ขอ</a>` : ''}` : S.isQuickCat(r.category) ? '<span class="hint">ไม่ต้องแนบ (งานประจำ)</span>' : '<span class="hint">ไม่มีไฟล์แนบ</span>')}</div>
       </div>`;
   }
   Pages._requestInfo = requestInfo;
@@ -664,6 +687,10 @@
         <div class="page-head"><div><div class="eyebrow">${r.id}${r.emergency ? ' · บันทึกโดยแอดมิน (เร่งด่วน)' : ''}</div><h1>${esc(S.destName(r))}</h1><p>ส่งเมื่อ ${fmt.dt(r.createdAt)}</p></div>
           <div class="row">${mine ? `<a class="btn btn-ghost btn-sm" href="#/request?copy=${r.id}">${icon('copy')} คัดลอกเป็นคำขอใหม่</a>` : ''}${canEdit ? `<a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} ${r.status === 'revise' ? 'แก้ไขและส่งใหม่' : 'แก้ไข'}</a>` : ''}${canCancel ? `<button class="btn btn-danger btn-sm" id="cancelBtn">${icon('xCircle')} ยกเลิกคำขอ</button>` : ''}</div></div>
         <div style="margin-bottom:18px">${decisionBox(r)}</div>
+        ${S.needsMemo(r) && (mine || S.isAdmin(S.me)) ? `<div class="card memo-late" style="margin-bottom:18px"><div class="card-head"><h3>${icon('filePlus')} แนบบันทึกข้อความตามหลัง</h3><span class="pill tone-bad">ค้างบันทึกข้อความ</span></div>
+          <p class="hint" style="margin-bottom:12px">คำขอนี้แอดมินบันทึกแทนให้กรณีเร่งด่วน — ${mine ? 'ต้องแนบบันทึกข้อความที่มีลายเซ็นผู้อำนวยการ (หรือผู้รักษาราชการแทน) ก่อน จึงจะขอใช้รถครั้งต่อไปได้' : 'ผู้ขอยังไม่ได้แนบ แอดมินแนบแทนได้'} · ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</p>
+          ${C.filePicker('memoLate', [], { label: 'เลือกไฟล์บันทึกข้อความ', pdf: true })}
+          <button class="btn btn-primary" id="memoSave" style="margin-top:12px">${icon('upload')} บันทึกไฟล์แนบ</button></div>` : ''}
         ${rates.length && mine ? `<div class="note-box" style="margin-bottom:18px">${icon('star')}<div>รถกลับถึงแล้ว — ช่วยประเมินคนขับ ${rates.map(x => `<a class="btn btn-gold btn-xs" href="#/rate/${r.id}/${x.i}">${esc(C.dName(x.a.driverId))}</a>`).join(' ')}</div></div>` : ''}
         <div class="detail-grid">
           ${requestInfo(r)}
@@ -673,6 +700,14 @@
           </div>
         </div></div></div>`,
       mount(root) {
+        if ($('#memoSave', root)) {
+          const getMemo = C.bindFilePicker(root, 'memoLate', [], { pdf: true });
+          $('#memoSave', root).addEventListener('click', e => {
+            const files = getMemo();
+            if (!files.length) return UI.toast('กรุณาเลือกไฟล์บันทึกข้อความ', 'error');
+            UI.busy(e.currentTarget, () => S.attachMemo(r.id, files)).then(() => UI.toast('แนบบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้แล้ว')).catch(() => {});
+          });
+        }
         $('#cancelBtn', root)?.addEventListener('click', async () => {
           const res = await UI.confirm('ต้องการยกเลิกคำขอใช้รถนี้ใช่ไหม?', { title: 'ยกเลิกคำขอ', ok: 'ยกเลิกคำขอ', danger: true, input: { label: 'เหตุผลที่ยกเลิก', required: true } });
           if (res && res.value) S.cancelRequest(r.id, res.value).then(() => UI.toast('ยกเลิกคำขอแล้ว')).catch(e => UI.toast(e.message, 'error'));

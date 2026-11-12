@@ -92,7 +92,12 @@ service cloud.firestore {
                         // 3) ประเมินคนขับ / ข้ามการประเมิน — แก้ได้เฉพาะเครื่องหมาย rated, ratingSkipped
                         || (request.resource.data.status == resource.data.status
                           && changedOnly(['assignments', 'updatedAt'])
-                          && asgAllOnly(['rated', 'ratingSkipped']))))
+                          && asgAllOnly(['rated', 'ratingSkipped']))
+                        // 4) แนบบันทึกข้อความตามหลัง (คำขอที่แอดมินบันทึกแทน) — เพิ่มไฟล์ได้อย่างเดียว ลบไฟล์เดิมไม่ได้
+                        || (resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
+                          && request.resource.data.status == resource.data.status
+                          && changedOnly(['attachments', 'history', 'updatedAt'])
+                          && request.resource.data.attachments.size() > resource.data.attachments.size())))
                     // คนขับ: กดออกเดินทาง/กลับถึง เลขไมล์ ค่าน้ำมัน — เปลี่ยนรถ/คนขับ/รายละเอียดคำขอไม่ได้
                     || (role('driver') && email() in resource.data.driverEmails
                         && resource.data.status in ['approved', 'ontrip', 'returned']

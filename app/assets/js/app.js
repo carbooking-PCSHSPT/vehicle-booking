@@ -41,7 +41,7 @@ const C = (() => {
           <div class="meta">
             <span>${icon('flag')}${esc(r.purpose)}</span>
             <span>${icon('clock')}${fmt.range(r.startAt, r.endAt)}</span>
-            <span>${icon('users')}${S().paxText(r)}</span>${tripTagHTML(r)}
+            <span>${icon('users')}${S().paxText(r)}</span>${tripTagHTML(r)}${S().needsMemo(r) ? `<span class="tag red">${icon('alert')}ค้างบันทึกข้อความ</span>` : ''}
             ${vs ? `<span>${icon('van')}${esc(vs)}</span>` : ''}
           </div>
         </div>
@@ -240,7 +240,7 @@ const C = (() => {
   }
 
   // ประวัติคำขอ
-  const HIST = { submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
+  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
   const history = r => `<div class="hist">${(r.history || []).slice().reverse().map(h => { const [ic, t] = HIST[h.action] || ['info', h.action]; return `<div class="hist-item"><span class="hi">${icon(ic)}</span><div><b>${t}${h.action === 'depart' || h.action === 'return' ? ` · ${esc(h.note)}` : ''}</b><small>${esc(h.byName || h.by || '')} · ${fmt.dt(h.at)}</small>${h.note && !['depart', 'return'].includes(h.action) ? `<p>${esc(h.note)}</p>` : ''}</div></div>`; }).join('')}</div>`;
 
   // รถที่ได้รับมอบหมาย (สำหรับผู้ขอ/แอดมินดู)
@@ -288,7 +288,108 @@ const C = (() => {
     UI.hydrate(th);
     return () => files;
   }
-  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone };
+  // ───────── ดูเอกสารแนบควบคู่ในหน้าเดียวกัน (PDF ทุกหน้า / รูป) — ซูม · หมุน · ขยายเต็มจอ ─────────
+  // ตัวแสดงถูกเก็บไว้ (DV) ตามคำขอ+ไฟล์ → หน้าวาดใหม่หลังกดบันทึก เอกสารไม่โหลดใหม่ ตำแหน่งที่อ่านอยู่ไม่หาย
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  let pdfLibP = null;
+  const loadPdfJs = () => pdfLibP || (pdfLibP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = PDFJS + 'pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; res(window.pdfjsLib); };
+    s.onerror = () => { pdfLibP = null; rej(new Error('โหลดตัวแสดง PDF ไม่สำเร็จ')); };
+    document.head.appendChild(s);
+  }));
+  const pdfDocs = new Map();
+  const DV = { key: '', el: null, api: null };
+  const docSlot = () => '<div data-docview></div>';
+  function mountDocViewer(root, refs, key) {
+    const slot = root.querySelector('[data-docview]');
+    if (!slot) return null;
+    if (DV.key === key && DV.el) { const top = DV.scroll || 0; slot.replaceWith(DV.el); DV.el.querySelector('.dv-body').scrollTop = top; return DV.api; }
+    const st = { i: 0, zoom: 1, rot: 0 }, ZS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 2.5, 3];
+    const el = document.createElement('section');
+    el.className = 'dv'; el.setAttribute('aria-label', 'บันทึกข้อความ');
+    el.innerHTML = `<div class="dv-bar">
+        <b class="dv-title">${icon('file')} บันทึกข้อความ</b>
+        ${refs.length > 1 ? `<div class="dv-tabs">${refs.map((r, i) => `<button type="button" data-dvi="${i}" class="${i ? '' : 'on'}">${UI.isPdf(r) ? 'PDF' : 'รูป'} ${i + 1}</button>`).join('')}</div>` : ''}
+        <div class="dv-tools">
+          <button type="button" class="icon-btn sm" data-dv="out" title="ย่อ" aria-label="ย่อ">${icon('minus')}</button><span class="dv-z">100%</span><button type="button" class="icon-btn sm" data-dv="in" title="ขยาย" aria-label="ขยาย">${icon('plus')}</button>
+          <button type="button" class="icon-btn sm" data-dv="fit" title="พอดีความกว้าง" aria-label="พอดีความกว้าง">${icon('fitWidth')}</button>
+          <button type="button" class="icon-btn sm" data-dv="rot" title="หมุน 90°" aria-label="หมุน">${icon('rotate')}</button>
+          <button type="button" class="icon-btn sm" data-dv="max" title="ขยายเต็มจอ (Esc ออก)" aria-label="ขยายเต็มจอ">${icon('maximize')}</button>
+          <button type="button" class="icon-btn sm" data-dv="tab" title="เปิดในแท็บใหม่" aria-label="เปิดในแท็บใหม่">${icon('arrowUR')}</button>
+          <button type="button" class="icon-btn sm dv-close" data-dv="close" title="ปิด" aria-label="ปิด">${icon('x')}</button>
+        </div></div>
+      <div class="dv-body"><div class="dv-pages"><div class="dv-msg">กำลังโหลดเอกสาร…</div></div></div>
+      <div class="dv-foot"></div>`;
+    slot.replaceWith(el);
+    const body = el.querySelector('.dv-body'), pages = el.querySelector('.dv-pages'), foot = el.querySelector('.dv-foot');
+    body.addEventListener('scroll', () => { DV.scroll = body.scrollTop; }, { passive: true });
+    let token = 0, lastW = 0;
+    const draw = async () => {
+      const my = ++token, ref = refs[st.i];
+      el.querySelector('.dv-z').textContent = Math.round(st.zoom * 100) + '%';
+      el.querySelectorAll('[data-dvi]').forEach(b => b.classList.toggle('on', +b.dataset.dvi === st.i));
+      const avail = Math.max(200, body.clientWidth - 24); lastW = body.clientWidth;
+      const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+      try {
+        const url = await S().fileUrl(ref);
+        if (my !== token) return;
+        const frag = document.createDocumentFragment();
+        if (UI.isPdf(ref)) {
+          const lib = await loadPdfJs();
+          if (!pdfDocs.has(url)) pdfDocs.set(url, lib.getDocument({ url }).promise);
+          const pdf = await pdfDocs.get(url);
+          if (my !== token) return;
+          pages.innerHTML = '';
+          for (let n = 1; n <= pdf.numPages; n++) {
+            const page = await pdf.getPage(n);
+            if (my !== token) return;
+            const v1 = page.getViewport({ scale: 1, rotation: (page.rotate + st.rot) % 360 });
+            const vp = page.getViewport({ scale: avail / v1.width * st.zoom * dpr, rotation: (page.rotate + st.rot) % 360 });
+            const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+            c.style.width = Math.floor(vp.width / dpr) + 'px';
+            pages.appendChild(c);
+            await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+          }
+          foot.textContent = `${pdf.numPages} หน้า · เลื่อนลงเพื่อดูหน้าถัดไป`;
+        } else {
+          const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('เปิดรูปไม่สำเร็จ')); i.src = url; });
+          if (my !== token) return;
+          const side = st.rot % 180 !== 0, w0 = side ? im.naturalHeight : im.naturalWidth, h0 = side ? im.naturalWidth : im.naturalHeight;
+          const k = avail / w0 * st.zoom, c = document.createElement('canvas');
+          c.width = Math.floor(w0 * k * dpr); c.height = Math.floor(h0 * k * dpr); c.style.width = Math.floor(w0 * k) + 'px';
+          const g = c.getContext('2d'); g.translate(c.width / 2, c.height / 2); g.rotate(st.rot * Math.PI / 180);
+          const dw = (side ? c.height : c.width), dh = (side ? c.width : c.height); g.drawImage(im, -dw / 2, -dh / 2, dw, dh);
+          frag.appendChild(c); pages.innerHTML = ''; pages.appendChild(frag);
+          foot.textContent = 'รูปภาพ';
+        }
+      } catch (e) {
+        if (my === token) { pages.innerHTML = `<div class="dv-msg">${icon('alert')} ${UI.esc(e.message || 'เปิดเอกสารไม่สำเร็จ')}<br><button type="button" class="btn btn-ghost btn-sm" data-dv="tab" style="margin-top:10px">${icon('arrowUR')} เปิดในแท็บใหม่</button></div>`; foot.textContent = ''; }
+      }
+    };
+    const setMax = on => { el.classList.toggle('dv-max', on); document.body.classList.toggle('dv-max-open', on); el.querySelector('[data-dv=max]').innerHTML = icon(on ? 'minimize' : 'maximize'); setTimeout(draw, 30); };
+    el.addEventListener('click', e => {
+      const t = e.target.closest('[data-dvi]'); if (t) { st.i = +t.dataset.dvi; st.rot = 0; body.scrollTop = 0; draw(); return; }
+      const b = e.target.closest('[data-dv]'); if (!b) return;
+      const a = b.dataset.dv, zi = ZS.findIndex(z => z >= st.zoom - 1e-6);
+      if (a === 'in') { st.zoom = ZS[Math.min(ZS.length - 1, zi + 1)]; draw(); }
+      if (a === 'out') { st.zoom = ZS[Math.max(0, zi - 1)]; draw(); }
+      if (a === 'fit') { st.zoom = 1; draw(); }
+      if (a === 'rot') { st.rot = (st.rot + 90) % 360; draw(); }
+      if (a === 'max') setMax(!el.classList.contains('dv-max'));
+      if (a === 'tab') UI.openFile(refs[st.i]);
+      if (a === 'close') { if (el.classList.contains('dv-max')) setMax(false); document.documentElement.classList.remove('dv-sheet'); }
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && el.classList.contains('dv-max')) setMax(false); });
+    // ความกว้างช่องเปลี่ยน (หมุนจอ/ซ่อน-แสดง/เปลี่ยนมุมมอง) → วาดใหม่ให้พอดี
+    if (window.ResizeObserver) new ResizeObserver(UI.debounce(() => { if (el.isConnected && Math.abs(body.clientWidth - lastW) > 8 && body.clientWidth > 0) draw(); }, 200)).observe(body);
+    const api = { show: i => { if (i >= 0 && i < refs.length && i !== st.i) { st.i = i; st.rot = 0; body.scrollTop = 0; draw(); } }, redraw: draw };
+    Object.assign(DV, { key, el, api, scroll: 0 });
+    if (body.clientWidth > 0) draw(); else setTimeout(draw, 60);
+    return api;
+  }
+
+  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer };
 })();
 
 const App = (() => {
@@ -516,6 +617,7 @@ const App = (() => {
   // ───────── เหตุการณ์ทั่วไป ─────────
   function bind() {
     addEventListener('hashchange', render);
+    addEventListener('hashchange', () => { document.documentElement.classList.remove('dv-sheet'); document.body.classList.remove('dv-max-open'); });
     addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('click', e => {
       const dd = e.target.closest('[data-dd]');

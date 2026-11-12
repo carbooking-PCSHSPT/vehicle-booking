@@ -184,6 +184,15 @@ const Store = (() => {
   const categories = (all = false) => (db.settings.categories && db.settings.categories.length ? db.settings.categories : DEFAULT_CATS.map((c, i) => ({ ...c, active: true, order: i })))
     .filter(c => all || c.active !== false).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
   const catOf = id => categories(true).find(c => c.id === id);
+  // หมวด "งานประจำ": ขอในวันได้ (ล่วงหน้าอย่างน้อย quickHours ชั่วโมง) และไม่ต้องแนบบันทึกข้อความ
+  // หมวดที่ยังไม่เคยตั้งค่า → ใช้ค่าเริ่มต้น (ส่งเอกสาร · การเงิน · ยืม-คืน รับ-ซื้อของ)
+  const DEFAULT_QUICK = ['docs', 'finance', 'goods'];
+  const isQuickCat = id => { const c = catOf(id); return c ? (c.quick != null ? !!c.quick : DEFAULT_QUICK.includes(id)) : false; };
+  const quickHours = () => (db.settings.quickLeadHours != null ? +db.settings.quickLeadHours : 2);
+  // คำขอที่ค้างบันทึกข้อความ: แอดมินบันทึกแทน (เร่งด่วน) · ไม่ใช่งานประจำ · ยังไม่มีไฟล์แนบ · ไม่ได้ยกเลิก/ไม่อนุมัติ
+  // (คำขอที่ครูส่งเองต้องแนบตั้งแต่ตอนส่งอยู่แล้ว)
+  const needsMemo = r => !!r && !!r.emergency && !isQuickCat(r.category) && !(r.attachments || []).length && !['cancelled', 'rejected'].includes(r.status);
+  const memoDebts = email => email ? db.requests.filter(r => r.requester && r.requester.email === email && needsMemo(r)).sort((a, b) => a.startAt.localeCompare(b.startAt)) : [];
   const catName = r => { if (!r || !r.category) return 'ไม่ระบุ'; if (r.category === 'other') return r.categoryOther ? `อื่น ๆ: ${r.categoryOther}` : 'อื่น ๆ'; const c = catOf(r.category); return c ? c.name : 'ไม่ระบุ'; };
   const seatsOf = list => (list || []).reduce((s, a) => s + (+(vehicle(a.vehicleId) || {}).seats || 0), 0);
 
@@ -217,18 +226,20 @@ const Store = (() => {
     const myDriver = driverOfUser(me);
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
-      depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน'
+      depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน',
+      memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว'
     };
     db.requests.forEach(r => {
       (r.history || []).forEach(h => {
         if (h.by === me.email) return;
         let mine = false, link = '';
         if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
-        if (isAdmin(me) && ['submit', 'resubmit', 'cancel'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
+        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen });
       });
     });
+    memoDebts(me.email).forEach(r => out.push({ id: 'memo' + r.id, at: r.createdAt, title: 'ค้างบันทึกข้อความ — กรุณาแนบ', body: `${r.id} · ${destName(r)} · ต้องแนบก่อนจึงจะขอใช้รถครั้งต่อไปได้`, link: `#/my/${r.id}`, unread: true }));
     pendingRatings().forEach(p => out.push({ id: 'rate' + p.r.id + p.i, at: p.a.returnedAt, title: 'ประเมินคนขับรถ', body: `${p.r.id} · ${destName(p.r)} · ${(driver(p.a.driverId) || {}).name || ''}`, link: `#/rate/${p.r.id}/${p.i}`, unread: true, rate: true }));
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
   }
@@ -764,6 +775,16 @@ const Store = (() => {
     teachers: +x.teachers || 0, students: +x.students || 0, others: +x.others || 0, passengerNames: String(x.passengerNames || '').trim(),
     pickup: String(x.pickup || '').trim(), contactPhone: String(x.contactPhone || '').trim(), note: String(x.note || '').trim(), attachments: x.attachments || []
   });
+  // กฎขอล่วงหน้า: งานประจำ = อย่างน้อย quickHours ชั่วโมง · หมวดอื่น = อย่างน้อย leadDays วัน
+  function checkLead(x) {
+    if (isQuickCat(x.category)) {
+      const h = quickHours();
+      if (new Date(x.startAt) < new Date(Date.now() + h * 36e5)) throw new Error(`งาน${catName(x)} ต้องขอก่อนเวลาออกอย่างน้อย ${h} ชั่วโมง (ถ้าด่วนกว่านี้ กรุณาโทรหาแอดมิน)`);
+      return;
+    }
+    const lead = +db.settings.leadDays || 0;
+    if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ถ้าเร่งด่วน กรุณาโทรหาแอดมิน)`);
+  }
   const checkCat = x => { if (!x.category) throw new Error('กรุณาเลือกหมวดงาน'); if (x.category === 'other' && !x.categoryOther) throw new Error('กรุณาระบุหมวดงาน (อื่น ๆ)'); };
   async function rememberPlaces(dests) {
     for (const d of dests) {
@@ -786,6 +807,7 @@ const Store = (() => {
     categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
     TRIP, tripType, windows, tripTag, paxText,
+    DEFAULT_QUICK, isQuickCat, quickHours, needsMemo, memoDebts,
     notifications, markSeen, pendingRatings,
     // ข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน): หน้าที่ต้องใช้ข้อมูลตั้งแต่วันที่ from เรียกฟังก์ชันนี้ตอนสร้างหน้า
     // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง
@@ -814,9 +836,11 @@ const Store = (() => {
     async submitRequest(input) {
       const x = cleanReqInput(input);
       checkCat(x);
-      const lead = +db.settings.leadDays || 0;
-      if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ถ้าเร่งด่วน กรุณาติดต่อแอดมิน)`);
+      const debts = memoDebts(me.email);
+      if (debts.length) throw new Error(`ยังขอใช้รถไม่ได้ — มีคำขอที่ค้างบันทึกข้อความ: ${debts.map(r => r.id).join(', ')} กรุณาแนบให้เรียบร้อยก่อน`);
+      checkLead(x);
       if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
+      if (!isQuickCat(x.category) && !(x.attachments || []).length) throw new Error('กรุณาแนบบันทึกข้อความขออนุญาตใช้รถ');
       // ออกเลขคำขอก่อน เพื่อตั้งชื่อไฟล์บันทึกข้อความใน Drive ด้วยเลขคำขอ (ค้นในโฟลเดอร์ได้ง่าย)
       const id = await A.nextId(x.startAt);
       x.attachments = await A.upload(x.attachments, MEMO(id));
@@ -833,7 +857,7 @@ const Store = (() => {
       if (!canEdit(cur)) throw new Error(EDIT_MSG);
       const x = cleanReqInput(input);
       checkCat(x);
-      if (!admin) { const lead = +db.settings.leadDays || 0; if (startOfDay(x.startAt) < addDays(startOfDay(new Date()), lead)) throw new Error(`ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน`); }
+      if (!admin) checkLead(x);
       x.attachments = await A.upload(x.attachments, MEMO(id));
       const r = await mutateReq(id, r => {
         if (!canEdit(r)) throw new Error(EDIT_MSG + ' (สถานะเพิ่งเปลี่ยน)');
@@ -845,6 +869,23 @@ const Store = (() => {
       });
       rememberPlaces(x.destinations);
       return r;
+    },
+    // แนบบันทึกข้อความตามหลัง (ผู้ขอ หรือแอดมิน) — ใช้กับคำขอที่แอดมินบันทึกแทนกรณีเร่งด่วน
+    async attachMemo(id, files) {
+      const check = r => {
+        if (!r) throw new Error('ไม่พบคำขอ');
+        if (r.requester.email !== me.email && !isAdmin(me)) throw new Error('ไม่มีสิทธิ์แนบไฟล์ในคำขอนี้');
+        if (['cancelled', 'rejected'].includes(r.status)) throw new Error('คำขอนี้ยกเลิก/ไม่อนุมัติแล้ว');
+      };
+      check(request(id));
+      if (!(files || []).length) throw new Error('กรุณาเลือกไฟล์บันทึกข้อความ');
+      const refs = await A.upload(files, MEMO(id));
+      return mutateReq(id, r => {
+        check(r);
+        r.attachments = [...(r.attachments || []), ...refs];
+        r.history.push(H('memo', 'แนบบันทึกข้อความตามหลัง'));
+        return r;
+      });
     },
     async cancelRequest(id, reason) {
       const check = r => {

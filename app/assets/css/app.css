@@ -755,7 +755,7 @@ table.roster { width: 100%; border-collapse: separate; border-spacing: 0; font-s
 .cat-opt input:checked + span .i { color: var(--gold-2); }
 .cat-opt input:focus-visible + span { outline: 3px solid rgba(36, 48, 122, .3); }
 .hm { display: inline-grid; place-items: center; min-width: 34px; padding: 3px 8px; border-radius: 8px; background: rgba(36, 48, 122, var(--a)); color: var(--ink); font-family: var(--font-display); font-weight: 500; }
-.cat-row { display: grid; grid-template-columns: auto minmax(0, 1fr) 160px auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--cream); border: 1px solid var(--line); }
+.cat-row { display: grid; grid-template-columns: auto minmax(0, 1fr) 160px auto auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--cream); border: 1px solid var(--line); }
 .cat-row.off { opacity: .55; }
 .cat-row .ci { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--navy-50); color: var(--navy); }
 .cat-row input[type=text], .cat-row select { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
@@ -1084,6 +1084,62 @@ html:not(.lt1060) .cta-tile.t-primary .ct b { font-size: 1.15rem; }
 .lt640 .person .ph { width: 68px; height: 68px; margin-bottom: 8px; }
 .lt640 .person .pos { font-size: .78rem; }
 .lt640 .org-level > .person:last-child:nth-child(odd):not(.l1) { grid-column: 1 / -1; width: calc(50% - 5px); justify-self: center; }
+/* ───────── ดูบันทึกข้อความคู่กับการจัดรถ (หน้าพิจารณาคำขอของแอดมิน) ───────── */
+.dv { display: flex; flex-direction: column; min-height: 0; border-radius: var(--r-lg); background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden; }
+.dv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: #fdfaf3; }
+.dv-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 600; color: var(--navy); font-size: .95rem; }
+.dv-title .i { color: var(--gold-700); }
+.dv-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: var(--sand); }
+.dv-tabs button { border: 0; background: none; padding: 4px 11px; border-radius: 999px; font-family: var(--font-display); font-size: .78rem; color: var(--ink-2); cursor: pointer; }
+.dv-tabs button.on { background: #fff; color: var(--navy); font-weight: 600; box-shadow: 0 3px 8px -5px rgba(60, 40, 10, .4); }
+.dv-tools { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.dv-tools .icon-btn.sm { width: 32px; height: 32px; border-radius: 10px; }
+.dv-tools .icon-btn .i { width: 16px; height: 16px; }
+.dv-z { min-width: 42px; text-align: center; font-family: var(--font-display); font-size: .78rem; color: var(--muted); }
+.dv-close { display: none !important; }
+.dv-body { flex: 1; min-height: 0; overflow: auto; background: #e9e5dc; -webkit-overflow-scrolling: touch; }
+.dv-pages { display: grid; justify-items: center; gap: 12px; padding: 12px; min-width: max-content; }
+.dv-pages canvas { display: block; background: #fff; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .35); max-width: none; }
+.dv-msg { padding: 40px 20px; text-align: center; color: var(--muted); font-size: .9rem; }
+.dv-foot { padding: 6px 12px; font-size: .74rem; color: var(--muted); border-top: 1px solid var(--line); background: #fdfaf3; }
+.dv-fab { display: none; }
+/* คอม (กว้างกว่า 1000px): แบ่งจอ เอกสารซ้าย (ค้างอยู่กับที่) · ข้อมูล/จัดรถขวา */
+html:not(.lt1000) .rq-split.dv-open { display: grid; grid-template-columns: minmax(360px, 44%) minmax(0, 1fr); gap: 20px; align-items: start; }
+html:not(.lt1000) .rq-split.dv-open .rq-doc { position: sticky; top: calc(var(--nav-h) + 14px); height: calc(100vh - var(--nav-h) - 28px); }
+html:not(.lt1000) .rq-split.dv-open .rq-doc .dv { height: 100%; }
+html:not(.lt1000) .rq-split:not(.dv-open) .rq-doc { display: none; }
+/* แบ่งจอแล้ว: ย่อเมนูหลังบ้านเหลือแต่ไอคอน ให้มีที่ว่างจัดรถ */
+html:not(.lt1120) .admin:has(.rq-split.dv-open) { grid-template-columns: 62px minmax(0, 1fr); gap: 18px; }
+html:not(.lt1120) .admin:has(.rq-split.dv-open) .side { padding: 8px; }
+html:not(.lt1120) .admin:has(.rq-split.dv-open) .side h5 { display: none; }
+html:not(.lt1120) .admin:has(.rq-split.dv-open) .side a { position: relative; justify-content: center; padding: 11px 0; font-size: 0; gap: 0; }
+html:not(.lt1120) .admin:has(.rq-split.dv-open) .side a .cnt { position: absolute; top: 2px; right: 2px; min-width: 18px; padding: 0 5px; font-size: .64rem; line-height: 17px; }
+.rq-split.dv-open .rq-main .detail-grid.side-only > .stack { grid-template-columns: 1fr; }
+/* แท็บเล็ต/มือถือ: ปุ่มลอย + แผ่นเอกสารเลื่อนขึ้นจากด้านล่าง */
+.lt1000 .rq-doc { position: fixed; z-index: 120; left: calc(var(--fx) + 8px); right: calc(var(--fx) + 8px); bottom: 8px; height: min(68vh, 760px); transform: translateY(calc(100% + 20px)); transition: transform .3s cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+.lt1000 .rq-doc .dv { height: 100%; box-shadow: 0 -20px 60px -20px rgba(27, 31, 59, .55); }
+html.lt1000.dv-sheet .rq-doc { transform: none; pointer-events: auto; }
+html.lt1000:not(.lt640) .rq-doc { height: min(54vh, 700px); }
+/* แผ่นเอกสารเปิดอยู่ → เว้นที่ท้ายหน้า ให้เลื่อนฟอร์มจัดรถขึ้นมาเหนือแผ่นเอกสารได้ (ดูคู่กัน) */
+html.lt1000.dv-sheet .rq-main { padding-bottom: min(70vh, 780px); }
+.lt1000 .dv-close { display: grid !important; }
+.lt1000 .rq-split.has-doc .dv-fab { display: inline-flex; align-items: center; gap: 8px; position: fixed; z-index: 110; right: calc(var(--fx) + 16px); bottom: 84px; padding: 12px 18px; border: 0; border-radius: 999px; background: var(--navy); color: #fff; font-family: var(--font-display); font-weight: 500; box-shadow: 0 14px 30px -12px rgba(36, 48, 122, .8); cursor: pointer; }
+html.lt1000.dv-sheet .dv-fab { opacity: 0; pointer-events: none; }
+.lt1000 .dv-toggle { display: none; }
+/* ขยายเต็มจอ */
+.dv.dv-max { position: fixed; z-index: 260; inset: 10px calc(var(--fx) + 10px); height: auto !important; border-radius: 18px; box-shadow: 0 30px 90px -20px rgba(0, 0, 0, .6); }
+body.dv-max-open::after { content: ""; position: fixed; inset: 0; z-index: 250; background: rgba(27, 31, 59, .55); }
+.rq-doc:has(.dv-max) { z-index: 260 !important; transform: none !important; }
+.rq-split.dv-open .req-top .kv { grid-template-columns: 120px minmax(0, 1fr); gap: 6px 14px; }
+@media print { .rq-doc, .dv-fab, .dv-toggle { display: none !important; } .rq-split { display: block !important; } }
+/* ค้างบันทึกข้อความ */
+.memo-debt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; background: var(--paper); border: 1px solid #fecaca; box-shadow: var(--shadow); }
+.memo-debt .md-ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: #fde2e2; color: var(--bad); flex: none; }
+.memo-debt b { display: block; font-family: var(--font-display); font-weight: 600; color: var(--navy); }
+.memo-debt small { display: block; color: var(--muted); font-size: .82rem; }
+.memo-debt .btn { margin-left: auto; flex: none; }
+.lt640 .memo-debt { flex-wrap: wrap; } .lt640 .memo-debt .btn { margin-left: 0; width: 100%; }
+.memo-late { border-color: #fecaca; }
 /* คำแนะนำไฟล์คมชัด */
 .clear-tips ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
 /* ส่วนท้าย: ลิงก์เมนูเรียงแถวเดียว */
