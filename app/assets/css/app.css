@@ -1307,5 +1307,31 @@ html.vm-wide body { min-width: var(--fw); overflow-x: visible; }
   .admin { display: block; padding: 0; width: 100%; }
   .card { box-shadow: none; break-inside: avoid; }
   .chart-box { height: 260px; }
+  /* พิมพ์หน้าสถิติ/รายงาน: ไม่ให้ตารางถูกตัด (ไม่มีแถบเลื่อนบนกระดาษ) · เรียงการ์ดลงมาเต็มความกว้าง */
+  .print-only { display: block !important; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .split, .cols-2, .cols-3, .cols-4 { display: block !important; }
+  .split > .card, .grid > .card { margin: 0 0 14px !important; }
+  .card { border: 1px solid #d9d4c7 !important; padding: 12px 14px !important; }
+  .tbl-wrap { overflow: visible !important; }
+  .tbl { width: 100% !important; font-size: 8.5pt; }
+  .tbl th, .tbl td { padding: 4px 6px !important; white-space: normal !important; }
+  .tbl thead { display: table-header-group; }
+  .tbl tr { break-inside: avoid; }
+  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; }
+  /* กราฟ: ย่อตามสัดส่วนเดิมของภาพกราฟ (ไม่ยืด ไม่ล้นกรอบ ไม่ถูกตัด) */
+  .chart-box { height: auto !important; }
+  .chart-box canvas { width: auto !important; height: auto !important; max-width: 100% !important; max-height: 250px !important; }
+  .tbl .hm { min-width: 22px; padding: 1px 4px; }
+  .tbl.mtx { min-width: 0 !important; table-layout: fixed; }
+  .tbl.mtx th, .tbl.mtx td { padding: 3px 2px !important; text-align: center !important; word-break: break-word; }
+  .tbl.mtx th:first-child, .tbl.mtx td:first-child { width: 22%; text-align: left !important; padding-left: 6px !important; }
+  .tbl th { font-size: 7.5pt; }
 }
+.print-only { display: none; }
+.print-brand { display: none; align-items: center; gap: 10px; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 2px solid #1f2a5c; }
+.print-brand img { width: 38px; height: auto; }
+.print-brand b { display: block; font-family: var(--font-display); color: #1f2a5c; }
+.print-brand span { font-size: .8rem; color: #444; }
+@media print { .print-brand.print-only { display: flex !important; } }
 .hm.dk { color: #fff; }

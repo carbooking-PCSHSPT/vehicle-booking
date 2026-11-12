@@ -795,7 +795,8 @@
     const data = { byMonth, byVehicle, byDriver, byDept, K, byProv };
     return {
       layout: 'admin',
-      html: `${head('รายงาน', 'สถิติการใช้รถ', `${per.label} · ${fmt.date(per.from)} – ${fmt.date(per.to > new Date(2900, 0) ? new Date() : per.to)}`, `<button class="btn btn-ghost btn-sm no-print" id="pdf">${icon('printer')} PDF / พิมพ์</button><button class="btn btn-primary btn-sm no-print" id="xls">${icon('download')} Excel ทุกตาราง</button>`)}
+      html: `<div class="print-brand print-only"><img src="images/logo.png" alt=""><div><b>${esc(S.db.settings.schoolName || '')}</b><span>${esc(S.db.settings.division || '')} · ${esc(S.db.settings.unit || 'งานยานพาหนะ')} · พิมพ์เมื่อ ${fmt.dt(new Date().toISOString())}</span></div></div>
+        ${head('รายงาน', 'สถิติการใช้รถ', `${per.label} · ${fmt.date(per.from)} – ${fmt.date(per.to > new Date(2900, 0) ? new Date() : per.to)}`, `<button class="btn btn-ghost btn-sm no-print" id="pdf">${icon('printer')} PDF / พิมพ์</button><button class="btn btn-primary btn-sm no-print" id="xls">${icon('download')} Excel ทุกตาราง</button>`)}
         ${periodBar('#/admin/stats', per, query)}${histNote(hist)}
         <div class="kpis">
           <div class="kpi"><span class="k-ic">${icon('clipboard')}</span><b class="num">${K.req}<em>คำขอ</em></b><span class="l">อนุมัติ ${K.ok} · ไม่อนุมัติ ${K.rej} · ยกเลิก ${K.cancel}</span></div>
