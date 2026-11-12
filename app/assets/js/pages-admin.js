@@ -626,6 +626,67 @@
   // แถบแจ้งระหว่างโหลดข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน — ดู Store.needHistory)
   const histNote = loading => loading ? `<div class="note-box" style="margin-bottom:14px">${icon('clock')}<div>กำลังโหลดข้อมูลย้อนหลัง… ตัวเลขจะครบเมื่อโหลดเสร็จ</div></div>` : '';
 
+  // ═════════ พิมพ์รายงานค่าใช้จ่าย (A4 · บันทึกเป็น PDF ได้) ═════════
+  const PSIGN = 'vb-print-sign';
+  async function printExpenses(rows, per, filters) {
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem(PSIGN) || '{}'); } catch (e) { /* ใช้ค่าเริ่มต้น */ }
+    const sg = saved.sign || [{ n: S.me.name || '', p: 'เจ้าหน้าที่งานยานพาหนะ', r: 'ผู้จัดทำ' }, { n: '', p: 'หัวหน้างานยานพาหนะ', r: 'ผู้ตรวจสอบ' }, { n: '', p: 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป', r: 'ผู้รับรอง' }];
+    const hasPhotos = rows.some(x => (x.e.photos || []).length);
+    const opt = await UI.modal({
+      title: `${icon('printer')} พิมพ์รายงาน / บันทึก PDF`, size: 'lg',
+      body: `<form id="po" class="stack" style="gap:14px">
+        <div class="note-box navy">${icon('info')}<div>ระบบจะเปิดหน้าต่างพิมพ์ของเบราว์เซอร์ — ถ้าต้องการไฟล์ ให้เลือกเครื่องพิมพ์เป็น <b>"บันทึกเป็น PDF" (Save as PDF)</b></div></div>
+        <div class="grid2">
+          <div class="field"><label>แนวกระดาษ</label><div class="row" style="gap:16px"><label class="check"><input type="radio" name="o" value="p" ${saved.o !== 'l' ? 'checked' : ''}> แนวตั้ง</label><label class="check"><input type="radio" name="o" value="l" ${saved.o === 'l' ? 'checked' : ''}> แนวนอน</label></div></div>
+          <div class="field"><label>ส่วนที่พิมพ์</label><div class="stack" style="gap:6px">
+            <label class="check"><input type="checkbox" name="byV" ${saved.byV !== false ? 'checked' : ''}> สรุปแยกตามรถแต่ละคัน</label>
+            <label class="check"><input type="checkbox" name="sign" ${saved.signOn !== false ? 'checked' : ''}> ช่องลงนาม</label>
+            <label class="check"><input type="checkbox" name="pics" ${hasPhotos ? '' : 'disabled'}> แนบรูปใบเสร็จท้ายรายงาน${hasPhotos ? '' : ' (ไม่มีรูป)'}</label></div></div>
+        </div>
+        <div class="field"><label>ผู้ลงนาม <span class="hint" style="font-weight:400">(ระบบจำไว้ใช้ครั้งต่อไป · เว้นชื่อว่างได้ เพื่อเขียนด้วยมือ)</span></label>
+          <div class="stack" style="gap:8px">${sg.map((x, i) => `<div class="grid3" style="gap:8px"><input class="input" name="r${i}" value="${esc(x.r)}" placeholder="บทบาท"><input class="input" name="n${i}" value="${esc(x.n)}" placeholder="ชื่อ-นามสกุล"><input class="input" name="p${i}" value="${esc(x.p)}" placeholder="ตำแหน่ง"></div>`).join('')}</div></div>
+      </form>`,
+      actions: [{ label: 'ยกเลิก', value: null }, { label: 'พิมพ์ / PDF', kind: 'btn-primary', icon: 'printer', onClick: el => UI.formData($('#po', el)) }]
+    });
+    if (!opt) return;
+    const sign = [0, 1, 2].map(i => ({ r: opt['r' + i].trim(), n: opt['n' + i].trim(), p: opt['p' + i].trim() }));
+    try { localStorage.setItem(PSIGN, JSON.stringify({ o: opt.o, byV: opt.byV, signOn: opt.sign, sign })); } catch (e) { /* ไม่บันทึกก็ได้ */ }
+
+    const st = S.db.settings, m2 = n => (+n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const total = rows.reduce((s, x) => s + x.e.amount, 0);
+    const asc = rows.slice().sort((a, b) => a.e.date.localeCompare(b.e.date));
+    const to = per.to > new Date(2900, 0) ? new Date() : per.to;
+    const from = per.k === 'all' && asc.length ? new Date(asc[0].e.date) : per.from;
+    // สรุปตามประเภท
+    const byType = Object.entries(S.EXPENSE).map(([k, l]) => { const rs = rows.filter(x => x.e.type === k); return { l, n: rs.length, lit: rs.reduce((s, x) => s + (+x.e.liters || 0), 0), amt: rs.reduce((s, x) => s + x.e.amount, 0) }; }).filter(x => x.n);
+    // สรุปตามรถ
+    const vids = [...new Set(rows.map(x => x.e.vehicleId))];
+    const byVeh = vids.map(id => { const rs = rows.filter(x => x.e.vehicleId === id), sum = k => rs.filter(x => x.e.type === k).reduce((s, x) => s + x.e.amount, 0); return { id, n: rs.length, lit: rs.reduce((s, x) => s + (+x.e.liters || 0), 0), fuel: sum('fuel'), toll: sum('toll'), oth: sum('parking') + sum('other'), amt: rs.reduce((s, x) => s + x.e.amount, 0) }; }).sort((a, b) => b.amt - a.amt);
+    const pics = opt.pics ? asc.flatMap(({ r, e }) => (e.photos || []).filter(p => !UI.isPdf(p)).map(p => ({ p, r, e }))) : [];
+    const html = `
+      <header class="pd-head"><img src="images/logo.png" alt=""><div><b>${esc(st.schoolName || '')}</b><span>${esc(st.division || '')} · ${esc(st.unit || 'งานยานพาหนะ')}</span></div></header>
+      <h1 class="pd-title">รายงานค่าน้ำมันและค่าใช้จ่ายยานพาหนะ</h1>
+      <p class="pd-sub">${esc(per.k === 'custom' ? 'ช่วงวันที่กำหนดเอง' : per.label)} · ตั้งแต่ ${fmt.dateLong(from)} ถึง ${fmt.dateLong(to)}${filters.length ? `<br>เงื่อนไข: ${esc(filters.join(' · '))}` : ''}</p>
+      <h2>1. สรุปตามประเภทค่าใช้จ่าย</h2>
+      <table class="pd-tbl"><thead><tr><th>ประเภท</th><th class="r">จำนวนรายการ</th><th class="r">ปริมาณ (ลิตร)</th><th class="r">จำนวนเงิน (บาท)</th></tr></thead>
+        <tbody>${byType.map(x => `<tr><td>${x.l}</td><td class="r">${x.n}</td><td class="r">${x.lit ? fmt.num(x.lit, 2) : '-'}</td><td class="r">${m2(x.amt)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>รวมทั้งสิ้น</td><td class="r">${rows.length}</td><td class="r">${fmt.num(byType.reduce((s, x) => s + x.lit, 0), 2)}</td><td class="r">${m2(total)}</td></tr></tfoot></table>
+      <p class="pd-words">(${UI.bahtText(total)})</p>
+      ${opt.byV ? `<h2>2. สรุปแยกตามรถ</h2>
+      <table class="pd-tbl"><thead><tr><th>รถ</th><th>ทะเบียน</th><th class="r">รายการ</th><th class="r">ลิตร</th><th class="r">ค่าน้ำมัน</th><th class="r">ทางด่วน</th><th class="r">อื่น ๆ</th><th class="r">รวม (บาท)</th></tr></thead>
+        <tbody>${byVeh.map(x => `<tr><td>${esc(C.vName(x.id))}</td><td>${esc(C.vPlate(x.id) || '')}</td><td class="r">${x.n}</td><td class="r">${x.lit ? fmt.num(x.lit, 2) : '-'}</td><td class="r">${m2(x.fuel)}</td><td class="r">${m2(x.toll)}</td><td class="r">${m2(x.oth)}</td><td class="r">${m2(x.amt)}</td></tr>`).join('')}</tbody></table>` : ''}
+      <h2>${opt.byV ? 3 : 2}. รายละเอียดรายการ</h2>
+      <table class="pd-tbl pd-list"><colgroup><col style="width:5%"><col style="width:10%"><col style="width:15%"><col style="width:22%"><col style="width:28%"><col style="width:9%"><col style="width:11%"></colgroup><thead><tr><th class="c">ที่</th><th>วันที่</th><th>รถ</th><th>เลขที่คำขอ / ปลายทาง</th><th>ประเภท / รายละเอียด</th><th>ชำระโดย</th><th class="r">จำนวนเงิน</th></tr></thead>
+        <tbody>${asc.map(({ r, e }, i) => `<tr><td class="c">${i + 1}</td><td class="nw">${fmt.date(e.date)}</td><td class="nw">${esc(C.vName(e.vehicleId))}<small>${esc(C.vPlate(e.vehicleId) || '')}</small></td><td>${r.id}<small>${esc(S.destName(r))}</small></td><td>${S.EXPENSE[e.type]}${e.station ? ` · ${esc(e.station)}` : ''}<small>${e.liters ? `${fmt.num(e.liters, 2)} ลิตร × ${fmt.num(e.pricePerL, 2)} บาท` : ''}${e.odo ? `${e.liters ? ' · ' : ''}เลขไมล์ ${fmt.num(e.odo)}` : ''}</small></td><td>${esc(S.PAY[e.pay] || '-')}</td><td class="r">${m2(e.amount)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="6">รวมทั้งสิ้น ${rows.length} รายการ</td><td class="r">${m2(total)}</td></tr></tfoot></table>
+      <p class="pd-words">จำนวนเงินรวม ${m2(total)} บาท (${UI.bahtText(total)})</p>
+      ${opt.sign ? `<div class="pd-sign">${sign.map(x => `<div>${x.r ? `<p class="pd-role">${esc(x.r)}</p>` : ''}<p class="pd-line">ลงชื่อ ....................................</p><p>(${x.n ? esc(x.n) : '....................................'})</p><p>${x.p ? `ตำแหน่ง ${esc(x.p)}` : 'ตำแหน่ง ..............................'}</p><p>วันที่ ....... / ....... / .......</p></div>`).join('')}</div>` : ''}
+      <p class="pd-foot">พิมพ์จากระบบยานพาหนะ เมื่อ ${fmt.dt(new Date().toISOString())} โดย ${esc(S.me.name || S.me.email)}</p>
+      ${pics.length ? `<section class="pd-pics"><h2>ภาคผนวก: รูปใบเสร็จ (${pics.length} รูป)</h2><div class="pd-grid">${pics.map(({ p, r, e }) => `<figure>${UI.img(p, 'ใบเสร็จ')}<figcaption>${fmt.date(e.date)} · ${esc(C.vName(e.vehicleId))} · ${S.EXPENSE[e.type]} ${m2(e.amount)} บาท · ${r.id}</figcaption></figure>`).join('')}</div></section>` : ''}`;
+    const nm = `รายงานค่าใช้จ่ายยานพาหนะ ${fmt.localDate(from)} ถึง ${fmt.localDate(to)}`;
+    UI.printDoc(html, { title: nm, landscape: opt.o === 'l' });
+  }
+
   // ═════════ ค่าน้ำมัน / ค่าใช้จ่าย ═════════
   Pages.adminExpenses = ({ query }) => {
     const per = periodOf(query), vf = query.v || '', tf = query.t || '', cf = query.c || '';
@@ -638,7 +699,7 @@
     const qs = o => '#/admin/expenses?' + new URLSearchParams({ ...query, ...o });
     return {
       layout: 'admin',
-      html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
+      html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="pdf" ${rows.length ? '' : 'disabled'}>${icon('printer')} พิมพ์ / PDF</button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
         ${periodBar('#/admin/expenses', per, query)}${histNote(hist)}
         <div class="toolbar"><select class="input" id="vf" style="width:auto"><option value="">รถทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}" ${v.id === vf ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
           <select class="input" id="tf" style="width:auto"><option value="">ทุกประเภท</option>${Object.entries(S.EXPENSE).map(([k, l]) => `<option value="${k}" ${k === tf ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -651,7 +712,7 @@
         </div>
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>วันที่</th><th>ประเภท</th><th>รถ</th><th>คำขอ</th><th>รายละเอียด</th><th>บิล</th><th class="r">ยอดเงิน (฿)</th></tr></thead>
-          <tbody>${rows.map(({ r, e }) => `<tr><td>${fmt.date(e.date)}</td><td>${S.EXPENSE[e.type]}</td><td>${esc(C.vName(e.vehicleId))}</td><td><a class="link" href="#/admin/requests/${r.id}">${r.id}</a><small>${esc(S.destName(r))}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td><td>${esc(e.station || '')}<small>${e.liters ? `${e.liters} ล. × ${e.pricePerL} ฿` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''}</small></td><td>${(e.photos || []).map(p => UI.thumb(p, 'sm')).join('') || '<small>—</small>'}</td><td class="r"><b>${fmt.money(e.amount)}</b></td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการในช่วงนี้', 'fuel')}</td></tr>`}</tbody>
+          <tbody>${rows.map(({ r, e }) => `<tr><td>${fmt.date(e.date)}</td><td>${S.EXPENSE[e.type]}</td><td>${esc(C.vName(e.vehicleId))}</td><td><a class="link" href="#/admin/requests/${r.id}">${r.id}</a><small>${esc(S.destName(r))}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td><td>${esc(e.station || '')}<small>${e.liters ? `${fmt.num(e.liters, 2)} ล. × ${fmt.num(e.pricePerL, 2)} ฿` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''}</small></td><td>${(e.photos || []).map(p => UI.thumb(p, 'sm')).join('') || '<small>—</small>'}</td><td class="r"><b>${fmt.money(e.amount)}</b></td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการในช่วงนี้', 'fuel')}</td></tr>`}</tbody>
           ${rows.length ? `<tfoot><tr><td colspan="6">รวม</td><td class="r">${fmt.money(total)}</td></tr></tfoot>` : ''}
         </table></div></div>`,
       mount(root) {
@@ -659,6 +720,8 @@
         $('#vf', root).addEventListener('change', e => { location.hash = qs({ v: e.target.value }); });
         $('#tf', root).addEventListener('change', e => { location.hash = qs({ t: e.target.value }); });
         $('#cf', root).addEventListener('change', e => { location.hash = qs({ c: e.target.value }); });
+        $('#pdf', root).addEventListener('click', () => printExpenses(rows, per, [
+          vf && `รถ: ${C.vName(vf)}`, tf && `ประเภท: ${S.EXPENSE[tf]}`, cf && `หมวดงาน: ${cf === 'none' ? 'ไม่ระบุหมวด' : S.catName({ category: cf })}`].filter(Boolean)));
         $('#xls', root).addEventListener('click', () => UI.exportSheets(`ค่าใช้จ่าย-${per.label}`, [{ name: 'ค่าใช้จ่าย', head: ['วันที่', 'ประเภท', 'รถ', 'ทะเบียน', 'เลขที่คำขอ', 'หมวดงาน', 'ปลายทาง', 'ปั๊ม/สถานที่', 'ลิตร', 'ราคา/ลิตร', 'เลขไมล์', 'วิธีชำระ', 'ยอดเงิน', 'บันทึกโดย'], rows: rows.map(({ r, e }) => [e.date, S.EXPENSE[e.type], C.vName(e.vehicleId), C.vPlate(e.vehicleId), r.id, S.catName(r), S.destName(r), e.station, e.liters, e.pricePerL, e.odo, S.PAY[e.pay], e.amount, e.byName || e.by]) }]));
       }
     };

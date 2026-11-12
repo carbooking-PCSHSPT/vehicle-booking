@@ -1265,7 +1265,41 @@ html.vm-wide body { min-width: var(--fw); overflow-x: visible; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .reveal { opacity: 1; transform: none; }
 }
+/* ── เอกสารพิมพ์ / PDF (UI.printDoc) ── */
+#printArea { display: none; }
+.print-doc { font-family: var(--font-body); color: #111; font-size: 10.5pt; line-height: 1.45; }
+.print-doc .pd-head { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; border-bottom: 2px solid #1f2a5c; }
+.print-doc .pd-head img { width: 44px; height: auto; }
+.print-doc .pd-head b { display: block; font-family: var(--font-display); font-size: 13pt; color: #1f2a5c; }
+.print-doc .pd-head span { font-size: 9.5pt; color: #444; }
+.print-doc .pd-title { font-family: var(--font-display); font-size: 16pt; text-align: center; margin: 14px 0 2px; color: #111; }
+.print-doc .pd-sub { text-align: center; color: #333; margin-bottom: 10px; }
+.print-doc h2 { font-family: var(--font-display); font-size: 11.5pt; margin: 14px 0 6px; color: #1f2a5c; break-after: avoid; }
+.print-doc .pd-tbl { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+.print-doc .pd-tbl th, .print-doc .pd-tbl td { border: 1px solid #9aa0ae; padding: 4px 6px; vertical-align: top; text-align: left; }
+.print-doc .pd-tbl thead th { background: #e9ecf5; font-family: var(--font-display); font-weight: 600; }
+.print-doc .pd-tbl thead { display: table-header-group; }
+.print-doc .pd-tbl tr { break-inside: avoid; }
+.print-doc .pd-tbl tfoot td { font-weight: 700; background: #f4f5f9; }
+.print-doc .pd-tbl small { display: block; color: #555; font-size: 8.5pt; }
+.print-doc .r { text-align: right !important; white-space: nowrap; } .print-doc .c { text-align: center !important; } .print-doc .nw { white-space: nowrap; }
+.print-doc .pd-words { margin-top: 6px; text-align: right; font-weight: 600; }
+.print-doc .pd-sign { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 34px; text-align: center; break-inside: avoid; }
+.print-doc .pd-sign p { margin: 0 0 6px; font-size: 10pt; }
+.print-doc .pd-sign .pd-role { font-family: var(--font-display); font-weight: 600; margin-bottom: 26px; }
+.print-doc .pd-sign .pd-line { white-space: nowrap; }
+.print-doc .pd-foot { margin-top: 22px; font-size: 8pt; color: #777; text-align: right; }
+.print-doc .pd-pics { break-before: page; }
+.print-doc .pd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.print-doc .pd-grid figure { margin: 0; border: 1px solid #ccc; padding: 6px; break-inside: avoid; text-align: center; }
+.print-doc .pd-grid img { max-width: 100%; max-height: 105mm; object-fit: contain; }
+.print-doc .pd-grid figcaption { font-size: 8.5pt; color: #333; margin-top: 4px; }
+@page { margin: 14mm 12mm 16mm; @bottom-right { content: "หน้า " counter(page) " / " counter(pages); font-size: 8pt; color: #777; } }
 @media print {
+  html.printing body > *:not(#printArea) { display: none !important; }
+  html.printing #printArea { display: block; }
+  html.printing, html.printing body { background: #fff !important; }
+  html.printing.vm-frame body { width: auto !important; box-shadow: none !important; margin: 0 !important; }
   .nav, .footer, .side, .no-print, .local-badge, #toasts, .form-actions { display: none !important; }
   body { background: #fff; }
   html.vm-frame { background: #fff; } html.vm-frame body { width: auto; box-shadow: none; }

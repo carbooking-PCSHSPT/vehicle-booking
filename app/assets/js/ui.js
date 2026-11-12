@@ -234,5 +234,34 @@ const UI = (() => {
     }
   }
 
-  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay };
+  // จำนวนเงินเป็นตัวอักษร (เช่น 4,322.50 → สี่พันสามร้อยยี่สิบสองบาทห้าสิบสตางค์)
+  function bahtText(n) {
+    const D = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'], P = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
+    const rd = (s, higher) => { let o = ''; const L = s.length; for (let i = 0; i < L; i++) { const d = +s[i], p = L - i - 1; if (!d) continue; o += p === 1 && d === 1 ? 'สิบ' : p === 1 && d === 2 ? 'ยี่สิบ' : p === 0 && d === 1 && (L > 1 || higher) ? 'เอ็ด' : D[d] + P[p]; } return o; };
+    const conv = (s, higher = false) => { s = s.replace(/^0+/, ''); if (!s) return ''; if (s.length > 6) { const hi = conv(s.slice(0, -6)); return hi + 'ล้าน' + rd(s.slice(-6).replace(/^0+/, ''), true); } return rd(s, higher); };
+    const [b, st] = (Math.round(Math.abs(+n || 0) * 100) / 100).toFixed(2).split('.');
+    return (conv(b) || 'ศูนย์') + 'บาท' + (st === '00' ? 'ถ้วน' : rd(st.replace(/^0/, ''), false) + 'สตางค์');
+  }
+  // พิมพ์ / บันทึก PDF: วางเอกสารไว้ใน #printArea แล้วเรียกหน้าต่างพิมพ์ของเบราว์เซอร์ (เลือก "บันทึกเป็น PDF" ได้)
+  // ใช้ฟอนต์ไทยของหน้าเว็บได้ครบ ไม่ต้องใช้ไลบรารีสร้าง PDF · ชื่อไฟล์ PDF = title
+  async function printDoc(html, { title = 'เอกสาร', landscape = false } = {}) {
+    $('#printArea')?.remove(); $('#printPage')?.remove();
+    const area = document.createElement('div'); area.id = 'printArea'; area.className = 'print-doc'; area.innerHTML = html;
+    const st = document.createElement('style'); st.id = 'printPage'; st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'}; }`;
+    document.body.appendChild(area); document.head.appendChild(st);
+    hydrate(area);
+    const imgs = $$('img', area);
+    if (imgs.length) {
+      toast('กำลังเตรียมเอกสาร…', 'info');
+      const waitImg = img => new Promise(r => { const ok = () => img.complete && img.naturalWidth > 1; if (ok() || img.classList.contains('broken')) return r(); const t = setInterval(() => { if (ok() || img.classList.contains('broken')) { clearInterval(t); r(); } }, 150); });
+      await Promise.race([Promise.all(imgs.map(waitImg)), new Promise(r => setTimeout(r, 12000))]);
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const oldTitle = document.title, root = document.documentElement;
+    const done = () => { root.classList.remove('printing'); document.title = oldTitle; area.remove(); st.remove(); window.removeEventListener('afterprint', done); };
+    root.classList.add('printing'); document.title = title.replace(/[\\/:*?"<>|]/g, '-');
+    window.addEventListener('afterprint', done);
+    setTimeout(() => window.print(), 60);
+  }
+  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc };
 })();
