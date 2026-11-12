@@ -244,7 +244,19 @@ const UI = (() => {
   }
   // พิมพ์ / บันทึก PDF: วางเอกสารไว้ใน #printArea แล้วเรียกหน้าต่างพิมพ์ของเบราว์เซอร์ (เลือก "บันทึกเป็น PDF" ได้)
   // ใช้ฟอนต์ไทยของหน้าเว็บได้ครบ ไม่ต้องใช้ไลบรารีสร้าง PDF · ชื่อไฟล์ PDF = title
-  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true } = {}) {
+  // ย่อตัวอักษรของ [data-fit] ให้อยู่บรรทัดเดียว (วัดขนาดจริงนอกจอ ที่ความกว้างเท่าเนื้อที่บนกระดาษ)
+  async function fitLines(area, width) {
+    const els = $$('[data-fit]', area); if (!els.length || !width) return;
+    area.style.cssText = `display:block;position:fixed;left:-10000px;top:0;width:${width};visibility:hidden`;
+    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) { /* ใช้ฟอนต์สำรอง */ } }
+    els.forEach(el => {
+      el.style.whiteSpace = 'nowrap';
+      let fs = parseFloat(getComputedStyle(el).fontSize), n = 0;
+      while (el.scrollWidth > el.clientWidth + 1 && n++ < 40) { fs -= .25; el.style.fontSize = fs + 'px'; }
+    });
+    area.style.cssText = '';
+  }
+  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true, fitWidth = '' } = {}) {
     $('#printArea')?.remove(); $('#printPage')?.remove();
     const area = document.createElement('div'); area.id = 'printArea'; area.className = 'print-doc'; area.innerHTML = html;
     const st = document.createElement('style'); st.id = 'printPage'; st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'};${margin ? ` margin: ${margin};` : ''}${pageNo ? '' : ' @bottom-right { content: none; }'} }`;
@@ -257,6 +269,7 @@ const UI = (() => {
       await Promise.race([Promise.all(imgs.map(waitImg)), new Promise(r => setTimeout(r, 12000))]);
     }
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    await fitLines(area, fitWidth);
     const oldTitle = document.title, root = document.documentElement;
     const done = () => { root.classList.remove('printing'); document.title = oldTitle; area.remove(); st.remove(); window.removeEventListener('afterprint', done); };
     root.classList.add('printing'); document.title = title.replace(/[\\/:*?"<>|]/g, '-');

@@ -111,33 +111,56 @@
 
   // ═════════ รายการคำขอ ═════════
   Pages.adminRequests = ({ query }) => {
-    const f = query.f || 'pending', q = (query.q || '').trim(), m = query.m || '', cf = query.c || '';
+    const f = query.f || 'pending', q = (query.q || '').trim(), m = query.m || '', cf = query.c || '', sg = query.sg || '';
     const G = { pending: ['pending'], revise: ['revise'], approved: ['approved'], ontrip: ['ontrip'], returned: ['returned'], closed: ['closed'], rejected: ['rejected', 'cancelled'], all: null };
     let list = S.db.requests.filter(r => !G[f] || G[f].includes(r.status));
     if (m) list = list.filter(r => r.startAt.slice(0, 7) === m);
     if (cf) list = list.filter(r => (r.category || '') === (cf === 'none' ? '' : cf));
+    // ฉบับลงนาม: no = อนุมัติแล้วแต่ยังไม่แนบฉบับลงนาม · yes = เก็บฉบับลงนามแล้ว
+    const hasSig = r => (r.signed || []).length > 0;
+    if (sg) list = list.filter(r => C.canMemo(r) && (sg === 'yes' ? hasSig(r) : !hasSig(r)));
     if (q) list = list.filter(r => [r.id, r.purpose, r.requester.name, r.requester.dept, S.destName(r)].join(' ').toLowerCase().includes(q.toLowerCase()));
     list.sort((a, b) => f === 'pending' || f === 'approved' ? a.startAt.localeCompare(b.startAt) : b.startAt.localeCompare(a.startAt));
     const cnt = k => S.db.requests.filter(r => !G[k] || G[k].includes(r.status)).length;
-    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, c: cf, ...o });
+    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, c: cf, sg, ...o });
+    const printable = list.filter(C.canMemo);
     return {
       layout: 'admin',
       html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a>`)}
         <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['returned', 'รอปิดงาน'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k })}"><button class="${f === k ? 'on' : ''}" tabindex="-1">${l} ${cnt(k)}</button></a>`).join('')}</div></div>
-        <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><input class="input" type="month" id="m" value="${esc(m)}" style="width:auto"><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
+        <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><input class="input" type="month" id="m" value="${esc(m)}" style="width:auto"><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
+          <select class="input" id="sg" style="width:auto" title="บันทึกข้อความฉบับลงนาม"><option value="">ฉบับลงนาม: ทั้งหมด</option><option value="no" ${sg === 'no' ? 'selected' : ''}>ยังไม่มีฉบับลงนาม</option><option value="yes" ${sg === 'yes' ? 'selected' : ''}>เก็บฉบับลงนามแล้ว</option></select>
+          <button class="btn btn-primary btn-sm" id="memoBatch" ${printable.length ? '' : 'disabled'}>${icon('printer')} <span>พิมพ์บันทึกข้อความ</span></button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
+        ${printable.length ? `<p class="hint" style="margin:-4px 0 10px">${icon('info')} ติ๊กเลือกรายการที่ต้องการพิมพ์บันทึกข้อความ (เฉพาะที่อนุมัติแล้ว) — ไม่เลือก = พิมพ์ทั้งหมด ${printable.length} ฉบับในรายการนี้</p>` : ''}
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
+          <thead><tr><th class="ck">${printable.length ? `<input type="checkbox" id="pickAll" aria-label="เลือกทั้งหมด">` : ''}</th><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
           <tbody>${list.map(r => `<tr class="click" data-href="#/admin/requests/${r.id}">
-            <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
+            <td class="ck">${C.canMemo(r) ? `<input type="checkbox" data-pick="${r.id}" aria-label="เลือก ${r.id}">` : ''}</td>
+            <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}${C.canMemo(r) ? (hasSig(r) ? '<small style="color:var(--ok)">✓ มีฉบับลงนาม</small>' : '<small style="color:var(--gold-700)">ยังไม่มีฉบับลงนาม</small>') : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
             <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${S.tripTag(r) ? `<small>${S.tripTag(r).text}</small>` : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
             <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
             <td>${S.passengers(r)} คน<small>ครู ${r.teachers} · นร. ${r.students}${+r.others ? ` · อื่น ${r.others}` : ''}</small></td>
             <td>${(r.assignments || []).map(a => `${esc(C.vName(a.vehicleId))}<small>${esc(C.dName(a.driverId))}</small>`).join('') || '<small>—</small>'}</td>
-            <td>${C.statusPill(r)}</td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการ', 'clipboard')}</td></tr>`}</tbody>
+            <td>${C.statusPill(r)}</td></tr>`).join('') || `<tr><td colspan="8">${UI.empty('ไม่มีรายการ', 'clipboard')}</td></tr>`}</tbody>
         </table></div></div>`,
       mount(root) {
-        root.addEventListener('click', e => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; });
+        root.addEventListener('click', e => { if (e.target.closest('.ck')) return; const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; });
+        // เลือกหลายรายการ → พิมพ์บันทึกข้อความต่อกัน (1 ฉบับต่อหน้า)
+        const picked = () => $$('[data-pick]:checked', root).map(x => x.dataset.pick);
+        const syncBtn = () => { const n = picked().length; $('#memoBatch span', root).textContent = n ? `พิมพ์บันทึกข้อความ (${n} ฉบับ)` : 'พิมพ์บันทึกข้อความ'; const all = $('#pickAll', root); if (all) { const t = $$('[data-pick]', root).length; all.checked = n > 0 && n === t; all.indeterminate = n > 0 && n < t; } };
+        root.addEventListener('change', e => {
+          if (e.target.id === 'pickAll') $$('[data-pick]', root).forEach(x => { x.checked = e.target.checked; });
+          if (e.target.id === 'pickAll' || e.target.dataset.pick) syncBtn();
+        });
+        $('#memoBatch', root).addEventListener('click', async () => {
+          const ids = picked();
+          let rs = ids.length ? ids.map(S.request).filter(Boolean) : printable;
+          if (!ids.length && !(await UI.confirm(`ไม่ได้เลือกรายการ — พิมพ์บันทึกข้อความทั้งหมด <b>${printable.length} ฉบับ</b> ในรายการนี้ใช่ไหม?`, { title: 'พิมพ์บันทึกข้อความ', ok: 'พิมพ์ทั้งหมด' }))) return;
+          rs = rs.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
+          C.printMemos(rs);
+        });
+        $('#sg', root).addEventListener('change', e => { location.hash = qs({ sg: e.target.value }); });
         $('#q', root).addEventListener('input', UI.debounce(e => { location.hash = qs({ q: e.target.value }); }, 450));
         $('#m', root).addEventListener('change', e => { location.hash = qs({ m: e.target.value }); });
         $('#cf', root).addEventListener('change', e => { location.hash = qs({ c: e.target.value }); });

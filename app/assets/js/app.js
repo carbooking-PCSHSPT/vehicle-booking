@@ -402,7 +402,14 @@ const C = (() => {
     };
   }
   const canMemo = r => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);
-  function printMemo(r) {
+  const MEMO_PAGE = { margin: '15mm 18mm 12mm 25mm', pageNo: false, fitWidth: '167mm' };   // A4 กว้าง 210 − ขอบซ้าย 25 − ขวา 18
+  function printMemo(r) { UI.printDoc(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
+  // พิมพ์หลายฉบับต่อกัน (1 คำขอ = 1 หน้า)
+  function printMemos(list) {
+    if (!list.length) return;
+    UI.printDoc(list.map(memoHTML).join(''), { title: list.length === 1 ? `บันทึกข้อความขอใช้รถ ${list[0].id}` : `บันทึกข้อความขอใช้รถ ${list.length} ฉบับ ${list[0].id} ถึง ${list[list.length - 1].id}`, ...MEMO_PAGE });
+  }
+  function memoHTML(r) {
     const s = S(), st = s.db.settings, M = memoSettings();
     const dTh = d => new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
     const tm = d => `${UI.fmt.time(d)} น.`;
@@ -420,7 +427,7 @@ const C = (() => {
     const sig = (role, name, p) => `<div class="mm-sig"><p>(ลงชื่อ) ${dots(42)} ${role}</p><p>(${name ? esc(name) : dots(40)})</p><p>ตำแหน่ง ${p ? esc(p) : dots(36)}</p></div>`;
     const html = `<div class="memo-doc">
       <div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>
-      <div class="mm-line"><b>ส่วนราชการ</b><span>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
+      <div class="mm-line"><b>ส่วนราชการ</b><span data-fit>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
       <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${r.id}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(r.createdAt)}</span></div></div>
       <div class="mm-line"><b>เรื่อง</b><span>ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน</span></div>
       <hr>
@@ -450,10 +457,10 @@ const C = (() => {
       </div>
       <p class="mm-foot">อ้างอิงระบบยานพาหนะ เลขที่คำขอ ${r.id} · ส่งคำขอ ${UI.fmt.dt(r.createdAt)}${apv ? ` · จัดรถ/อนุมัติในระบบโดย ${esc(apv.byName || apv.by)} เมื่อ ${UI.fmt.dt(apv.at)}` : ''} · พิมพ์เมื่อ ${UI.fmt.dt(new Date().toISOString())}</p>
     </div>`;
-    UI.printDoc(html, { title: `บันทึกข้อความขอใช้รถ ${r.id}`, margin: '15mm 18mm 12mm 25mm', pageNo: false });
+    return html;
   }
 
-  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, canMemo, memoSettings };
+  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, canMemo, memoSettings };
 })();
 
 const App = (() => {
