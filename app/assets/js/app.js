@@ -240,7 +240,7 @@ const C = (() => {
   }
 
   // ประวัติคำขอ
-  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'], signed: ['file', 'บันทึกข้อความฉบับลงนาม'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
+  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'], esign: ['edit', 'ลงนามอิเล็กทรอนิกส์'], signed: ['file', 'บันทึกข้อความฉบับลงนาม'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
   const history = r => `<div class="hist">${(r.history || []).slice().reverse().map(h => { const [ic, t] = HIST[h.action] || ['info', h.action]; return `<div class="hist-item"><span class="hi">${icon(ic)}</span><div><b>${t}${h.action === 'depart' || h.action === 'return' ? ` · ${esc(h.note)}` : ''}</b><small>${esc(h.byName || h.by || '')} · ${fmt.dt(h.at)}</small>${h.note && !['depart', 'return'].includes(h.action) ? `<p>${esc(h.note)}</p>` : ''}</div></div>`; }).join('')}</div>`;
 
   // รถที่ได้รับมอบหมาย (สำหรับผู้ขอ/แอดมินดู)
@@ -394,19 +394,23 @@ const C = (() => {
   function memoSettings() {
     const st = S().db.settings, m = st.memo || {}, cm = st.committee || [];
     const byPos = re => (cm.find(c => re.test(c.position || '') && c.name) || {}).name || '';
+    const uh = S().user(m.headEmail) || {}, ud = S().user(m.depEmail) || {};
     return {
       to: m.to || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป',
       noPrefix: m.noPrefix || '',
-      headName: m.headName || byPos(/หัวหน้างานยานพาหนะ/), headPos: m.headPos || 'หัวหน้างานยานพาหนะ',
-      depName: m.depName || byPos(/รองผู้อำนวยการ/), depPos: m.depPos || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป'
+      headName: m.headName || uh.name || byPos(/หัวหน้างานยานพาหนะ/), headPos: m.headPos || 'หัวหน้างานยานพาหนะ',
+      depName: m.depName || ud.name || byPos(/รองผู้อำนวยการ/), depPos: m.depPos || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป'
     };
   }
   const canMemo = r => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);
   const MEMO_PAGE = { margin: '15mm 18mm 12mm 25mm', pageNo: false, fitWidth: '167mm' };   // A4 กว้าง 210 − ขอบซ้าย 25 − ขวา 18
-  function printMemo(r) { UI.printDoc(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
+  // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
+  const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);
+  async function printMemo(r) { await S().loadSignatures(sigEmails([r])); UI.printDoc(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
   // พิมพ์หลายฉบับต่อกัน (1 คำขอ = 1 หน้า)
-  function printMemos(list) {
+  async function printMemos(list) {
     if (!list.length) return;
+    await S().loadSignatures(sigEmails(list));
     UI.printDoc(list.map(memoHTML).join(''), { title: list.length === 1 ? `บันทึกข้อความขอใช้รถ ${list[0].id}` : `บันทึกข้อความขอใช้รถ ${list.length} ฉบับ ${list[0].id} ถึง ${list[list.length - 1].id}`, ...MEMO_PAGE });
   }
   function memoHTML(r) {
@@ -424,7 +428,13 @@ const C = (() => {
     const dests = (r.destinations || []).map(d => d.name + (d.province ? ` จังหวัด${d.province.replace(/^จ(\.|ังหวัด)\s*/, '')}` : '')).join(', ') || s.destName(r);
     const asg = r.assignments || [];
     const apv = (r.history || []).filter(h => h.action === 'approve').pop();
-    const sig = (role, name, p) => `<div class="mm-sig"><p>(ลงชื่อ) ${dots(42)} ${role}</p><p>(${name ? esc(name) : dots(40)})</p><p>ตำแหน่ง ${p ? esc(p) : dots(36)}</p></div>`;
+    // es = { img, at } ลายเซ็นอิเล็กทรอนิกส์ (ถ้ามี) — วางรูปลายเซ็นทับเส้นจุด
+    const sig = (role, name, p, es) => `<div class="mm-sig${es && es.img ? ' has-img' : ''}"><p>(ลงชื่อ) <span class="mm-dots">${es && es.img ? `<img src="${es.img}" alt="">` : ''}${dots(42)}</span> ${role}</p><p>(${name ? esc(name) : dots(40)})</p><p>ตำแหน่ง ${p ? esc(p) : dots(36)}</p>${es && es.at ? `<p class="mm-es">ลงนามอิเล็กทรอนิกส์ผ่านระบบ ${UI.fmt.dt(es.at)}</p>` : ''}</div>`;
+    const E = r.esign || {};
+    const reqSig = r.createdBy === r.requester.email && s.sigOf(r.requester.email) ? { img: s.sigOf(r.requester.email), at: r.createdAt } : null;
+    const headSig = E.head ? { img: s.sigOf(E.head.email), at: E.head.at } : null;
+    const depSig = E.deputy ? { img: s.sigOf(E.deputy.email), at: E.deputy.at } : null;
+    const dateLine = es => es ? `<p class="mm-date">วันที่ ${dTh(es.at)}</p>` : `<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p>`;
     const html = `<div class="memo-doc">
       <div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>
       <div class="mm-line"><b>ส่วนราชการ</b><span data-fit>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
@@ -441,7 +451,7 @@ const C = (() => {
         ${r.note ? `<li><b>หมายเหตุ</b> ${esc(r.note)}</li>` : ''}
       </ol>
       <p class="mm-p">จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต</p>
-      <div class="mm-right">${sig('ผู้ขอใช้รถ', r.requester.name, pos)}</div>
+      <div class="mm-right">${sig('ผู้ขอใช้รถ', r.requester.name, pos, reqSig)}</div>
       <div class="mm-boxes">
         <div class="mm-box"><h3>ความเห็นหัวหน้างานยานพาหนะ</h3>
           <p>เรียน ${esc(M.to)}</p>
@@ -449,18 +459,18 @@ const C = (() => {
           ${asg.length ? `<ul>${asg.map(a => `<li>${esc(vName(a.vehicleId))}${vPlate(a.vehicleId) ? ` ทะเบียน ${esc(vPlate(a.vehicleId))}` : ''} · พนักงานขับรถ ${esc(dName(a.driverId))}${dPhone(a.driverId) ? ` โทร ${esc(dPhone(a.driverId))}` : ''}</li>`).join('')}</ul>` : `<p>${dots(70)}</p>`}
           ${r.decision && r.decision.note ? `<p class="mm-note">หมายเหตุ: ${esc(r.decision.note)}</p>` : ''}
           <p class="mm-ind">เห็นควรอนุญาต</p>
-          ${sig('', M.headName, M.headPos)}<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p></div>
+          ${sig('', E.head ? E.head.name : M.headName, M.headPos, headSig)}${dateLine(headSig)}</div>
         <div class="mm-box"><h3>ความเห็น / คำสั่ง</h3>
-          <p class="mm-chk"><span class="cb"></span> อนุญาต &nbsp;&nbsp;&nbsp; <span class="cb"></span> ไม่อนุญาต</p>
-          <p>${dots(70)}</p><p>${dots(70)}</p>
-          ${sig('', M.depName, M.depPos)}<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p></div>
+          <p class="mm-chk"><span class="cb ${E.deputy && E.deputy.decision !== 'deny' ? 'on' : ''}"></span> อนุญาต &nbsp;&nbsp;&nbsp; <span class="cb ${E.deputy && E.deputy.decision === 'deny' ? 'on' : ''}"></span> ไม่อนุญาต</p>
+          ${E.deputy && E.deputy.note ? `<p class="mm-fill">${esc(E.deputy.note)}</p>` : `<p>${dots(70)}</p><p>${dots(70)}</p>`}
+          ${sig('', E.deputy ? E.deputy.name : M.depName, M.depPos, depSig)}${dateLine(depSig)}</div>
       </div>
       <p class="mm-foot">อ้างอิงระบบยานพาหนะ เลขที่คำขอ ${r.id} · ส่งคำขอ ${UI.fmt.dt(r.createdAt)}${apv ? ` · จัดรถ/อนุมัติในระบบโดย ${esc(apv.byName || apv.by)} เมื่อ ${UI.fmt.dt(apv.at)}` : ''} · พิมพ์เมื่อ ${UI.fmt.dt(new Date().toISOString())}</p>
     </div>`;
     return html;
   }
 
-  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, canMemo, memoSettings };
+  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {
@@ -481,7 +491,7 @@ const App = (() => {
     ['/schedule', 'schedule', 'in'], ['/vehicles', 'vehicles', 'in'], ['/vehicles/:id', 'vehicleDetail', 'in'],
     ['/my', 'my', 'in'], ['/my/:id', 'myDetail', 'in'], ['/rate/:id/:idx', 'rate', 'in'], ['/contact', 'contact', 'any'],
     ['/driver', 'driverHome', 'driver'], ['/driver/:id/:idx', 'driverJob', 'driver'],
-    ['/admin', 'adminHome', 'back'], ['/admin/requests', 'adminRequests', 'admin'], ['/admin/requests/:id', 'adminRequest', 'admin'],
+    ['/admin', 'adminHome', 'back'], ['/admin/requests', 'adminRequests', 'admin'], ['/admin/requests/:id', 'adminRequest', 'admin'], ['/admin/esign', 'adminEsign', 'back'],
     ['/admin/new', 'adminNew', 'admin'], ['/admin/roster', 'adminRoster', 'admin'], ['/admin/vehicles', 'adminVehicles', 'admin'], ['/admin/vehicles/:id', 'adminVehicle', 'admin'],
     ['/admin/drivers', 'adminDrivers', 'admin'], ['/admin/users', 'adminUsers', 'admin'], ['/admin/expenses', 'adminExpenses', 'admin'],
     ['/admin/ratings', 'adminRatings', 'back'], ['/admin/stats', 'adminStats', 'back'], ['/admin/settings', 'adminSettings', 'admin']
@@ -580,7 +590,7 @@ const App = (() => {
     if (m.auth === 'out' && inn) return go(query.next || defaultHome());
     if (m.auth !== 'any' && m.auth !== 'out' && !inn) return go('#/login?next=' + encodeURIComponent('#' + location.hash.slice(1)));
     if (inn && me.mustChangePassword && m.page !== 'password') return go('#/password');
-    if (inn && !me.mustChangePassword && me.needsProfile && m.page !== 'profile') return go('#/profile');
+    if (inn && !me.mustChangePassword && (me.needsProfile || Store.needsSign(me)) && m.page !== 'profile') return go('#/profile');
     if (m.auth === 'admin' && !Store.isAdmin(me)) return go(Store.isExec(me) ? '#/admin/stats' : '#/');
     if (m.auth === 'back' && !Store.isBack(me)) return go('#/');
     if (m.auth === 'driver' && !Store.isDriver(me) && !Store.isAdmin(me)) return go('#/');

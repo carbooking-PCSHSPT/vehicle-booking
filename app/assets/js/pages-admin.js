@@ -19,6 +19,7 @@
         ${admin ? `<h5>งานประจำวัน</h5>${L('/admin', 'grid', 'ภาพรวม')}${L('/admin/requests', 'clipboard', 'คำขอใช้รถ', pending)}${L('/admin/new', 'alert', 'บันทึกคำขอเร่งด่วน')}${L('/admin/roster', 'calendar', 'ตารางงานคนขับ')}${L('/driver', 'wheel', 'มุมมองคนขับ')}
         <h5>ข้อมูลหลัก</h5>${L('/admin/vehicles', 'van', 'ข้อมูลรถ')}${L('/admin/drivers', 'users', 'พนักงานขับรถ')}${L('/admin/users', 'userPlus', 'ผู้ใช้และสิทธิ์')}` : ''}
         <h5>รายงาน</h5>${admin ? L('/admin/expenses', 'fuel', 'ค่าน้ำมัน/ค่าใช้จ่าย') : ''}${L('/admin/stats', 'chart', 'สถิติและรายงาน')}${L('/admin/ratings', 'star', 'ประเมินคนขับ')}
+        ${S.signerRoles(me).length ? `<h5>ลงนาม</h5>${L('/admin/esign', 'edit', 'บันทึกข้อความรอลงนาม', S.db.requests.filter(r => S.signerRoles(me).some(ro => S.needsMySign(r, ro))).length)}` : ''}
         ${admin ? `<h5>ระบบ</h5>${L('/admin/settings', 'settings', 'ตั้งค่า')}` : ''}
       </aside>
       <div class="page-enter" style="min-width:0">${html}</div>
@@ -256,7 +257,11 @@
               ${exp.length ? `<div class="row between" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--navy-50)"><b>รวม</b><span class="money">${fmt.money(expTotal)} บาท</span></div>` : ''}
             </div>` : ''}
             ${C.canMemo(r) ? `<div class="card memo-card"><div class="card-head"><h3>${icon('file')} บันทึกข้อความขอใช้รถ</h3><button class="btn btn-primary btn-sm" data-memo>${icon('printer')} พิมพ์ / PDF</button></div>
-              <ol class="memo-steps"><li>พิมพ์บันทึกข้อความ (ข้อมูลคำขอ + รถ/คนขับที่จัดให้)</li><li>ลงนาม: ผู้ขอใช้รถ → หัวหน้างานยานพาหนะ → รองผู้อำนวยการฯ</li><li>สแกนแล้วแนบกลับที่นี่ เก็บเป็นหลักฐานของฝ่าย</li></ol>
+              ${(() => { const E = r.esign || {}, mine = r.createdBy === r.requester.email; const st = (ok, t, d) => `<li class="${ok ? 'ok' : ''}">${icon(ok ? 'checkCircle' : 'clock')}<span>${t}</span><small>${d}</small></li>`; return `<ul class="es-steps">
+                ${st(mine, 'ผู้ขอใช้รถ', mine ? 'ลงนามอิเล็กทรอนิกส์เมื่อส่งคำขอ' : 'แอดมินบันทึกแทน — ให้ผู้ขอเซ็นบนกระดาษ')}
+                ${st(!!E.head, 'หัวหน้างานยานพาหนะ', E.head ? `${esc(E.head.name)} · ${fmt.dt(E.head.at)}` : 'รอลงนาม')}
+                ${st(!!E.deputy, 'รองผู้อำนวยการฯ', E.deputy ? `${E.deputy.decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'} · ${esc(E.deputy.name)} · ${fmt.dt(E.deputy.at)}` : E.head ? 'รอลงนาม' : 'รอหัวหน้างานลงนามก่อน')}</ul>
+                <p class="hint" style="margin:-4px 0 10px">${E.deputy ? 'ลงนามอิเล็กทรอนิกส์ครบแล้ว — พิมพ์/บันทึก PDF เก็บเป็นหลักฐานได้ทันที' : 'ผู้ลงนามที่ยังไม่มีบัญชี/ไม่ได้กำหนดในตั้งค่า ให้พิมพ์แล้วเซ็นบนกระดาษ จากนั้นสแกนแนบด้านล่าง'}</p>`; })()}
               ${(r.signed || []).length ? `<div class="note-box green" style="margin-bottom:10px">${icon('checkCircle')}<div><b>เก็บฉบับลงนามแล้ว</b> (${r.signed.length} ไฟล์)<div class="thumbs" style="margin-top:6px">${r.signed.map(p => `<span class="sg-item">${UI.thumb(p, 'sm')}<button type="button" class="icon-btn sm" data-rmsig="${esc(p)}" aria-label="ลบไฟล์นี้">${icon('trash')}</button></span>`).join('')}</div></div></div>` : `<p style="margin-bottom:10px"><span class="pill tone-warn">ยังไม่มีฉบับลงนาม</span></p>`}
               ${C.filePicker('sig', [], { label: 'แนบไฟล์สแกนฉบับลงนาม', pdf: true })}
               <button class="btn btn-ghost btn-sm" id="sigSave" style="margin-top:10px">${icon('upload')} บันทึกไฟล์ฉบับลงนาม</button></div>` : ''}
@@ -326,6 +331,73 @@
           if (e.target.closest('#aClose')) { const res = await UI.confirm('ปิดงานคำขอนี้? (ตรวจสอบเลขไมล์และค่าใช้จ่ายให้ครบก่อน)', { title: 'ปิดงาน', ok: 'ปิดงาน', input: { label: 'หมายเหตุ (ถ้ามี)' } }); if (res) S.closeRequest(r.id, res.value).then(() => { UI.toast('ปิดงานแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); }
           if (e.target.closest('#aReopen')) S.reopenRequest(r.id).then(App.render);
           if (e.target.closest('#aCancel')) { const res = await UI.confirm('ยกเลิกคำขอนี้? ระบบจะแจ้งผู้ขอในเว็บ', { title: 'ยกเลิกคำขอ', ok: 'ยกเลิกคำขอ', danger: true, input: { label: 'เหตุผล', required: true } }); if (res) S.cancelRequest(r.id, res.value).then(() => { UI.toast('ยกเลิกแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); }
+        });
+      }
+    };
+  };
+
+  // ═════════ บันทึกข้อความรอลงนาม (หัวหน้างานยานพาหนะ / รองผู้อำนวยการ) ═════════
+  Pages.adminEsign = ({ query }) => {
+    const me = S.me, roles = S.signerRoles(me);
+    const RL = { head: 'หัวหน้างานยานพาหนะ', deputy: 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป' };
+    if (!roles.length) return { layout: 'admin', html: `${head('ลงนาม', 'บันทึกข้อความรอลงนาม')}<div class="note-box">${icon('info')}<div>บัญชีนี้ยังไม่ได้ถูกกำหนดเป็นผู้ลงนาม — แอดมินกำหนดได้ที่ <b>ตั้งค่า → บันทึกข้อความขอใช้รถ</b></div></div>` };
+    const role = roles.includes(query.role) ? query.role : roles[0], tab = query.t === 'done' ? 'done' : 'todo';
+    const all = S.db.requests.filter(C.canMemo);
+    const todo = all.filter(r => S.needsMySign(r, role)).sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const done = all.filter(r => ((r.esign || {})[role] || {}).email === me.email).sort((a, b) => b.esign[role].at.localeCompare(a.esign[role].at)).slice(0, 200);
+    const list = tab === 'todo' ? todo : done;
+    const qs = o => '#/admin/esign?' + new URLSearchParams({ role, t: tab, ...o });
+    return {
+      layout: 'admin',
+      html: `${head('ลงนามอิเล็กทรอนิกส์', 'บันทึกข้อความรอลงนาม', `ในฐานะ ${RL[role]} · ${esc(me.name || me.email)}`)}
+        ${!me.sigAt ? `<div class="note-box red" style="margin-bottom:14px">${icon('alert')}<div>ยังไม่มีลายเซ็นในระบบ — <a class="link" href="#/profile">ไปเซ็นชื่อที่หน้าโปรไฟล์</a> ก่อนลงนาม</div></div>` : ''}
+        <div class="toolbar">${roles.length > 1 ? `<div class="seg">${roles.map(r2 => `<a href="${qs({ role: r2 })}"><button class="${r2 === role ? 'on' : ''}" tabindex="-1">${RL[r2]}</button></a>`).join('')}</div>` : ''}
+          <div class="seg"><a href="${qs({ t: 'todo' })}"><button class="${tab === 'todo' ? 'on' : ''}" tabindex="-1">รอลงนาม ${todo.length}</button></a><a href="${qs({ t: 'done' })}"><button class="${tab === 'done' ? 'on' : ''}" tabindex="-1">ลงนามแล้ว ${done.length}</button></a></div>
+          ${tab === 'todo' && todo.length ? `<button class="btn btn-primary btn-sm" id="doSign" disabled>${icon('edit')} <span>ลงนามที่เลือก</span></button>` : ''}</div>
+        <p class="hint" style="margin:-4px 0 10px">${icon('info')} ${role === 'deputy' ? 'แสดงเฉพาะฉบับที่หัวหน้างานยานพาหนะลงนามแล้ว · ' : ''}กด "ดูบันทึก" เพื่ออ่านก่อนลงนาม · ติ๊กเลือกหลายฉบับแล้วลงนามพร้อมกันได้ · ระบบบันทึกชื่อและเวลาที่ลงนามไว้ในคำขอ</p>
+        <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th class="ck">${tab === 'todo' && todo.length ? '<input type="checkbox" id="pickAll" aria-label="เลือกทั้งหมด">' : ''}</th><th>เลขที่</th><th>วันเดินทาง</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>รถ / คนขับ</th><th>${tab === 'done' ? 'ลงนามเมื่อ' : ''}</th></tr></thead>
+          <tbody>${list.map(r => `<tr>
+            <td class="ck">${tab === 'todo' ? `<input type="checkbox" data-pick="${r.id}" aria-label="เลือก ${r.id}">` : ''}</td>
+            <td><b style="white-space:nowrap">${r.id}</b>${r.esign && r.esign.head && role === 'deputy' ? `<small style="color:var(--ok)">หัวหน้างานลงนาม ${fmt.date(r.esign.head.at)}</small>` : ''}</td>
+            <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small></td>
+            <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small></td>
+            <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
+            <td>${(r.assignments || []).map(a => `${esc(C.vName(a.vehicleId))}<small>${esc(C.dName(a.driverId))}</small>`).join('') || '<small>—</small>'}</td>
+            <td>${tab === 'done' ? `<small>${fmt.dt(r.esign[role].at)}</small>${role === 'deputy' ? `<span class="pill ${r.esign.deputy.decision === 'deny' ? 'tone-bad' : 'tone-ok'}">${r.esign.deputy.decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'}</span>` : ''}` : ''}<button class="btn btn-ghost btn-xs" data-prev="${r.id}">${icon('file')} ดูบันทึก</button></td></tr>`).join('') || `<tr><td colspan="7">${UI.empty(tab === 'todo' ? 'ไม่มีบันทึกข้อความรอลงนาม' : 'ยังไม่มีรายการ', 'checkCircle')}</td></tr>`}</tbody>
+        </table></div></div>`,
+      mount(root) {
+        const picked = () => $$('[data-pick]:checked', root).map(x => x.dataset.pick);
+        const sync = () => { const b = $('#doSign', root); if (!b) return; const n = picked().length; b.disabled = !n; b.querySelector('span').textContent = n ? `ลงนามที่เลือก (${n} ฉบับ)` : 'ลงนามที่เลือก'; };
+        root.addEventListener('change', e => { if (e.target.id === 'pickAll') $$('[data-pick]', root).forEach(x => { x.checked = e.target.checked; }); sync(); });
+        // ยืนยันการลงนาม (รองผู้อำนวยการเลือก อนุญาต/ไม่อนุญาต ได้)
+        const sign = async ids => {
+          if (!ids.length) return;
+          await S.loadSignatures([me.email]);
+          const my = S.sigOf(me.email);
+          const res = await UI.modal({
+            title: `${icon('edit')} ลงนาม ${ids.length} ฉบับ`,
+            body: `<p class="muted" style="margin-bottom:10px">ลงนามในฐานะ <b>${RL[role]}</b> ในบันทึกข้อความ: ${ids.map(esc).join(', ')}</p>
+              ${role === 'deputy' ? `<div class="field"><label>ความเห็น / คำสั่ง</label><div class="row" style="gap:16px"><label class="check"><input type="radio" name="dc" value="allow" checked> อนุญาต</label><label class="check"><input type="radio" name="dc" value="deny"> ไม่อนุญาต</label></div></div>
+              <div class="field" style="margin-top:10px"><label>ความเห็นเพิ่มเติม <span class="hint">(จำเป็นเมื่อไม่อนุญาต)</span></label><textarea id="dn" rows="2"></textarea></div>` : ''}
+              <div class="sig-now" style="margin-top:12px">${my ? `<img src="${my}" alt="ลายเซ็น">` : ''}<span class="hint">ลายเซ็นที่จะใช้ · ${esc(me.name || '')}</span></div>`,
+            actions: [{ label: 'ยกเลิก', value: null }, { label: 'ยืนยันลงนาม', kind: 'btn-primary', icon: 'check', onClick: async el => {
+              const decision = role === 'deputy' ? el.querySelector('[name=dc]:checked').value : 'allow';
+              const note = role === 'deputy' ? el.querySelector('#dn').value : '';
+              return { n: await S.esign(ids, role, { decision, note }) };
+            } }]
+          });
+          if (res && res.n != null) { UI.toast(`ลงนามแล้ว ${res.n} ฉบับ`); App.render(); }
+        };
+        $('#doSign', root)?.addEventListener('click', () => sign(picked()));
+        root.addEventListener('click', async e => {
+          const p = e.target.closest('[data-prev]'); if (!p) return;
+          const r = S.request(p.dataset.prev); if (!r) return;
+          await S.loadSignatures(C.sigEmails([r]));
+          const res = await UI.modal({ title: `${icon('file')} บันทึกข้อความ ${r.id}`, size: 'xl', body: `<div class="memo-preview print-doc">${C.memoHTML(r)}</div>`,
+            actions: [{ label: 'ปิด', value: null }, { label: 'พิมพ์ / PDF', icon: 'printer', value: 'print' }, ...(S.needsMySign(r, role) ? [{ label: 'ลงนามฉบับนี้', kind: 'btn-primary', icon: 'edit', value: 'sign' }] : [])] });
+          if (res === 'print') C.printMemo(S.request(r.id));
+          if (res === 'sign') sign([r.id]);
         });
       }
     };
@@ -926,6 +998,9 @@
             ${(() => { const M = C.memoSettings(), m = s.memo || {}; return `<div class="grid2">
               <div class="field"><label>เรียน</label><input name="m_to" value="${esc(m.to || '')}" placeholder="${esc(M.to)}"></div>
               <div class="field"><label>คำนำหน้าเลขที่หนังสือ (ช่อง "ที่")</label><input name="m_noPrefix" value="${esc(m.noPrefix || '')}" placeholder="(ถ้ามี) เช่น ยพ."><span class="hint">ต่อด้วยเลขที่คำขอ เช่น ยพ. VR-2569-0012</span></div>
+              ${(() => { const back = S.db.users.filter(u => S.isBack(u) && u.active !== false); const opt = cur => `<option value="">— ยังไม่กำหนด (เซ็นบนกระดาษ) —</option>${back.map(u => `<option value="${esc(u.email)}" ${u.email === cur ? 'selected' : ''}>${esc(u.name || u.email)}${u.position ? ' · ' + esc(u.position) : ''}</option>`).join('')}`; return `
+              <div class="field"><label>${icon('edit')} บัญชีผู้ลงนามอิเล็กทรอนิกส์: หัวหน้างานยานพาหนะ</label><select name="m_headEmail">${opt(m.headEmail || '')}</select></div>
+              <div class="field"><label>${icon('edit')} บัญชีผู้ลงนามอิเล็กทรอนิกส์: รองผู้อำนวยการฯ</label><select name="m_depEmail">${opt(m.depEmail || '')}</select><span class="hint">เลือกได้เฉพาะบัญชีแอดมิน/ผู้บริหาร · ผู้ลงนามจะเห็นเมนู "บันทึกข้อความรอลงนาม"</span></div>`; })()}
               <div class="field"><label>ชื่อหัวหน้างานยานพาหนะ</label><input name="m_headName" value="${esc(m.headName || '')}" placeholder="${esc(M.headName || 'ชื่อ-นามสกุล')}"></div>
               <div class="field"><label>ตำแหน่ง</label><input name="m_headPos" value="${esc(m.headPos || '')}" placeholder="${esc(M.headPos)}"></div>
               <div class="field"><label>ชื่อรองผู้อำนวยการฝ่ายบริหารงานทั่วไป</label><input name="m_depName" value="${esc(m.depName || '')}" placeholder="${esc(M.depName || 'ชื่อ-นามสกุล')}"></div>
@@ -976,7 +1051,7 @@
           const committee = $$('[data-ci]', root).map(row => { const i = +row.dataset.ci; const o = { ...(cm[i] || { id: 'c' + Date.now() + i }) }; $$('[data-k]', row).forEach(el => { o[el.dataset.k] = el.dataset.k === 'level' ? +el.value : el.value; }); o.photo = (photoGetters[i] ? photoGetters[i]() : [])[0] || ''; return o; });
           const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.quick = c.id !== 'other' && row.querySelector('[data-ck=quick]').checked; c.order = i; return c; });
           return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactPhone: f.contactPhone, contactLine: f.contactLine, contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
-            memo: { to: f.m_to.trim(), noPrefix: f.m_noPrefix.trim(), headName: f.m_headName.trim(), headPos: f.m_headPos.trim(), depName: f.m_depName.trim(), depPos: f.m_depPos.trim() } };
+            memo: { headEmail: f.m_headEmail || '', depEmail: f.m_depEmail || '', to: f.m_to.trim(), noPrefix: f.m_noPrefix.trim(), headName: f.m_headName.trim(), headPos: f.m_headPos.trim(), depName: f.m_depName.trim(), depPos: f.m_depPos.trim() } };
         };
         const saveCats = async mut => { const x = collect(); mut(x.categories); x.categories.forEach((c, i) => { c.order = i; }); await S.saveSettings(x); App.render(); };
         root.addEventListener('click', async e => {

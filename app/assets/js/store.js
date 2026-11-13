@@ -74,7 +74,7 @@ const Store = (() => {
   let authState = 'loading';      // loading | out | in
   let authError = '';
   const listeners = new Set();
-  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {} }; }
+  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {} }; }
   function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
 
   function defaultSettings() {
@@ -195,6 +195,14 @@ const Store = (() => {
   // จับคู่ชื่อที่แอดมินพิมพ์เอง กับบัญชีผู้ใช้ (ตัดคำนำหน้าและช่องว่าง) — ใช้ติดตามบันทึกข้อความค้าง
   const nameKey = s => String(s || '').replace(/\s+/g, '').replace(/^(นางสาว|น\.ส\.|นาย|นาง|ดร\.|ว่าที่ร้อยตรี|ว่าที่ร\.ต\.)/, '');
   const userByName = n => { const k = nameKey(n); if (k.length < 3) return null; const m = db.users.filter(u => nameKey(u.name) === k); return m.length === 1 ? m[0] : null; };
+  // ── ลายเซ็นอิเล็กทรอนิกส์ (วาดเองเท่านั้น · เก็บที่ signatures/{email} อ่านได้เฉพาะเจ้าของและผู้บริหาร/แอดมิน) ──
+  const onlyDriverRole = u => (u.roles || []).length > 0 && (u.roles || []).every(r => r === 'driver');
+  const needsSign = u => !!u && !u.sigAt && !onlyDriverRole(u);
+  const sigCache = new Map();
+  // ผู้ลงนามในบันทึกข้อความ (ตั้งค่า → บันทึกข้อความขอใช้รถ)
+  const memoSigners = () => { const m = db.settings.memo || {}; return { head: String(m.headEmail || '').toLowerCase(), deputy: String(m.depEmail || '').toLowerCase() }; };
+  const signerRoles = u => { if (!u) return []; const s = memoSigners(); return [s.head === u.email && 'head', s.deputy === u.email && 'deputy'].filter(Boolean); };
+  const needsMySign = (r, role) => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status) && !((r.esign || {})[role]) && (role === 'head' || !!(r.esign || {}).head);
   const memoDebts = email => email ? db.requests.filter(r => r.requester && r.requester.email === email && needsMemo(r)).sort((a, b) => a.startAt.localeCompare(b.startAt)) : [];
   const catName = r => { if (!r || !r.category) return 'ไม่ระบุ'; if (r.category === 'other') return r.categoryOther ? `อื่น ๆ: ${r.categoryOther}` : 'อื่น ๆ'; const c = catOf(r.category); return c ? c.name : 'ไม่ระบุ'; };
   const seatsOf = list => (list || []).reduce((s, a) => s + (+(vehicle(a.vehicleId) || {}).seats || 0), 0);
@@ -242,6 +250,8 @@ const Store = (() => {
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen });
       });
     });
+    // ผู้ลงนามอิเล็กทรอนิกส์: มีบันทึกข้อความรอลงนาม
+    signerRoles(me).forEach(ro => { const n = db.requests.filter(r => needsMySign(r, ro)).length; if (n) out.push({ id: 'esign-' + ro + n, at: nowISO(), title: `บันทึกข้อความรอลงนาม ${n} ฉบับ`, body: ro === 'head' ? 'ในฐานะหัวหน้างานยานพาหนะ' : 'ในฐานะรองผู้อำนวยการฝ่ายบริหารงานทั่วไป', link: `#/admin/esign?role=${ro}`, unread: true }); });
     memoDebts(me.email).forEach(r => out.push({ id: 'memo' + r.id, at: r.createdAt, title: 'ค้างบันทึกข้อความ — กรุณาแนบ', body: `${r.id} · ${destName(r)} · ต้องแนบก่อนจึงจะขอใช้รถครั้งต่อไปได้`, link: `#/my/${r.id}`, unread: true }));
     pendingRatings().forEach(p => out.push({ id: 'rate' + p.r.id + p.i, at: p.a.returnedAt, title: 'ประเมินคนขับรถ', body: `${p.r.id} · ${destName(p.r)} · ${(driver(p.a.driverId) || {}).name || ''}`, link: `#/rate/${p.r.id}/${p.i}`, unread: true, rate: true }));
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
@@ -468,6 +478,7 @@ const Store = (() => {
       async put(col, id, data) {
         if (col === 'settings') db.settings = clone(data);
         else if (col === 'vprivate') db.vprivate[id] = clone(data);
+        else if (col === 'signatures') (db.signatures = db.signatures || {})[id] = clone(data);
         else {
           const k = cols[col], list = db[col], i = list.findIndex(x => x[k] === id);
           if (i >= 0) list[i] = clone(data); else list.push(clone(data));
@@ -485,6 +496,7 @@ const Store = (() => {
         await this.put(col, id, next);
         return next;
       },
+      async getDoc(col, id) { return col === 'signatures' ? clone((db.signatures || {})[id] || null) : null; },
       async del(col, id) {
         if (col === 'vprivate') delete db.vprivate[id];
         else db[col] = db[col].filter(x => x[cols[col]] !== id);
@@ -533,7 +545,7 @@ const Store = (() => {
     const auth = firebase.auth(), fs = firebase.firestore();
     try { fs.settings({ ignoreUndefinedProperties: true }); } catch (e) { /* ตั้งไว้แล้ว */ }
     fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate' };
+    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures' };
     const strip = o => JSON.parse(JSON.stringify(o));
     // แปลงข้อผิดพลาดของ Firestore เป็นข้อความที่ผู้ใช้เข้าใจ (ข้อผิดพลาดจากการตรวจข้อมูลของระบบส่งต่อตามเดิม)
     const friendly = e => {
@@ -682,6 +694,7 @@ const Store = (() => {
         keepHistory(col, id, next);
         return next;
       },
+      async getDoc(col, id) { const s = await guard(fs.collection(colName[col]).doc(id).get()); return s.exists ? s.data() : null; },
       async del(col, id) { return guard(fs.collection(colName[col]).doc(id).delete()); },
       async nextId(d) {
         const y = beYear(d || new Date());
@@ -811,6 +824,38 @@ const Store = (() => {
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
     TRIP, tripType, windows, tripTag, paxText,
     DEFAULT_QUICK, isQuickCat, quickHours, needsMemo, memoDebts, userByName,
+    needsSign, memoSigners, signerRoles, needsMySign,
+    // ลายเซ็น: อ่านจากแคช (ใช้ตอนวาดเอกสาร) / โหลดล่วงหน้า / บันทึกของตัวเอง
+    sigOf: email => sigCache.get(String(email || '').toLowerCase()) || null,
+    async loadSignatures(emails) {
+      const todo = [...new Set((emails || []).filter(Boolean).map(e => e.toLowerCase()))].filter(e => !sigCache.has(e));
+      await Promise.all(todo.map(async e => { try { const d = await A.getDoc('signatures', e); sigCache.set(e, d && d.img ? d.img : null); } catch (err) { sigCache.set(e, null); } }));
+    },
+    async saveSignature(img) {
+      if (!me) throw new Error('กรุณาเข้าสู่ระบบ');
+      if (!/^data:image\/png;base64,/.test(img || '') || img.length > 280000) throw new Error('ลายเซ็นไม่ถูกต้อง กรุณาเซ็นใหม่');
+      const at = nowISO();
+      await A.put('signatures', me.email, { email: me.email, img, at });
+      sigCache.set(me.email, img);
+      const u = { ...me, sigAt: at, updatedAt: at };
+      await A.put('users', me.email, u); me = u; emit();
+    },
+    // ลงนามอิเล็กทรอนิกส์ในบันทึกข้อความ (หัวหน้างานยานพาหนะ / รองผู้อำนวยการ) — ลงได้หลายคำขอพร้อมกัน
+    async esign(ids, role, { decision = 'allow', note = '' } = {}) {
+      if (!signerRoles(me).includes(role)) throw new Error('บัญชีนี้ไม่ได้ถูกกำหนดเป็นผู้ลงนามในตำแหน่งนี้ (ตั้งค่า → บันทึกข้อความขอใช้รถ)');
+      if (!me.sigAt) throw new Error('กรุณาเซ็นชื่อในหน้าโปรไฟล์ก่อน');
+      if (role === 'deputy' && decision === 'deny' && !String(note).trim()) throw new Error('กรุณาระบุเหตุผลที่ไม่อนุญาต');
+      let n = 0;
+      for (const id of ids) {
+        await mutateReq(id, r => {
+          if (!needsMySign(r, role)) return r;
+          r.esign = { ...(r.esign || {}), [role]: { email: me.email, name: me.name || me.email, position: me.position || '', at: nowISO(), ...(role === 'deputy' ? { decision, note: String(note).trim() } : {}) } };
+          r.history.push(H('esign', role === 'head' ? 'หัวหน้างานยานพาหนะลงนาม' : `รองผู้อำนวยการลงนาม: ${decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'}${note ? ' · ' + note : ''}`));
+          n++; return r;
+        });
+      }
+      return n;
+    },
     notifications, markSeen, pendingRatings,
     // ข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน): หน้าที่ต้องใช้ข้อมูลตั้งแต่วันที่ from เรียกฟังก์ชันนี้ตอนสร้างหน้า
     // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง

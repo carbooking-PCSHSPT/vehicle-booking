@@ -234,6 +234,69 @@ const UI = (() => {
     }
   }
 
+  // ── ช่องเซ็นชื่อ (วาดด้วยนิ้ว/ปากกา/เมาส์ เท่านั้น) ──
+  // คืน { clear, isEmpty, check() → ข้อความผิดพลาด|'' , toPNG() → dataURL ที่ตัดขอบแล้ว (พื้นโปร่งใส หมึกสีน้ำเงินเข้ม) }
+  function signaturePad(canvas, { ink = '#14215e', onChange } = {}) {
+    const ctx = canvas.getContext('2d');
+    let strokes = [], cur = null;
+    const fit = () => {
+      const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      if (!r.width) return;
+      canvas.width = Math.round(r.width * d); canvas.height = Math.round(r.height * d);
+      redraw();
+    };
+    const pt = e => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, p: e.pressure || .5 }; };
+    const drawStroke = s => {
+      const W = canvas.width, Hh = canvas.height, lw = Math.max(2, W / 260);
+      ctx.strokeStyle = ink; ctx.fillStyle = ink; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = lw;
+      if (s.length === 1) { ctx.beginPath(); ctx.arc(s[0].x * W, s[0].y * Hh, lw / 2, 0, 7); ctx.fill(); return; }
+      ctx.beginPath(); ctx.moveTo(s[0].x * W, s[0].y * Hh);
+      for (let i = 1; i < s.length - 1; i++) { const mx = (s[i].x + s[i + 1].x) / 2, my = (s[i].y + s[i + 1].y) / 2; ctx.quadraticCurveTo(s[i].x * W, s[i].y * Hh, mx * W, my * Hh); }
+      const l = s[s.length - 1]; ctx.lineTo(l.x * W, l.y * Hh); ctx.stroke();
+    };
+    const redraw = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); strokes.forEach(drawStroke); };
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', e => { e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* บางเครื่องไม่รองรับ */ } cur = [pt(e)]; strokes.push(cur); redraw(); });
+    canvas.addEventListener('pointermove', e => { if (!cur) return; e.preventDefault(); const co = e.getCoalescedEvents ? e.getCoalescedEvents() : []; (co.length ? co : [e]).forEach(x => cur.push(pt(x))); redraw(); });
+    const end = () => { if (cur) { cur = null; onChange && onChange(); } };
+    canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end); canvas.addEventListener('pointerleave', end);
+    window.addEventListener('resize', fit);
+    requestAnimationFrame(fit);
+    const bbox = () => {
+      let x0 = 1, y0 = 1, x1 = 0, y1 = 0, len = 0;
+      const ar = canvas.width / (canvas.height || 1);
+      strokes.forEach(s => s.forEach((p, i) => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); if (i) len += Math.hypot((p.x - s[i - 1].x) * ar, p.y - s[i - 1].y); }));
+      return { x0, y0, x1, y1, len };
+    };
+    return {
+      clear() { strokes = []; redraw(); onChange && onChange(); },
+      isEmpty: () => !strokes.length,
+      // กันลายเซ็นที่สั้น/เล็กเกินไป (เช่น จุดเดียว หรือขีดสั้น ๆ)
+      check() {
+        if (!strokes.length) return 'กรุณาเซ็นชื่อในกรอบ';
+        const b = bbox();
+        if (b.x1 - b.x0 < .22 || b.len < 1.2) return 'ลายเซ็นสั้นหรือเล็กเกินไป กรุณาเซ็นให้เต็มกรอบมากขึ้น';
+        return '';
+      },
+      // ตัดขอบว่าง แล้ววาดใหม่ที่ความสูง 180px (คมชัดเมื่อพิมพ์ ~1.3 ซม.)
+      toPNG() {
+        const b = bbox(), ar = canvas.width / canvas.height, pad = .03;
+        const bw = Math.min(1, b.x1 - b.x0 + pad * 2) * ar, bh = Math.min(1, b.y1 - b.y0 + pad * 2);
+        let k = 180 / bh; if (bw * k > 900) k = 900 / bw;   // ย่อขยายเท่ากันทั้งสองแกน (ไม่ให้ลายเซ็นเพี้ยน)
+        const c = document.createElement('canvas'); c.width = Math.max(60, Math.round(bw * k)); c.height = Math.max(40, Math.round(bh * k));
+        const g = c.getContext('2d'), sx = k, sy = k, ox = (b.x0 - pad) * ar, oy = b.y0 - pad;
+        g.strokeStyle = ink; g.fillStyle = ink; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = Math.max(3, 180 / 34);
+        strokes.forEach(s => {
+          const P = p => [(p.x * ar - ox) * sx, (p.y - oy) * sy];
+          if (s.length === 1) { const [x, y] = P(s[0]); g.beginPath(); g.arc(x, y, g.lineWidth / 2, 0, 7); g.fill(); return; }
+          g.beginPath(); g.moveTo(...P(s[0]));
+          for (let i = 1; i < s.length - 1; i++) { const [ax, ay] = P(s[i]), [bx, by] = P({ x: (s[i].x + s[i + 1].x) / 2, y: (s[i].y + s[i + 1].y) / 2 }); g.quadraticCurveTo(ax, ay, bx, by); }
+          g.lineTo(...P(s[s.length - 1])); g.stroke();
+        });
+        return c.toDataURL('image/png');
+      }
+    };
+  }
   // จำนวนเงินเป็นตัวอักษร (เช่น 4,322.50 → สี่พันสามร้อยยี่สิบสองบาทห้าสิบสตางค์)
   function bahtText(n) {
     const D = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'], P = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
@@ -276,5 +339,5 @@ const UI = (() => {
     window.addEventListener('afterprint', done);
     setTimeout(() => window.print(), 60);
   }
-  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc };
+  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc, signaturePad };
 })();

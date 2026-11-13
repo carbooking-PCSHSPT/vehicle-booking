@@ -207,11 +207,12 @@
 
   // ═════════ โปรไฟล์ / รหัสผ่าน ═════════
   Pages.profile = () => {
-    const me = S.me, first = me.needsProfile;
+    const me = S.me, needSig = S.needsSign(me), first = me.needsProfile || needSig;
+    const drvOnly = (me.roles || []).length > 0 && (me.roles || []).every(r => r === 'driver');
     return {
       live: false,
       html: `<div class="page"><div class="container" style="max-width:760px">
-        <div class="page-head"><div><div class="eyebrow">โปรไฟล์</div><h1>${first ? 'ยินดีต้อนรับ! กรอกข้อมูลก่อนเริ่มใช้งาน' : 'โปรไฟล์ของฉัน'}</h1><p>${first ? 'ข้อมูลนี้จะใช้เป็นผู้ขอใช้รถในทุกคำขอ แก้ไขได้ภายหลัง' : 'ข้อมูลผู้ขอใช้รถ'}</p></div></div>
+        <div class="page-head"><div><div class="eyebrow">โปรไฟล์</div><h1>${me.needsProfile ? 'ยินดีต้อนรับ! กรอกข้อมูลก่อนเริ่มใช้งาน' : needSig ? 'กรุณาเซ็นชื่อก่อนใช้งาน' : 'โปรไฟล์ของฉัน'}</h1><p>${first ? 'ข้อมูลและลายเซ็นนี้ใช้ในคำขอใช้รถและบันทึกข้อความขออนุญาตใช้รถ แก้ไขได้ภายหลัง' : 'ข้อมูลผู้ขอใช้รถ'}</p></div></div>
         <form class="form-section" id="pf">
           <div class="row" style="margin-bottom:18px">${UI.avatar(me.name || me.email, 'lg')}<div><b style="font-family:var(--font-display)">${esc(S.isUsernameEmail(me.email) ? 'ชื่อผู้ใช้: ' + S.usernameOf(me.email) : me.email)}</b><div class="hint">${(me.roles || []).map(r => S.ROLES[r]).join(' · ')}</div></div></div>
           <div class="grid2">
@@ -220,14 +221,32 @@
             <div class="field"><label>ฝ่าย / กลุ่มสาระ <b class="req">*</b></label><select name="dept" required><option value="">เลือก…</option>${S.DEPTS.map(d => `<option ${d === me.dept ? 'selected' : ''}>${esc(d)}</option>`).join('')}${me.dept && !S.DEPTS.includes(me.dept) ? `<option selected>${esc(me.dept)}</option>` : ''}</select></div>
             <div class="field"><label>เบอร์โทรศัพท์ <b class="req">*</b></label><input name="phone" type="tel" required value="${esc(me.phone || '')}" placeholder="08x-xxx-xxxx"></div>
           </div>
+          ${drvOnly ? '' : `<div class="sig-sec" id="sigSec">
+            <div class="sig-label">${icon('edit')} ลายเซ็นอิเล็กทรอนิกส์ ${needSig ? '<b class="req">*</b>' : ''} <span class="hint" style="font-weight:400">(ใช้ลงในบันทึกข้อความขออนุญาตใช้รถ)</span></div>
+            <div id="sigNow" ${needSig ? 'hidden' : ''}><div class="sig-now"><img id="sigImg" alt="ลายเซ็นปัจจุบัน"><span class="hint">เซ็นเมื่อ ${me.sigAt ? fmt.dt(me.sigAt) : '-'}</span></div><button type="button" class="btn btn-ghost btn-sm" id="sigRedo" style="margin-top:8px">${icon('edit')} เซ็นใหม่</button></div>
+            <div id="sigBox" ${needSig ? '' : 'hidden'}>
+              <div class="sig-pad"><canvas id="sigPad" aria-label="ช่องเซ็นชื่อ"></canvas><span class="sig-base">ลงชื่อบนเส้นนี้</span><span class="sig-x">✕</span></div>
+              <div class="row between" style="margin-top:8px"><span class="hint">${icon('info')} เซ็นด้วยนิ้ว/ปากกาบนมือถือหรือแท็บเล็ต หรือใช้เมาส์ · เซ็นให้เต็มกรอบ เหมือนเซ็นบนกระดาษ · ระบบไม่รับการอัปโหลดรูปลายเซ็น</span><button type="button" class="btn btn-ghost btn-sm" id="sigClear">${icon('trash')} ล้าง</button></div>
+            </div></div>`}
           <div class="form-actions" style="position:static;background:none;padding-bottom:0"><button class="btn btn-primary" type="submit">${icon('check')} บันทึก${first ? 'และเริ่มใช้งาน' : ''}</button></div>
         </form></div></div>`,
       mount(root) {
+        let pad = null, padOn = false;
+        const openPad = () => { $('#sigBox', root).hidden = false; $('#sigNow', root).hidden = true; padOn = true; if (!pad) pad = UI.signaturePad($('#sigPad', root)); };
+        if (!drvOnly) {
+          if (needSig) openPad();
+          else S.loadSignatures([me.email]).then(() => { const s = S.sigOf(me.email); const im = $('#sigImg', root); if (im && s) im.src = s; });
+          $('#sigRedo', root)?.addEventListener('click', openPad);
+          $('#sigClear', root)?.addEventListener('click', () => pad && pad.clear());
+        }
         $('#pf', root).addEventListener('submit', e => {
           e.preventDefault();
           const f = UI.formData(e.target);
           if (!f.name.trim() || !f.dept || !f.phone.trim()) return UI.toast('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบ', 'error');
-          UI.busy(e.target.querySelector('[type=submit]'), () => S.saveProfile(f)).then(() => { UI.toast('บันทึกโปรไฟล์แล้ว'); if (first) App.go(S.isDriver(S.me) && !S.isBack(S.me) ? '#/driver' : '#/'); }).catch(() => {});
+          let img = '';
+          if (padOn) { const err = pad.check(); if (err && (needSig || !pad.isEmpty())) { $('#sigBox', root).scrollIntoView({ block: 'center', behavior: 'smooth' }); return UI.toast(err, 'error'); } if (!err) img = pad.toPNG(); }
+          UI.busy(e.target.querySelector('[type=submit]'), async () => { await S.saveProfile(f); if (img) await S.saveSignature(img); })
+            .then(() => { UI.toast(img ? 'บันทึกโปรไฟล์และลายเซ็นแล้ว' : 'บันทึกโปรไฟล์แล้ว'); if (first) App.go(S.isDriver(S.me) && !S.isBack(S.me) ? '#/driver' : '#/'); else App.render(); }).catch(() => {});
         });
       }
     };
@@ -765,7 +784,9 @@
         <div style="margin-bottom:18px">${decisionBox(r)}</div>
         ${C.canMemo(r) && mine ? `<div class="note-box ${(r.signed || []).length ? 'green' : 'navy'}" style="margin-bottom:18px">${icon((r.signed || []).length ? 'checkCircle' : 'file')}<div>${(r.signed || []).length
           ? `<b>งานยานพาหนะเก็บบันทึกข้อความฉบับลงนามแล้ว</b><div class="thumbs" style="margin-top:6px">${r.signed.map(p => UI.thumb(p, 'sm')).join('')}</div>`
-          : `<b>อนุมัติแล้ว</b> — กด "พิมพ์บันทึกข้อความ" ลงนามในช่องผู้ขอใช้รถ แล้วส่งที่งานยานพาหนะ เพื่อเสนอหัวหน้างานยานพาหนะและรองผู้อำนวยการฯ ลงนาม`}</div></div>` : ''}
+          : (r.esign || {}).deputy ? `<b>ลงนามอิเล็กทรอนิกส์ครบแล้ว</b> (รองผู้อำนวยการฯ ${r.esign.deputy.decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'} · ${fmt.dt(r.esign.deputy.at)}) — กด "พิมพ์บันทึกข้อความ" เพื่อดู/บันทึก PDF ได้`
+          : r.createdBy === r.requester.email ? `<b>อนุมัติแล้ว</b> — ลายเซ็นของคุณลงในบันทึกข้อความให้อัตโนมัติ รอหัวหน้างานยานพาหนะและรองผู้อำนวยการฯ ลงนาม${(r.esign || {}).head ? ' (หัวหน้างานลงนามแล้ว)' : ''}`
+          : `<b>อนุมัติแล้ว</b> — กด "พิมพ์บันทึกข้อความ" ลงนามในช่องผู้ขอใช้รถ แล้วส่งที่งานยานพาหนะ`}</div></div>` : ''}
         ${S.needsMemo(r) && (mine || S.isAdmin(S.me)) ? `<div class="card memo-late" style="margin-bottom:18px"><div class="card-head"><h3>${icon('filePlus')} แนบบันทึกข้อความตามหลัง</h3><span class="pill tone-bad">ค้างบันทึกข้อความ</span></div>
           <p class="hint" style="margin-bottom:12px">คำขอนี้แอดมินบันทึกแทนให้กรณีเร่งด่วน — ${mine ? 'ต้องแนบบันทึกข้อความที่มีลายเซ็นผู้อำนวยการ (หรือผู้รักษาราชการแทน) ก่อน จึงจะขอใช้รถครั้งต่อไปได้' : 'ผู้ขอยังไม่ได้แนบ แอดมินแนบแทนได้'} · ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</p>
           ${C.filePicker('memoLate', [], { label: 'เลือกไฟล์บันทึกข้อความ', pdf: true })}

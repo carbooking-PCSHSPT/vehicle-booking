@@ -1346,6 +1346,12 @@ html.vm-wide body { min-width: var(--fw); overflow-x: visible; }
 .print-doc .pd-grid figcaption { font-size: 8.5pt; color: #333; margin-top: 4px; }
 .tbl .ck { width: 34px; padding-right: 0; }
 .tbl .ck input { width: 18px; height: 18px; accent-color: var(--navy); cursor: pointer; vertical-align: middle; }
+.es-steps { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.es-steps li { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 8px 10px; border-radius: 12px; background: #fdfaf3; border: 1px solid var(--line); }
+.es-steps li .i { width: 18px; height: 18px; color: var(--muted); grid-row: span 2; }
+.es-steps li span { font-family: var(--font-display); font-weight: 500; font-size: .9rem; }
+.es-steps li small { color: var(--muted); font-size: .78rem; }
+.es-steps li.ok { background: #ecfdf5; border-color: #bbf7d0; } .es-steps li.ok .i { color: var(--ok); }
 .memo-steps { margin: 0 0 12px; padding-left: 1.3em; color: var(--ink-2); font-size: .88rem; line-height: 1.6; }
 .sg-item { position: relative; display: inline-block; }
 .sg-item .icon-btn { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; background: #fff; box-shadow: var(--shadow); }
@@ -1382,6 +1388,25 @@ html.vm-wide body { min-width: var(--fw); overflow-x: visible; }
 .memo-doc .cb { display: inline-block; width: 12px; height: 12px; border: 1.3px solid #000; vertical-align: -1px; margin-right: 4px; }
 .memo-doc .mm-foot { margin-top: 8px; font-size: 9pt; color: #555; }
 .memo-doc + .memo-doc { break-before: page; }
+.memo-doc .mm-dots { position: relative; display: inline-block; }
+.memo-doc .mm-dots img { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); height: 12mm; max-width: 120%; object-fit: contain; }
+.memo-doc .mm-sig.has-img > p:first-child { margin-top: 30px; }
+.memo-doc .mm-es { font-size: 8.5pt !important; color: #444; }
+.memo-doc .cb.on { position: relative; } .memo-doc .cb.on::after { content: '✓'; position: absolute; left: 0; top: -7px; font-size: 14pt; font-weight: 700; line-height: 1; }
+.memo-doc .mm-fill { border-bottom: 1px dotted #000; min-height: 1.4em; }
+.memo-preview { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px 26px; max-width: 760px; margin: 0 auto; }
+.lt640 .memo-preview { padding: 14px 12px; font-size: .9em; }
+.lt640 .memo-preview .mm-boxes { grid-template-columns: 1fr; } .lt640 .memo-preview .mm-box + .mm-box { border-left: 0; border-top: 1px solid #000; }
+/* ช่องเซ็นชื่อ */
+.sig-label { display: block; margin: 18px 0 6px; font-family: var(--font-display); font-weight: 500; font-size: .92rem; color: var(--ink-2); }
+.sig-label .i { width: 16px; height: 16px; vertical-align: -2px; color: var(--gold); }
+.sig-pad { position: relative; height: 190px; border-radius: 16px; border: 2px dashed var(--line); background: #fff; overflow: hidden; }
+.sig-pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; z-index: 1; }
+.sig-pad .sig-base { position: absolute; left: 8%; right: 8%; bottom: 46px; border-bottom: 1.5px solid #c9c2b0; font-size: .72rem; color: var(--muted); text-align: right; padding-bottom: 2px; pointer-events: none; }
+.sig-pad .sig-x { position: absolute; left: 6%; bottom: 50px; color: #c9c2b0; font-size: 1.1rem; pointer-events: none; }
+.sig-now { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff; }
+.sig-now img { height: 64px; max-width: 260px; object-fit: contain; }
+.sig-now img:not([src]) { display: none; }
 @page { margin: 14mm 12mm 16mm; @bottom-right { content: "หน้า " counter(page) " / " counter(pages); font-size: 8pt; color: #777; } }
 @media print {
   html.printing body > *:not(#printArea) { display: none !important; }

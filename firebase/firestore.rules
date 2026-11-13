@@ -37,6 +37,9 @@ service cloud.firestore {
         && asgOnly(5, keys) && asgOnly(6, keys) && asgOnly(7, keys) && asgOnly(8, keys) && asgOnly(9, keys);
     }
     function noAdminRoles(roles) { return !roles.hasAny(['admin', 'superadmin']); }
+    // ผู้ลงนามอิเล็กทรอนิกส์ในบันทึกข้อความ (ตั้งค่า → บันทึกข้อความขอใช้รถ)
+    function cfg() { return get(/databases/$(database)/documents/config/settings).data; }
+    function memoSigner() { return active() && ('memo' in cfg()) && (email() == cfg().memo.get('headEmail', '') || email() == cfg().memo.get('depEmail', '')); }
 
     // ───── ผู้ใช้ ─────
     match /users/{userEmail} {
@@ -98,6 +101,11 @@ service cloud.firestore {
                           && request.resource.data.status == resource.data.status
                           && changedOnly(['attachments', 'history', 'updatedAt'])
                           && request.resource.data.attachments.size() > resource.data.attachments.size())))
+                    // ผู้ลงนาม (หัวหน้างานยานพาหนะ / รองผู้อำนวยการ): เพิ่มการลงนามอิเล็กทรอนิกส์ได้อย่างเดียว
+                    || (memoSigner()
+                        && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
+                        && request.resource.data.status == resource.data.status
+                        && changedOnly(['esign', 'history', 'updatedAt']))
                     // คนขับ: กดออกเดินทาง/กลับถึง เลขไมล์ ค่าน้ำมัน — เปลี่ยนรถ/คนขับ/รายละเอียดคำขอไม่ได้
                     || (role('driver') && email() in resource.data.driverEmails
                         && resource.data.status in ['approved', 'ontrip', 'returned']
@@ -105,6 +113,19 @@ service cloud.firestore {
                         && changedOnly(['assignments', 'expenses', 'history', 'status', 'updatedAt'])
                         && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd']));
       allow delete: if admin();
+    }
+
+    // ───── ลายเซ็นอิเล็กทรอนิกส์ (วาดในระบบ) ─────
+    // เขียนได้เฉพาะเจ้าของ (คนอื่น/แอดมินปลอมลายเซ็นแทนไม่ได้) · อ่านได้เฉพาะเจ้าของ แอดมิน และผู้บริหาร (ใช้พิมพ์บันทึกข้อความ)
+    match /signatures/{userEmail} {
+      allow read: if (signedIn() && userEmail == email()) || back();
+      allow create, update: if active() && userEmail == email()
+                            && request.resource.data.keys().hasOnly(['email', 'img', 'at'])
+                            && request.resource.data.email == email()
+                            && request.resource.data.img is string
+                            && request.resource.data.img.size() < 300000
+                            && request.resource.data.img.matches('^data:image/png;base64,.*');
+      allow delete: if sup();
     }
 
     // ───── ผลประเมินคนขับ (ไม่เก็บชื่อผู้ประเมิน) ─────
