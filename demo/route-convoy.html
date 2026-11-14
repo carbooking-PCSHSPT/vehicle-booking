@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ขบวนรถหน้าแรก 5 แบบ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-2: #3b52c9; --gold: #c9962b; --gold-2: #f2c14e; --cream: #faf6ee; --ink: #1b2147; --muted: #6e6a7c; --line: #e8e1d2; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e4d8; color: var(--ink); font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; overflow-x: hidden; }
+.top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font: 600 1rem Prompt; color: var(--navy); flex: 1 1 200px; }
+.seg { display: inline-flex; padding: 4px; border-radius: 14px; background: #efe8d8; }
+.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font: 500 .88rem Prompt; color: var(--ink); cursor: pointer; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .5); }
+main { padding: 22px 12px 60px; display: grid; gap: 34px; justify-items: center; }
+.opt { width: 100%; max-width: var(--pw, 390px); transition: max-width .35s; min-width: 0; }
+.opt-h { display: flex; align-items: baseline; gap: 10px; margin: 0 4px 10px; flex-wrap: wrap; }
+.opt-h .tag { display: inline-grid; place-items: center; min-width: 40px; height: 34px; padding: 0 8px; border-radius: 10px; background: var(--navy); color: #fff; font: 700 1rem Prompt; }
+.opt-h h2 { margin: 0; font: 600 1.1rem Prompt; color: var(--navy); }
+.opt-h p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: .86rem; }
+.note { margin: 10px 4px 0; font-size: .82rem; color: var(--muted); } .note b { color: var(--ink); }
+
+/* ── จำลองหน้าแรก ── */
+.phone { border-radius: 30px; overflow: hidden; background: var(--cream); border: 1px solid var(--line); box-shadow: 0 24px 50px -30px rgba(40, 30, 10, .55); }
+.nav { position: relative; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
+.nav .brand { display: flex; align-items: center; gap: 8px; font: 600 .95rem Prompt; color: var(--navy); flex: 1; }
+.nav .logo { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle, #fff 40%, #f6e6bf); display: grid; place-items: center; font-size: 15px; }
+.nav .ib { width: 40px; height: 40px; border-radius: 13px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink); }
+.hero { position: relative; overflow: hidden; padding: 4px 18px 22px; background: radial-gradient(600px 380px at 95% 10%, #fff0cf, transparent 70%), linear-gradient(#fbf7ee, #f8f2e4); }
+.hero .txt { position: relative; z-index: 3; max-width: 340px; display: flex; flex-direction: column; }
+.eb { display: flex; align-items: center; gap: 10px; color: var(--gold); font: 500 .88rem Prompt; margin-top: 12px; } .eb::before { content: ""; width: 40px; height: 1px; background: var(--gold); }
+.hero h3 { margin: 12px 0 8px; font: 700 1.95rem/1.15 Prompt; color: var(--navy); } .hero h3 em { display: inline-block; font-style: normal; color: var(--gold); border-bottom: 3px solid rgba(36, 48, 122, .65); border-radius: 0 0 50% 50% / 0 0 6px 6px; padding-bottom: 2px; }
+.lead { margin: 6px 0 16px; font-size: .95rem; line-height: 1.6; max-width: 58%; }
+.cta { order: 4; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 340px; }
+.t { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 18px; font: 600 .9rem Prompt; color: var(--ink); background: #fff; border: 1px solid #e3e6f4; box-shadow: 0 12px 24px -18px rgba(36, 48, 122, .6); }
+.t .ci { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: #eef0fa; flex: none; }
+.t.p { grid-column: 1 / -1; background: var(--navy); color: #fff; padding: 16px; } .t.p .ci { background: rgba(255, 255, 255, .18); } .t.p small { display: block; font: 400 .74rem 'IBM Plex Sans Thai'; opacity: .8; }
+.t.g { background: linear-gradient(135deg, #f6d27a, #d9a640); border: 0; }
+.stats { order: 3; display: flex; flex-direction: column; gap: 6px; margin: 0 0 18px; } .stats div { display: flex; align-items: baseline; gap: 8px; border-left: 2px solid var(--gold); padding-left: 10px; }
+.stats b { font: 700 1.15rem Prompt; color: var(--navy); min-width: 2.2em; } .stats small { font-size: .7rem; color: var(--muted); }
+.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.map { position: absolute; z-index: 1; right: 4px; top: 0; width: 46%; height: 314px; pointer-events: none; }
+.map svg { width: 100%; height: 100%; overflow: visible; }
+.street { fill: none; stroke: #ecdfc2; stroke-width: 6; } .street.s { stroke-width: 3; stroke: #efe5cf; }
+.city { fill: #d9dce8; } .city.b { fill: #c6cbde; } .win { fill: #fff; opacity: .7; }
+.swoosh { fill: none; stroke: url(#sw); stroke-width: 7; stroke-linecap: round; }
+.route-bg { fill: none; stroke: rgba(59, 82, 201, .18); stroke-width: 12; stroke-linecap: round; }
+.route { fill: none; stroke: var(--navy-2); stroke-width: 5; stroke-linecap: round; }
+.route-dash { fill: none; stroke: #fff; stroke-width: 1.6; stroke-dasharray: 5 7; opacity: .8; }
+/* ถนนสองเลน */
+.road-glow { fill: none; stroke: rgba(59, 82, 201, .16); stroke-width: 42; stroke-linecap: round; }
+.road-edge { fill: none; stroke: #fff; stroke-width: 31; stroke-linecap: round; }
+.road { fill: none; stroke: #39468f; stroke-width: 28; stroke-linecap: round; }
+.road-mid { fill: none; stroke: #f2c14e; stroke-width: 1.8; stroke-dasharray: 9 7; }
+.pin path { filter: drop-shadow(0 4px 4px rgba(20, 30, 80, .35)); }
+.chip { font: 600 14px Prompt; } .chipbg { fill: #fff; filter: drop-shadow(0 4px 6px rgba(20, 30, 80, .3)); }
+.lbl text { font: 600 16px Prompt; fill: #fff; } .lbl rect { filter: drop-shadow(0 3px 4px rgba(20, 30, 80, .35)); }
+.plus { font: 700 22px Prompt; fill: #c9962b; }
+/* แท็บเล็ต */
+.tab .hero { min-height: 470px; padding: 10px 36px 30px; } .tab .hero .txt { max-width: 500px; } .tab .hero h3 { font-size: 2.6rem; } .tab .lead { max-width: 19em; }
+.tab .map { width: 46%; right: 16px; top: 6px; height: calc(100% - 12px); }
+.tab .cta { grid-template-columns: repeat(3, 1fr); max-width: 520px; } .tab .t.p { grid-column: auto; padding: 12px; }
+.tab .stats { order: 5; flex-direction: row; gap: 18px; margin: 18px 0 0; } .tab .stats div { display: block; } .tab .stats b { display: block; font-size: 1.3rem; }
+
+/* ── C4 กลางคืน ── */
+.night.phone { background: #141a44; border-color: #232b66; }
+.night .nav .brand { color: #fff; } .night .nav .ib { background: #1f2760; border-color: #2c3578; color: #e6e8ff; }
+.night .hero { background: radial-gradient(520px 340px at 90% 8%, rgba(242, 193, 78, .16), transparent 70%), linear-gradient(#141a44, #1c2560); }
+.night .hero h3 { color: #fff; } .night .hero h3 em { border-color: rgba(242, 193, 78, .6); color: var(--gold-2); } .night .lead { color: #c9cdee; }
+.night .stats b { color: #fff; } .night .stats small { color: #9aa2d6; }
+.night .t:not(.p):not(.g) { background: #222b6a; color: #fff; border-color: #2f3a85; } .night .t .ci { background: rgba(255, 255, 255, .1); } .night .t.p { background: #3b52c9; border-color: #3b52c9; }
+.night .street { stroke: rgba(255, 255, 255, .05); } .night .street.s { stroke: rgba(255, 255, 255, .035); }
+.night .city { fill: #232c6b; } .night .city.b { fill: #2a3478; }
+.night .win { fill: #f6d27a; opacity: .85; animation: flick 5s ease-in-out infinite; } .night .win:nth-child(3n) { animation-delay: -1.7s; } .night .win:nth-child(4n) { opacity: .18; animation: none; } .night .win:nth-child(5n+1) { animation-delay: -3.1s; }
+@keyframes flick { 0%, 100% { opacity: .85; } 50% { opacity: .35; } }
+.night .route-bg { stroke: rgba(242, 193, 78, .12); stroke-width: 16; } .night .route { stroke: #7088ff; filter: drop-shadow(0 0 5px #7088ff); } .night .route-dash { opacity: .5; }
+.night .swoosh { opacity: .7; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="top"><h1>ต่อยอดแบบ C “ขบวนรถหลายคัน” · เลือก 1 แบบ</h1>
+  <div class="seg" id="w"><button data-w="390" class="on">มือถือ</button><button data-w="820">แท็บเล็ต / iPad</button></div></div>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="sw" x1="0" x2="1"><stop offset="0" stop-color="#f2c14e" stop-opacity="0"/><stop offset=".5" stop-color="#f2c14e"/><stop offset="1" stop-color="#24307a"/></linearGradient>
+  <linearGradient id="beam" x1="0" x2="1"><stop offset="0" stop-color="#fff6c8" stop-opacity=".85"/><stop offset="1" stop-color="#fff6c8" stop-opacity="0"/></linearGradient>
+  <radialGradient id="tail"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".9"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient>
+</defs></svg>
+<main id="m"></main>
+<script>
+const ROUTE = 'M150 560 C 70 520, 250 470, 170 420 S 50 330, 130 280 S 255 200, 205 150 S 215 90, 236 70';
+const ICON = { file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 15h6"/><path d="M12 12v6"/>', cal: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>', clip: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>', bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>' };
+const ic = k => `<svg class="i" viewBox="0 0 24 24">${ICON[k]}</svg>`;
+
+/* ── รถมุมบน หันหน้าไปทาง +x (หมุนตามเส้นทางอัตโนมัติ) ── */
+const lights = (h, w) => `<circle cx="${h - 1.2}" cy="${-(w - 2.4)}" r="1.4" fill="#fff6c8"/><circle cx="${h - 1.2}" cy="${w - 2.4}" r="1.4" fill="#fff6c8"/><rect x="${-h - .4}" y="${-(w - 1.2)}" width="1.7" height="2.8" rx=".6" fill="#ff5a5a"/><rect x="${-h - .4}" y="${w - 4}" width="1.7" height="2.8" rx=".6" fill="#ff5a5a"/>`;
+const SIZE = { van: [15, 7], bus: [22, 7.5], pickup: [16, 7], car: [13, 6] };
+const BODY = {
+  van: c => `<rect x="-15" y="-7" width="30" height="14" rx="4" fill="${c}"/><rect x="8" y="-5.5" width="4.5" height="11" rx="1.6" fill="#bfe0ff"/><rect x="-12" y="-5" width="18" height="10" rx="2" fill="#fff" opacity=".2"/><rect x="7" y="-9" width="2.6" height="2.2" rx=".8" fill="${c}"/><rect x="7" y="6.8" width="2.6" height="2.2" rx=".8" fill="${c}"/>`,
+  bus: c => `<rect x="-22" y="-7.5" width="44" height="15" rx="3.5" fill="${c}"/><rect x="16" y="-6" width="4.5" height="12" rx="1.6" fill="#bfe0ff"/><rect x="-7" y="-4" width="12" height="8" rx="1.5" fill="#fff" opacity=".4"/>${[-18, -13, 8].map(x => `<rect x="${x}" y="-3" width="3.5" height="6" rx="1" fill="#fff" opacity=".28"/>`).join('')}`,
+  pickup: c => `<rect x="-16" y="-7" width="32" height="14" rx="3.5" fill="${c}"/><rect x="-14" y="-5" width="12" height="10" rx="1.5" fill="#1b2147" opacity=".35"/><rect x="5" y="-5.5" width="4.5" height="11" rx="1.6" fill="#bfe0ff"/><rect x="-1" y="-5" width="6" height="10" rx="1.5" fill="#fff" opacity=".2"/>`,
+  car: c => `<rect x="-13" y="-6" width="26" height="12" rx="5" fill="${c}"/><rect x="3" y="-4.8" width="4.5" height="9.6" rx="1.8" fill="#bfe0ff"/><rect x="-9" y="-4.4" width="3" height="8.8" rx="1.4" fill="#bfe0ff" opacity=".8"/><rect x="-5.5" y="-4.6" width="8" height="9.2" rx="2" fill="#fff" opacity=".2"/>`
+};
+const veh = (k, c, night) => { const [h, w] = SIZE[k]; return (night ? `<path d="M${h} -4 L${h + 46} -18 L${h + 46} 18 L${h} 4Z" fill="url(#beam)"/><circle cx="${-h}" r="8" fill="url(#tail)"/>` : '') + BODY[k](c) + lights(h, w); };
+// ตัวเคลื่อนที่: o = {dur, begin, rev, lane, kp, kt, fade, night, label}
+const mover = (cls, k, c, o = {}) => {
+  const kp = o.rev ? 'keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : o.kp ? `keyPoints="${o.kp}" keyTimes="${o.kt}" calcMode="linear"` : '';
+  const motion = (rot) => `<animateMotion dur="${o.dur}s" begin="${o.begin || 0}s" repeatCount="indefinite" ${rot ? `rotate="${o.rev ? 'auto-reverse' : 'auto'}"` : ''} ${kp}><mpath href="#rp-${cls}"/></animateMotion>`;
+  const fade = o.fade ? `<animate attributeName="opacity" values="0;1;1;0;0" keyTimes="${o.fade}" dur="${o.dur}s" begin="${o.begin || 0}s" repeatCount="indefinite"/>` : '';
+  const car = `<g opacity="${o.fade ? 0 : 1}">${fade}${motion(true)}<g transform="translate(0 ${o.lane || 0})">${veh(k, c, o.night)}</g></g>`;
+  const lbl = o.label ? `<g class="lbl">${motion(false)}<g transform="translate(0 -26)"><rect y="-13" height="24" rx="12" fill="${c}"/><path d="M-5 10 L0 16 L5 10Z" fill="${c}"/><text text-anchor="middle" y="5">${o.label}</text></g></g>` : '';
+  return car + lbl;
+};
+
+const PINS = [[.32, '#f2b632'], [.56, '#3b52c9'], [.8, '#f2b632']];
+const pinSvg = (c, s = 1) => `<g transform="scale(${s})"><path d="M0 0 C-11 -13 -11 -26 0 -30 C11 -26 11 -13 0 0Z" fill="${c}"/><circle cy="-19" r="4.5" fill="#fff"/></g>`;
+const CITY = [[150, 470, 22, 90], [176, 440, 26, 120], [206, 455, 20, 105], [230, 420, 30, 140], [264, 445, 26, 115], [120, 490, 24, 70]];
+const art = (cls, moving, o = {}) => `<div class="map"><svg viewBox="0 -12 300 602" preserveAspectRatio="xMaxYMid meet" data-cls="${cls}">
+  <g><path class="street" d="M-20 120 L320 60 M-20 260 L320 200 M-20 400 L320 330 M60 -10 L20 600 M180 -10 L150 600 M290 -10 L270 600"/><path class="street s" d="M-20 190 L320 130 M-20 330 L320 270 M120 -10 L90 600 M240 -10 L215 600"/></g>
+  ${o.sky || ''}
+  <g>${CITY.map(([x, y, w, h], i) => `<g><rect class="city ${i % 2 ? 'b' : ''}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/>${Array.from({ length: Math.floor(h / 18) }, (_, k) => `<rect class="win" x="${x + 5}" y="${y + 8 + k * 18}" width="${w - 10}" height="5" rx="1"/>`).join('')}</g>`).join('')}</g>
+  <path class="swoosh" d="M-30 560 C 80 520, 200 540, 330 470"/>
+  ${o.road ? `<path class="road-glow" d="${ROUTE}"/><path class="road-edge" d="${ROUTE}"/><path class="road" d="${ROUTE}"/><path class="road-mid" d="${ROUTE}"/>`
+           : `<path class="route-bg" d="${ROUTE}"/><path class="route" d="${ROUTE}"/><path class="route-dash" d="${ROUTE}"/>`}
+  ${o.pre || ''}
+  <g class="pins"></g>
+  <g class="bigpin-wrap">${o.pinAnim || ''}<path d="M236 70 C206 40 206 6 236 -6 C266 6 266 40 236 70Z" fill="#3b52c9" filter="drop-shadow(0 8px 8px rgba(20,30,80,.35))"/><circle cx="236" cy="22" r="17" fill="#fff"/><g transform="translate(224 10)"><rect x="2" y="3" width="20" height="16" rx="4" fill="#3b52c9"/><rect x="5" y="6" width="14" height="6" rx="1.5" fill="#fff"/><circle cx="7" cy="17" r="1.6" fill="#fff"/><circle cx="17" cy="17" r="1.6" fill="#fff"/></g></g>
+  <path id="rp-${cls}" d="${ROUTE}" fill="none" stroke="none"/>
+  ${moving}
+  ${o.post || ''}
+</svg></div>`;
+
+/* ── ของตกแต่งเฉพาะแบบ ── */
+const STARS = [[30, 20], [80, 60], [150, 10], [20, 140], [110, 120], [280, 120], [60, 230], [270, 260], [180, 70], [10, 330]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 ? 1.3 : 2}" fill="#fff"><animate attributeName="opacity" values=".2;1;.2" dur="${2 + (i % 4) * .7}s" begin="-${i * .4}s" repeatCount="indefinite"/></circle>`).join('') + `<circle cx="70" cy="40" r="14" fill="#fff3c4" opacity=".9"/><circle cx="76" cy="35" r="12" fill="#18204f"/>`;
+const SCHOOL = `<g transform="translate(150 584)"><rect x="-32" y="-30" width="64" height="30" rx="3" fill="#fff" stroke="#c9962b" stroke-width="2"/><path d="M-38 -29 L0 -48 L38 -29Z" fill="#c9962b"/><rect x="-9" y="-18" width="18" height="18" rx="2" fill="#24307a"/><rect x="-26" y="-24" width="10" height="8" rx="1.5" fill="#bfe0ff"/><rect x="16" y="-24" width="10" height="8" rx="1.5" fill="#bfe0ff"/><path d="M0 -48 V-66" stroke="#24307a" stroke-width="1.8"/><path d="M0 -66 h13 l-3.5 4 l3.5 4 h-13Z" fill="#e0453a"/></g>`;
+const ARRIVE = 1.65, GAP = 3; // C5: ถึงปลายทางทุก 3 วินาที เริ่มที่ 1.65 วินาที
+const C5POST = `<text class="plus" x="186" y="34" opacity="0">+1<animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;.1;.4;.6;1" dur="${GAP}s" begin="${ARRIVE}s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 12;0 -6;0 -12;0 -12" keyTimes="0;.4;.6;1" dur="${GAP}s" begin="${ARRIVE}s" repeatCount="indefinite"/></text>
+  <g><rect class="chipbg" x="92" y="80" width="112" height="28" rx="14"/><text class="chip cnt" x="148" y="99" text-anchor="middle" fill="#1b2147">ถึงแล้ว 0 คัน</text></g>`;
+
+const OPTS = [
+  { tag: 'C1', cls: 'c1', t: 'ถนนสองเลน รถวิ่งสวนกัน', d: 'เส้นทางกลายเป็นถนนจริง มีเส้นกึ่งกลางสีเหลือง รถขาไปกับขากลับวิ่งชิดซ้ายแบบถนนไทย รถวาดละเอียดขึ้น (ตู้ บัส กระบะ เก๋ง) มีไฟหน้าไฟท้าย',
+    o: { road: true }, mv: c => [['van', '#5b74ff', 0], ['bus', '#d9a640', -4], ['car', '#ffffff', -8]].map(([k, col, b]) => mover(c, k, col, { dur: 12, begin: b, lane: -7 })).join('') + [['pickup', '#9aa6c9', -2], ['van', '#f2c14e', -8]].map(([k, col, b]) => mover(c, k, col, { dur: 12, begin: b, lane: -7, rev: true })).join(''),
+    n: '<b>ดูเป็นถนนจริงที่สุด</b> · มีชีวิตชีวา เคลื่อนไหวตลอดแต่ไม่รก' },
+  { tag: 'C2', cls: 'c2', t: 'แวะรับตามจุด', d: 'รถแต่ละคันจอดแวะที่หมุดทีละจุด หมุดเด้งและมีวงคลื่นตอนรถมาถึง เหมือนรับ–ส่งผู้โดยสาร แล้วไปต่อจนถึงปลายทาง',
+    mv: c => [['van', '#24307a', 0], ['bus', '#d9a640', -4], ['car', '#3b52c9', -8]].map(([k, col, b]) => mover(c, k, col, { dur: 12, begin: b, kp: '0;.32;.32;.56;.56;.8;.8;1;1', kt: '0;.22;.30;.46;.54;.70;.78;.92;1' })).join(''),
+    n: 'สื่อถึง “บริการรับ–ส่ง” ได้ชัดที่สุด · จังหวะช้าลง ดูสบายตา' },
+  { tag: 'C3', cls: 'c3', t: 'ป้ายชื่อรถลอยตาม', d: 'แต่ละคันมีป้ายชื่อ/เลขรถลอยอยู่ด้านบน ป้ายไม่หมุนตามรถจึงอ่านง่าย คันขากลับก็มีป้ายเช่นกัน',
+    mv: c => [['van', '#24307a', 0, 'ตู้ 01'], ['bus', '#c9962b', -3.3, 'บัส 02'], ['car', '#3b52c9', -6.6, 'เก๋ง 03']].map(([k, col, b, l]) => mover(c, k, col, { dur: 10, begin: b, label: l })).join('') + mover(c, 'pickup', '#6b7799', { dur: 10, begin: -5, rev: true, label: 'กระบะ 05' }),
+    n: 'ต่อยอดได้ — ดึง <b>ชื่อรถจริงที่กำลังเดินทางวันนี้</b> มาแสดงบนป้าย' },
+  { tag: 'C4', cls: 'c4', night: true, t: 'ขบวนรถยามค่ำคืน', d: 'โทนกลางคืน รถเปิดไฟหน้าส่องทาง ไฟท้ายแดงเรือง ตึกเปิดไฟระยิบระยับ มีดาวกระพริบและพระจันทร์',
+    o: { sky: STARS }, mv: c => [['van', '#5b74ff', 0], ['bus', '#d9a640', -3], ['car', '#e6e8ff', -6]].map(([k, col, b]) => mover(c, k, col, { dur: 9, begin: b, night: true })).join('') + mover(c, 'van', '#9aa6c9', { dur: 9, begin: -4.5, rev: true, night: true }),
+    n: 'โดดเด่นที่สุด แต่เปลี่ยนโทนหน้าแรก · ใช้ได้ทั้งแบบ <b>เปลี่ยนอัตโนมัติหลัง 18:00</b> แล้วกลางวันใช้แบบอื่น' },
+  { tag: 'C5', cls: 'c5', t: 'ออกจากโรงเรียน → ถึงปลายทาง', d: 'รถออกจากประตูโรงเรียนทีละคัน วิ่งไปถึงหมุดปลายทาง หมุดเด้ง มีเลข +1 ลอยขึ้น และป้ายนับ “ถึงแล้ว N คัน”',
+    o: { pre: SCHOOL, post: C5POST, pinAnim: `<animateTransform attributeName="transform" type="translate" values="0 0;0 -10;0 0;0 0" keyTimes="0;.06;.14;1" dur="${GAP}s" begin="${ARRIVE}s" repeatCount="indefinite"/>` },
+    mv: c => [['van', '#24307a', 0], ['bus', '#d9a640', -3], ['car', '#3b52c9', -6]].map(([k, col, b]) => mover(c, k, col, { dur: 9, begin: b, kp: '0;1;1', kt: '0;.85;1', fade: '0;.06;.85;.9;1' })).join(''),
+    n: 'เล่าเรื่องครบ “ต้นทาง–ปลายทาง” · ต่อยอดใช้ <b>จำนวนเที่ยวจริงของวันนี้</b> บนป้ายนับได้' }
+];
+const page = o => `<div class="phone ${o.night ? 'night' : ''}"><div class="nav"><span class="brand"><span class="logo">🏫</span>ระบบยานพาหนะ</span><span class="ib">${ic('bell')}</span><span class="ib">${ic('menu')}</span></div>
+  <div class="hero">${art(o.cls, o.mv(o.cls), o.o)}<div class="txt"><div class="eb">ฝ่ายบริหารงานทั่วไป</div><h3>ระบบยานพาหนะ<br><em>ขอรถส่วนกลาง</em></h3><p class="lead">บริการรถตู้ รถบัส ให้แก่คุณครูและบุคลากรทุกท่านในโรงเรียน</p>
+    <div class="cta"><span class="t p"><span class="ci">${ic('file')}</span><span>ขอใช้รถ<small>ส่งคำขอใหม่</small></span></span><span class="t g"><span class="ci">${ic('cal')}</span>ตารางรถว่าง</span><span class="t"><span class="ci">${ic('clip')}</span>การขอใช้รถของฉัน</span></div>
+    <div class="stats"><div><b>14</b><small>คันพร้อมให้บริการ</small></div><div><b>3</b><small>การเดินทางเดือนนี้</small></div><div><b>269</b><small>กม. เดือนนี้</small></div></div></div></div></div>`;
+document.getElementById('m').innerHTML = OPTS.map(o => `<section class="opt"><div class="opt-h"><span class="tag">${o.tag}</span><h2>${o.t}</h2><p>${o.d}</p></div>${page(o)}<p class="note">${o.n}</p></section>`).join('');
+
+// วางหมุดระหว่างทางตามตำแหน่งจริงบนเส้นทาง (+ วงคลื่นตอนรถแวะ สำหรับ C2)
+const STOP_PHASE = [2.64, 1.52, .4]; // C2: เวลาที่รถแวะถึงหมุดแต่ละจุด (รอบละ 4 วินาที)
+document.querySelectorAll('.map svg').forEach(svg => {
+  const cls = svg.dataset.cls, p = svg.querySelector('#rp-' + cls), L = p.getTotalLength();
+  svg.querySelector('.pins').innerHTML = PINS.map(([f, c], i) => {
+    const pt = p.getPointAtLength(L * f), x = pt.x.toFixed(1), y = pt.y.toFixed(1), ph = STOP_PHASE[i];
+    const ring = cls === 'c2' ? `<circle cx="${x}" cy="${y}" r="0" fill="none" stroke="${c}" stroke-width="3"><animate attributeName="r" values="6;24;24" keyTimes="0;.4;1" dur="4s" begin="${ph}s" repeatCount="indefinite"/><animate attributeName="opacity" values=".8;0;0" keyTimes="0;.4;1" dur="4s" begin="${ph}s" repeatCount="indefinite"/></circle>` : '';
+    const hop = cls === 'c2' ? `<animateTransform attributeName="transform" type="translate" additive="sum" values="0 0;0 -7;0 0;0 0" keyTimes="0;.08;.16;1" dur="4s" begin="${ph}s" repeatCount="indefinite"/>` : '';
+    return `${ring}<g class="pin" transform="translate(${x} ${y})">${hop}${pinSvg(c, i === 1 ? .8 : 1)}</g>`;
+  }).join('');
+});
+// C3: ปรับขนาดป้ายให้พอดีข้อความ (หลังฟอนต์โหลด)
+const fitLabels = () => document.querySelectorAll('.lbl').forEach(g => { const t = g.querySelector('text'), r = g.querySelector('rect'), w = t.getComputedTextLength() + 20; r.setAttribute('x', -w / 2); r.setAttribute('width', w); });
+fitLabels(); (document.fonts ? document.fonts.ready : Promise.resolve()).then(fitLabels);
+// C5: ป้ายนับคันที่ถึงปลายทาง (ตรงจังหวะกับแอนิเมชัน)
+const c5 = document.querySelector('svg[data-cls="c5"]'), cnt = c5.querySelector('.cnt');
+setInterval(() => { const t = c5.getCurrentTime(), n = t < ARRIVE ? 0 : ((Math.floor((t - ARRIVE) / GAP)) % 12) + 1; cnt.textContent = `ถึงแล้ว ${n} คัน`; }, 200);
+
+const setW = w => { document.documentElement.style.setProperty('--pw', w + 'px'); document.querySelectorAll('.phone').forEach(p => p.classList.toggle('tab', w > 600)); document.querySelectorAll('#w button').forEach(b => b.classList.toggle('on', +b.dataset.w === w)); };
+document.getElementById('w').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setW(+b.dataset.w); });
+setW(innerWidth > 900 ? 820 : 390);
+</script>
+</body>
+</html>
