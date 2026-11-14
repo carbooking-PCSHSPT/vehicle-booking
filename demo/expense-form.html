@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เดโม่ฟอร์มค่าใช้จ่าย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --gold: #c9962b; --gold-2: #e8c36a; --cream: #faf6ee; --ink: #1b2147; --ink-2: #3b3f5c; --muted: #6e6a7c; --line: #e8e1d2; --bad: #dc2626; --ok: #059669; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: #e9e4d8; font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; color: var(--ink); }
+.top { max-width: 980px; margin: 0 auto; padding: 18px 16px 6px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.top h1 { margin: 0; font: 600 1.1rem Prompt; color: var(--navy); }
+.top p { margin: 4px 0 0; color: var(--muted); font-size: .86rem; }
+.wrap { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 22px; max-width: 980px; margin: 0 auto; padding: 10px 16px 40px; align-items: start; }
+@media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+/* กรอบมือถือ */
+.phone { position: relative; width: 100%; max-width: 420px; margin: 0 auto; border-radius: 36px; padding: 12px; background: #1d2240; box-shadow: 0 30px 60px -30px rgba(20, 20, 40, .6); }
+.screen { border-radius: 26px; overflow: hidden; background: rgba(30, 34, 60, .55); height: 760px; display: flex; align-items: flex-end; }
+.modal { width: 100%; max-height: 100%; display: flex; flex-direction: column; background: #fffdf8; border-radius: 26px 26px 22px 22px; }
+.m-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.m-head h3 { margin: 0; flex: 1; font: 600 1.05rem Prompt; } .m-head .i { color: var(--gold); }
+.m-x { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; }
+.m-body { flex: 1; overflow: auto; padding: 14px 14px 10px; display: grid; gap: 12px; }
+.m-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font: 600 .95rem Prompt; color: var(--ink); cursor: pointer; }
+.btn.pri { background: var(--navy); color: #fff; border-color: var(--navy); }
+.btn.ghost { width: 100%; }
+.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+/* แถวรายการ */
+.exr { padding: 12px; border-radius: 18px; border: 1px solid var(--line); background: #fdfaf3; display: grid; gap: 10px; }
+.exr.err { border-color: var(--bad); box-shadow: 0 0 0 3px rgba(220, 38, 38, .12); }
+.exr-head { display: flex; justify-content: space-between; align-items: center; } .exr-head b { font: 600 1rem Prompt; color: var(--navy); }
+.rm { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; cursor: pointer; }
+.types { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.chip { position: relative; cursor: pointer; } .chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip span { display: grid; justify-items: center; gap: 3px; padding: 9px 2px 7px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font: 500 .8rem Prompt; color: var(--ink-2); }
+.chip span .i { color: var(--gold); }
+.chip input:checked + span { background: var(--navy); border-color: var(--navy); color: #fff; } .chip input:checked + span .i { color: var(--gold-2); }
+.brands { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.brands .chip span { min-height: 40px; place-items: center; font-size: .82rem; }
+.brands .chip input:checked + span { background: #fff2e8; border-color: #e8590c; color: #b84508; }
+label.l { display: block; margin-bottom: 5px; font: 500 .88rem Prompt; color: var(--ink-2); } label.l b { color: var(--bad); }
+input.in, select.in { width: 100%; height: 48px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff; font: 400 1rem 'IBM Plex Sans Thai'; color: var(--ink); }
+input.big { height: 52px; font: 500 1.2rem Prompt; }
+input.in:focus, select.in:focus { outline: 2px solid var(--navy); outline-offset: 1px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .one { grid-template-columns: 1fr; }
+.hint { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
+.drop { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px; border-radius: 16px; border: 2px dashed #ecd9a6; background: #fbf0d8; color: var(--ink); font: 600 .95rem Prompt; cursor: pointer; }
+.drop .i { color: var(--gold); width: 24px; height: 24px; } .drop.opt { background: #fff; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; } .thumbs:empty { display: none; }
+.thumb { position: relative; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; } .thumb button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .55); color: #fff; font-size: 12px; cursor: pointer; }
+.sum { text-align: right; color: var(--ink-2); } .sum:empty { display: none; }
+[hidden] { display: none !important; }
+.toast { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); max-width: 90%; padding: 10px 16px; border-radius: 14px; background: var(--bad); color: #fff; font: 500 .88rem Prompt; box-shadow: 0 10px 20px -10px rgba(0, 0, 0, .5); opacity: 0; transition: opacity .25s; pointer-events: none; text-align: center; }
+.toast.ok { background: var(--ok); } .toast.show { opacity: 1; }
+/* คำอธิบายข้างกรอบ */
+.notes { display: grid; gap: 12px; }
+.card { padding: 16px 18px; border-radius: 20px; background: #fff; border: 1px solid var(--line); }
+.card h2 { margin: 0 0 8px; font: 600 1rem Prompt; color: var(--navy); }
+.card ul { margin: 0; padding-left: 1.1em; line-height: 1.75; font-size: .92rem; }
+.card .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .74rem; background: #fde8e8; color: var(--bad); margin-left: 4px; }
+.card .tag.o { background: #eef0f6; color: var(--muted); }
+.saved { font-size: .86rem; } .saved table { width: 100%; border-collapse: collapse; } .saved td, .saved th { padding: 6px 4px; border-bottom: 1px dashed var(--line); text-align: left; vertical-align: top; } .saved th { color: var(--muted); font-weight: 500; font-size: .78rem; }
+.saved .r { text-align: right; }
+</style>
+</head>
+<body>
+<div class="top"><div><h1>เดโม่: ฟอร์มบันทึกค่าใช้จ่ายของคนขับ (แบบใหม่)</h1><p>ลองกดได้จริง — เลือกประเภท เลือกปั๊ม แนบรูป เพิ่ม/ลบรายการ และกด “บันทึกทั้งหมด” เพื่อดูการตรวจข้อมูล (เดโม่ ไม่บันทึกลงระบบ)</p></div></div>
+<div class="wrap">
+  <div class="phone"><div class="screen"><div class="modal">
+    <div class="m-head"><svg class="i" viewBox="0 0 24 24"><path d="M3 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M3 22h12"/><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/><path d="M7 7h4"/></svg><h3>บันทึกค่าใช้จ่าย · VR-2569-0008</h3><span class="m-x">✕</span></div>
+    <div class="m-body" id="body">
+      <div id="rows"></div>
+      <button type="button" class="btn ghost" id="add">＋ เพิ่มรายการ (เช่น ทางด่วน ที่จอดรถ)</button>
+      <p class="hint">ⓘ บันทึกย้อนหลังได้ภายใน 30 วันหลังกลับถึง</p>
+      <div class="sum" id="sum"></div>
+    </div>
+    <div class="m-foot"><button class="btn" id="reset">ยกเลิก</button><button class="btn pri" id="save">✓ บันทึกทั้งหมด</button></div>
+  </div></div><div class="toast" id="toast"></div></div>
+  <div class="notes">
+    <div class="card"><h2>⛽ น้ำมัน</h2><ul>
+      <li>ยอดเงิน <span class="tag">บังคับ</span> · จำนวนลิตร (ระบบคำนวณบาท/ลิตรให้)</li>
+      <li>ปั๊มน้ำมัน <span class="tag">บังคับเลือก</span> — “อื่น ๆ” ต้องพิมพ์ชื่อปั๊ม · ระบบจำปั๊มที่ใช้ครั้งก่อน</li>
+      <li>สาขา <span class="tag o">ไม่บังคับ</span></li>
+      <li>วิธีชำระ — ตั้งต้นที่ค่าที่ใช้ครั้งก่อน (ปกติ บัตรเติมน้ำมัน)</li>
+      <li>รูปบิลน้ำมัน <span class="tag">บังคับ</span></li></ul></div>
+    <div class="card"><h2>🛣 ทางด่วน · 🅿 ที่จอด · อื่น ๆ</h2><ul>
+      <li>ยอดเงิน <span class="tag">บังคับ</span></li>
+      <li>สถานที่ <span class="tag">บังคับ</span> (มีตัวอย่างตามประเภท)</li>
+      <li>วิธีชำระ — ตั้งต้น “เงินสด”</li>
+      <li>รูปบิล <span class="tag o">ถ้ามี</span></li></ul></div>
+    <div class="card"><h2>📋 ผลที่จะบันทึก</h2><div class="saved" id="saved"><p class="hint">กด “บันทึกทั้งหมด” แล้วผลจะแสดงที่นี่</p></div></div>
+  </div>
+</div>
+<script>
+const I = {
+  fuel: '<path d="M3 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M3 22h12"/><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/><path d="M7 7h4"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/>',
+  up: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>'
+};
+const ic = k => `<svg class="i" viewBox="0 0 24 24">${I[k]}</svg>`;
+const TYPES = [['fuel', 'fuel', 'น้ำมัน'], ['toll', 'route', 'ทางด่วน'], ['parking', 'pin', 'ที่จอด'], ['other', 'coins', 'อื่น ๆ']];
+const NAMES = { fuel: 'ค่าน้ำมัน', toll: 'ค่าทางด่วน', parking: 'ค่าที่จอดรถ', other: 'ค่าใช้จ่ายอื่น' };
+const BRANDS = ['ปตท.', 'พีที (PT)', 'บางจาก', 'เชลล์', 'คาลเท็กซ์', 'ซัสโก้', 'เพียว', 'อื่น ๆ'];
+const PAY = { card: 'บัตรเติมน้ำมัน', cash: 'เงินสด', transfer: 'โอน/เบิกภายหลัง', credit: 'เครดิตปั๊ม' };
+const PLACE = { toll: 'เช่น ด่านบางปะอิน / ทางด่วนศรีรัช', parking: 'เช่น ลานจอด ม.เกษตรศาสตร์', other: 'เช่น ค่าล้างรถ ร้าน…' };
+let lastBrand = 'ปตท.', n = 0;
+const rows = document.getElementById('rows');
+const row = ty => { const k = n++, fuel = ty === 'fuel'; const el = document.createElement('div'); el.className = 'exr'; el.dataset.k = k; el._pics = [];
+  el.innerHTML = `<div class="exr-head"><b>รายการที่ <span class="no"></span></b><button class="rm" type="button" title="ลบรายการ">${ic('trash')}</button></div>
+    <div class="types">${TYPES.map(([t, i, l]) => `<label class="chip"><input type="radio" name="t${k}" value="${t}" ${t === ty ? 'checked' : ''}><span>${ic(i)}${l}</span></label>`).join('')}</div>
+    <div class="two amt"><div><label class="l">ยอดเงิน (บาท) <b>*</b></label><input class="in big" data-f="amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div class="fuel"><label class="l">จำนวนลิตร</label><input class="in big" data-f="liters" type="number" inputmode="decimal" placeholder="0.00"><p class="hint ppl"></p></div></div>
+    <div class="fuel"><label class="l">ปั๊มน้ำมัน <b>*</b></label><div class="brands">${BRANDS.map(b => `<label class="chip"><input type="radio" name="b${k}" value="${b}" ${b === lastBrand ? 'checked' : ''}><span>${b}</span></label>`).join('')}</div>
+      <div class="two" style="margin-top:8px"><input class="in other" data-f="brandOther" placeholder="ชื่อปั๊ม *" hidden><input class="in br" data-f="branch" placeholder="สาขา (ไม่บังคับ) เช่น ลาดหลุมแก้ว"></div></div>
+    <div class="nf"><label class="l">สถานที่ <b>*</b></label><input class="in" data-f="place"></div>
+    <div><label class="l">วิธีชำระ</label><select class="in" data-f="pay">${Object.entries(PAY).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>
+    <div><label class="drop">${ic('up')}<span class="dl"></span><input type="file" accept="image/*" capture="environment" multiple hidden></label><div class="thumbs" style="margin-top:8px"></div><p class="hint need"></p></div>`;
+  const q = s => el.querySelector(s), type = () => el.querySelector(`[name=t${k}]:checked`).value;
+  const sync = () => { const f = type() === 'fuel'; el.querySelectorAll('.fuel').forEach(x => x.hidden = !f); q('.nf').hidden = f; q('.amt').classList.toggle('one', !f);
+    q('[data-f=place]').placeholder = PLACE[type()] || ''; q('[data-f=pay]').value = f ? 'card' : 'cash';
+    q('.dl').textContent = f ? 'ถ่ายรูปบิลน้ำมัน *' : 'แนบบิล (ถ้ามี)'; q('.drop').classList.toggle('opt', !f);
+    q('.need').textContent = f ? 'ค่าน้ำมันต้องมีรูปบิลประกอบ — ถ่ายให้เห็นยอดเงิน ลิตร และวันที่ชัดเจน' : 'ไม่บังคับแนบบิล'; total(); };
+  const brandSync = () => { const o = (el.querySelector(`[name=b${k}]:checked`) || {}).value === 'อื่น ๆ'; q('.other').hidden = !o; q('.br').parentElement.classList.toggle('one', !o); };
+  const calc = () => { const a = +q('[data-f=amount]').value, l = +q('[data-f=liters]').value; q('.ppl').textContent = a && l ? `≈ ${(a / l).toFixed(2)} บาท/ลิตร` : ''; total(); };
+  const drawPics = () => { q('.thumbs').innerHTML = el._pics.map((u, i) => `<div class="thumb"><img src="${u}" alt=""><button type="button" data-rmp="${i}">✕</button></div>`).join(''); };
+  el.addEventListener('change', e => { if (e.target.name === 't' + k) sync(); if (e.target.name === 'b' + k) brandSync(); if (e.target.type === 'file') { [...e.target.files].forEach(f => el._pics.push(URL.createObjectURL(f))); e.target.value = ''; drawPics(); el.classList.remove('err'); } });
+  el.addEventListener('input', e => { if (/amount|liters/.test(e.target.dataset.f || '')) calc(); el.classList.remove('err'); });
+  el.addEventListener('click', e => { const p = e.target.closest('[data-rmp]'); if (p) { el._pics.splice(+p.dataset.rmp, 1); drawPics(); } if (e.target.closest('.rm')) { el.remove(); renum(); } });
+  rows.appendChild(el); sync(); brandSync(); renum(); return el; };
+const renum = () => { [...rows.children].forEach((x, i) => { x.querySelector('.no').textContent = i + 1; x.querySelector('.rm').hidden = rows.children.length < 2; }); total(); };
+const total = () => { const s = [...rows.querySelectorAll('[data-f=amount]')].reduce((a, i) => a + (+i.value || 0), 0); document.getElementById('sum').innerHTML = rows.children.length > 1 ? `รวม ${rows.children.length} รายการ · <b>${s.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</b>` : ''; };
+const toast = (m, ok) => { const t = document.getElementById('toast'); t.textContent = m; t.className = 'toast show' + (ok ? ' ok' : ''); clearTimeout(t._t); t._t = setTimeout(() => t.className = 'toast', 2600); };
+document.getElementById('add').addEventListener('click', () => { const last = rows.lastElementChild; const lt = last ? last.querySelector('input[type=radio]:checked').value : 'fuel'; const el = row(lt === 'fuel' ? 'toll' : 'other'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
+document.getElementById('reset').addEventListener('click', () => { rows.innerHTML = ''; n = 0; row('fuel'); document.getElementById('saved').innerHTML = '<p class="hint">กด “บันทึกทั้งหมด” แล้วผลจะแสดงที่นี่</p>'; });
+document.getElementById('save').addEventListener('click', () => {
+  const out = [];
+  for (const [i, el] of [...rows.children].entries()) {
+    const g = s => (el.querySelector(`[data-f=${s}]`) || {}).value?.trim() || '', type = el.querySelector('input[type=radio]:checked').value, fuel = type === 'fuel';
+    const bsel = (el.querySelector(`[name=b${el.dataset.k}]:checked`) || {}).value || '', brand = bsel === 'อื่น ๆ' ? g('brandOther') : bsel;
+    const fail = m => { el.classList.add('err'); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); toast(`รายการที่ ${i + 1}: ${m}`); return true; };
+    if (!(+g('amount') > 0)) return fail('กรุณาระบุยอดเงิน');
+    if (fuel && !brand) return fail('กรุณาเลือกปั๊มน้ำมัน' + (bsel === 'อื่น ๆ' ? ' (พิมพ์ชื่อปั๊ม)' : ''));
+    if (fuel && !el._pics.length) return fail('ค่าน้ำมันต้องถ่ายรูปบิลประกอบ');
+    if (!fuel && !g('place')) return fail('กรุณาระบุสถานที่');
+    out.push({ type, amount: +g('amount'), liters: fuel ? +g('liters') || 0 : 0, station: fuel ? [brand, g('branch')].filter(Boolean).join(' ') : g('place'), pay: PAY[g('pay')], pics: el._pics.length });
+    if (fuel && BRANDS.includes(brand)) lastBrand = brand;
+  }
+  toast(`บันทึกค่าใช้จ่าย ${out.length} รายการแล้ว (เดโม่)`, true);
+  document.getElementById('saved').innerHTML = `<table><tr><th>ประเภท</th><th>ปั๊ม / สถานที่</th><th>ชำระ</th><th class="r">บาท</th><th class="r">บิล</th></tr>${out.map(x => `<tr><td>${NAMES[x.type]}${x.liters ? `<br><small>${x.liters} ล. · ${(x.amount / x.liters).toFixed(2)} บ./ล.</small>` : ''}</td><td>${x.station}</td><td>${x.pay}</td><td class="r">${x.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td class="r">${x.pics} รูป</td></tr>`).join('')}</table>`;
+});
+row('fuel');
+</script>
+</body>
+</html>
