@@ -43,7 +43,7 @@ const OTHER_KIND = 'อื่น ๆ';
 const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
 function doGet() {
-  return json({ ok: true, service: 'pcshs-vehicle', version: '2026-11-09', features: ['upload', 'file', 'setpassword', 'kinds', 'backup'], time: new Date().toISOString() });
+  return json({ ok: true, service: 'pcshs-vehicle', version: '2026-11-14', features: ['upload', 'file', 'thumb', 'setpassword', 'kinds', 'backup'], time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -54,6 +54,7 @@ function doPost(e) {
     const user = verifyUser(body.idToken);
     if (body.action === 'upload') return json({ ok: true, id: saveFile(body, user) });
     if (body.action === 'file' || body.action === 'image') return json(Object.assign({ ok: true }, readFile(body.id)));
+    if (body.action === 'thumb') return json(Object.assign({ ok: true }, readThumb(body.id)));
     if (body.action === 'setpassword') return json({ ok: true, done: setPassword(body, user) });
     return json({ ok: false, error: 'ไม่รู้จักคำสั่งนี้' });
   } catch (err) {
@@ -110,9 +111,35 @@ function readFile(id) {
   let file;
   try { file = DriveApp.getFileById(id); } catch (e) { throw new Error('ไม่พบไฟล์ (อาจถูกลบออกจาก Drive)'); }
   // ส่งกลับเฉพาะรูป/PDF ที่ผู้ใช้อัปโหลด — ไฟล์สำรองข้อมูล (.json) เปิดผ่านเว็บไม่ได้
-  if (file.isTrashed() || !isOurs(file) || !/^(image\/|application\/pdf)/.test(file.getMimeType())) throw new Error('ไม่พบไฟล์');
+  if (file.isTrashed() || !isOursCached(file, id) || !/^(image\/|application\/pdf)/.test(file.getMimeType())) throw new Error('ไม่พบไฟล์');
   const blob = file.getBlob();
   return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+}
+// รูปย่อ (~220px) สำหรับรูปเล็กบนเว็บ (รูปโปรไฟล์ รูปย่อใบเสร็จ) — เล็กกว่ารูปเต็มหลายเท่า โหลดเร็ว
+// จำไว้ใน CacheService 6 ชั่วโมง → คนถัดไปที่เปิดได้รูปทันที · ไม่มีรูปย่อ (ไฟล์เพิ่งอัปโหลด) = ส่งรูปเต็มแทน
+function readThumb(id) {
+  id = String(id || '').replace(/#pdf$/, '');
+  if (!/^[\w-]{10,}$/.test(id)) throw new Error('ไม่พบไฟล์');
+  const cache = CacheService.getScriptCache(), key = 'th_' + id;
+  const hit = cache.get(key);
+  if (hit) return { mime: cache.get(key + '_m') || 'image/jpeg', data: hit, thumb: true };
+  let file;
+  try { file = DriveApp.getFileById(id); } catch (e) { throw new Error('ไม่พบไฟล์ (อาจถูกลบออกจาก Drive)'); }
+  if (file.isTrashed() || !isOursCached(file, id) || !/^image\//.test(file.getMimeType())) throw new Error('ไม่พบไฟล์');
+  let blob = null;
+  try { blob = file.getThumbnail(); } catch (e) { blob = null; }
+  if (!blob || !blob.getBytes().length) return readFile(id);
+  const mime = blob.getContentType() || 'image/png', data = Utilities.base64Encode(blob.getBytes());
+  if (data.length < 95000) { cache.put(key, data, 21600); cache.put(key + '_m', mime, 21600); }   // CacheService เก็บได้ค่าละไม่เกิน 100KB
+  return { mime: mime, data: data, thumb: true };
+}
+// จำผลตรวจ "ไฟล์อยู่ในโฟลเดอร์ของระบบ" ไว้ 6 ชั่วโมง (ไม่ต้องไล่ตรวจโฟลเดอร์แม่ใน Drive ซ้ำทุกครั้ง)
+function isOursCached(file, id) {
+  const cache = CacheService.getScriptCache(), key = 'ours_' + id;
+  if (cache.get(key)) return true;
+  const ok = isOurs(file);
+  if (ok) cache.put(key, '1', 21600);
+  return ok;
 }
 // ไฟล์ต้องอยู่ใต้โฟลเดอร์หลักของระบบ (ประเภท/ปี/เดือน = 3 ชั้น · ไฟล์รุ่นเก่า ปี/เดือน = 2 ชั้น)
 function isOurs(file) {

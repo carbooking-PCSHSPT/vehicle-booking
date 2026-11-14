@@ -141,7 +141,10 @@ const UI = (() => {
       if (img._h) return; img._h = 1;
       // ระหว่างโหลด: แสดงพื้นวิบวับแทนข้อความ alt (ไม่ให้ชื่อคนล้นวงกลมรูป)
       img.classList.add('ld');
-      Store.fileUrl(img.dataset.file).then(u => { img.onload = () => img.classList.remove('ld'); img.src = u; if (img.complete) img.classList.remove('ld'); }).catch(() => { img.classList.remove('ld'); img.alt = ''; img.classList.add('broken'); });
+      // รูปที่แสดงเล็ก (ความกว้างจริงบนจอ × ความละเอียดจอ ≤ 260px) → ขอรูปย่อ โหลดเร็วกว่ามาก
+      const w = img.getBoundingClientRect().width || img.parentElement?.getBoundingClientRect().width || 0;
+      const small = w > 0 && w * (window.devicePixelRatio || 1) <= 260;
+      Store.fileUrl(img.dataset.file, { small }).then(u => { img.onload = () => img.classList.remove('ld'); img.src = u; if (img.complete) img.classList.remove('ld'); }).catch(() => { img.classList.remove('ld'); img.alt = ''; img.classList.add('broken'); });
     });
     stackTables(root);
   }

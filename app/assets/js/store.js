@@ -689,6 +689,7 @@ const Store = (() => {
       return data;
     }
     const fileCache = new Map();
+    let noThumb = false;   // Apps Script ยังไม่ได้ Deploy รุ่นที่มีคำสั่ง thumb
     return {
       async start() {
         auth.onAuthStateChanged(async fu => {
@@ -768,22 +769,40 @@ const Store = (() => {
         }));
       },
       // รูปจาก Drive: 1) แคชในหน่วยความจำ 2) แคชถาวรในเครื่อง (Cache Storage · เฉพาะรูปภาพ ไม่เก็บ PDF) 3) ดึงผ่าน Apps Script ครั้งละไม่เกิน 4 ไฟล์
-      async fileUrl(ref) {
+      // small = รูปที่แสดงเล็ก → ขอ "รูปย่อ" (Apps Script รุ่นใหม่) · ถ้ามีรูปเต็มในเครื่องแล้วใช้รูปเต็มเลย
+      // Apps Script รุ่นเก่ายังไม่มีคำสั่ง thumb → ใช้รูปเต็มแทนอัตโนมัติ (ไม่พัง)
+      async fileUrl(ref, { small = false } = {}) {
         const s = String(ref || '');
         if (!s.startsWith('drive:')) return s;
         const id = s.slice(6);
-        if (!fileCache.has(id)) fileCache.set(id, (async () => {
-          let blob = await diskGet(id);
+        const toBlob = r => { const bin = atob(r.data), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new Blob([bytes], { type: r.mime }); };
+        const full = () => {
+          if (!fileCache.has(id)) fileCache.set(id, (async () => {
+            let blob = await diskGet(id);
+            if (!blob) {
+              const r = await queued(() => callScript('file', { id }));
+              blob = toBlob(r);
+              if (/^image\//.test(r.mime)) diskPut(id, blob);
+            }
+            return URL.createObjectURL(blob);
+          })().catch(e => { fileCache.delete(id); throw e; }));
+          return fileCache.get(id);
+        };
+        if (!small || noThumb || /#pdf$/.test(id)) return full();
+        if (fileCache.has(id)) return fileCache.get(id);        // มีรูปเต็มอยู่แล้ว
+        const tk = 't:' + id;
+        if (!fileCache.has(tk)) fileCache.set(tk, (async () => {
+          let blob = await diskGet(id) || await diskGet('t-' + id);
           if (!blob) {
-            const r = await queued(() => callScript('file', { id }));
-            const bin = atob(r.data), bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            blob = new Blob([bytes], { type: r.mime });
-            if (/^image\//.test(r.mime)) diskPut(id, blob);
+            let r;
+            try { r = await queued(() => callScript('thumb', { id })); }
+            catch (e) { if (/ไม่รู้จักคำสั่ง/.test(e.message || '')) { noThumb = true; return full(); } throw e; }
+            blob = toBlob(r);
+            if (/^image\//.test(r.mime)) diskPut(r.thumb ? 't-' + id : id, blob);
           }
           return URL.createObjectURL(blob);
-        })().catch(e => { fileCache.delete(id); throw e; }));
-        return fileCache.get(id);
+        })().catch(e => { fileCache.delete(tk); throw e; }));
+        return fileCache.get(tk);
       },
       reset() { location.reload(); }
     };
@@ -914,8 +933,10 @@ const Store = (() => {
     // โหลดรูปที่ใช้บ่อยไว้ล่วงหน้าตอนว่าง (รูปรถ คนขับ คณะทำงาน) → เปิดหน้าไหนก็ขึ้นทันที
     warmImages() {
       if (LOCAL || !me) return;
-      const refs = [...db.vehicles.map(v => (v.photos || [])[0]), ...db.drivers.map(d => d.photo), ...((db.settings.committee || []).map(c => c.photo))].filter(x => typeof x === 'string' && x.startsWith('drive:'));
-      [...new Set(refs)].forEach(ref => A.fileUrl(ref).catch(() => {}));
+      const ok = x => typeof x === 'string' && x.startsWith('drive:');
+      // รูปคนขับ/คณะทำงาน แสดงเป็นวงกลมเล็ก → โหลดรูปย่อ · รูปรถแสดงใหญ่ → รูปเต็ม
+      [...new Set([...db.drivers.map(d => d.photo), ...((db.settings.committee || []).map(c => c.photo))].filter(ok))].forEach(ref => A.fileUrl(ref, { small: true }).catch(() => {}));
+      [...new Set(db.vehicles.map(v => (v.photos || [])[0]).filter(ok))].forEach(ref => A.fileUrl(ref).catch(() => {}));
     },
     changeOwnPassword: p => A.changeOwnPassword(p),
     async saveProfile(data) {
@@ -923,7 +944,7 @@ const Store = (() => {
       await A.put('users', u.email, u); me = u; emit();
     },
     // ── ไฟล์ ──
-    upload: files => A.upload(files), fileUrl: ref => A.fileUrl(ref),
+    upload: files => A.upload(files), fileUrl: (ref, opts) => A.fileUrl(ref, opts),
     // ── คำขอใช้รถ ──
     async submitRequest(input) {
       const x = cleanReqInput(input);
