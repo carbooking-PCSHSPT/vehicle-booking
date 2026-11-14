@@ -13,18 +13,25 @@
   Pages._adminShell = (path, html) => {
     const me = S.me, admin = S.isAdmin(me);
     const pending = S.db.requests.filter(r => r.status === 'pending').length;
-    const L = (h, ic, t, cnt) => `<a href="#${h}" title="${t}" class="${path === h || (h !== '/admin' && path.startsWith(h)) ? 'on' : ''}">${icon(ic)}${t}${cnt ? `<span class="cnt">${cnt}</span>` : ''}</a>`;
-    return `<div class="admin">
-      <aside class="side no-print">
+    const isOn = h => path === h || (h !== '/admin' && path.startsWith(h));
+    let cur = null;
+    const L = (h, ic, t, cnt) => { if (isOn(h) && !cur) cur = { ic, t }; return `<a href="#${h}" title="${t}" class="${isOn(h) ? 'on' : ''}">${icon(ic)}<span class="sl">${t}</span>${cnt ? `<span class="cnt">${cnt}</span>` : ''}</a>`; };
+    // แท็บเล็ต/มือถือ: ปุ่ม "เมนูหลังบ้าน" (บอกหน้าปัจจุบัน) → กดแล้วเปิดตารางปุ่มเมนู (แทนแถบเลื่อนแนวนอนที่ใช้ยาก)
+    const links = `
         ${admin ? `<h5>งานประจำวัน</h5>${L('/admin', 'grid', 'ภาพรวม')}${L('/admin/requests', 'clipboard', 'คำขอใช้รถ', pending)}${L('/admin/new', 'alert', 'บันทึกคำขอเร่งด่วน')}${L('/admin/roster', 'calendar', 'ตารางงานคนขับ')}${L('/driver', 'wheel', 'มุมมองคนขับ')}
         <h5>ข้อมูลหลัก</h5>${L('/admin/vehicles', 'van', 'ข้อมูลรถ')}${L('/admin/drivers', 'users', 'พนักงานขับรถ')}${L('/admin/users', 'userPlus', 'ผู้ใช้และสิทธิ์')}` : ''}
         <h5>รายงาน</h5>${admin ? L('/admin/expenses', 'fuel', 'ค่าน้ำมัน/ค่าใช้จ่าย') : ''}${L('/admin/stats', 'chart', 'สถิติและรายงาน')}${L('/admin/ratings', 'star', 'ประเมินคนขับ')}
         ${S.signerRoles(me).length ? `<h5>ลงนาม</h5>${L('/admin/esign', 'edit', 'บันทึกข้อความรอลงนาม', S.db.requests.filter(r => S.signerRoles(me).some(ro => S.needsMySign(r, ro))).length)}` : ''}
-        ${admin ? `<h5>ระบบ</h5>${L('/admin/settings', 'settings', 'ตั้งค่า')}` : ''}
+        ${admin ? `<h5>ระบบ</h5>${L('/admin/settings', 'settings', 'ตั้งค่า')}` : ''}`;
+    return `<div class="admin">
+      <aside class="side no-print">
+        <button type="button" class="side-toggle" data-side-toggle aria-expanded="false">${icon(cur ? cur.ic : 'grid')}<span><small>เมนูหลังบ้าน</small><b>${cur ? cur.t : 'เลือกเมนู'}</b></span>${pending && admin ? `<span class="cnt">${pending}</span>` : ''}${icon('chev', 'chev')}</button>
+        <div class="side-links">${links}</div>
       </aside>
       <div class="page-enter" style="min-width:0">${html}</div>
     </div>`;
   };
+  document.addEventListener('click', e => { const t = e.target.closest('[data-side-toggle]'); if (!t) return; const s = t.closest('.side'); s.classList.toggle('open'); t.setAttribute('aria-expanded', s.classList.contains('open')); });
   const head = (eyebrow, title, sub = '', right = '') => `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="row">${right}</div>` : ''}</div>`;
 
   // ═════════ ภาพรวม ═════════
@@ -37,6 +44,8 @@
     rs.filter(r => r.status === 'ontrip').forEach(r => r.assignments.forEach(a => { if (a.status === 'ontrip' && now - new Date(r.endAt) > 30 * 6e4) alerts.push({ red: true, ic: 'clock', t: `${C.vName(a.vehicleId)} เลยเวลากลับแล้ว ${fmt.dur(now - new Date(r.endAt))} (ยังไม่กดกลับถึง)`, h: `#/admin/requests/${r.id}` }); }));
     rs.filter(r => r.status === 'approved' && r.assignments.some(a => a.status === 'assigned') && now - new Date(r.startAt) > 60 * 6e4).forEach(r => alerts.push({ ic: 'navigation', t: `${r.id} ถึงเวลาออกเดินทางแล้วแต่คนขับยังไม่กดออกเดินทาง`, h: `#/admin/requests/${r.id}` }));
     rs.filter(r => r.status === 'approved' && r.assignments.some(a => !a.driverId)).forEach(r => alerts.push({ ic: 'wheel', t: `${r.id} ยังไม่ได้ระบุคนขับ`, h: `#/admin/requests/${r.id}` }));
+    // คนขับแจ้งปัญหาตอนตรวจรถก่อนออกเดินทาง (3 วันล่าสุด)
+    rs.forEach(r => (r.assignments || []).forEach(a => { if (a.check && !a.check.ok && !a.check.skipped && now - new Date(a.check.at) < 3 * DAY) alerts.push({ red: true, ic: 'shield', t: `${C.vName(a.vehicleId)} · คนขับแจ้งปัญหาก่อนออกเดินทาง: ${[...(a.check.miss || []), a.check.note].filter(Boolean).join(', ')}`, h: `#/admin/requests/${r.id}` }); }));
     Object.values(S.db.vprivate).forEach(p => {
       const v = S.vehicle(p.id); if (!v) return;
       [['actExpiry', 'พ.ร.บ.'], ['taxExpiry', 'ภาษีรถ']].forEach(([k, l]) => { if (p[k]) { const d = daysTo(p[k]); if (d <= 30) alerts.push({ red: d <= 7, ic: 'shield', t: `${v.name} · ${l} ${d < 0 ? `หมดอายุแล้ว ${-d} วัน` : `จะหมดอายุในอีก ${d} วัน`} (${fmt.date(p[k])})`, h: `#/admin/vehicles/${v.id}?tab=private` }); } });

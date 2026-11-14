@@ -112,7 +112,7 @@ service cloud.firestore {
                         && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && request.resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && changedOnly(['assignments', 'expenses', 'history', 'status', 'closedAt', 'updatedAt'])
-                        && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd']));
+                        && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd', 'check']));
       allow delete: if admin();
     }
 

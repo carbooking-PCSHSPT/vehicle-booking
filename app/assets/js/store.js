@@ -558,6 +558,15 @@ const Store = (() => {
     };
   }
 
+  // ───── แคชรูปถาวรในเครื่อง + คิวดาวน์โหลด (รูปขึ้นเร็วตั้งแต่ครั้งที่ 2 · ไม่ยิงคำขอพร้อมกันจนช้า) ─────
+  const DISK = 'vb-drive-img-v1';
+  const diskGet = async id => { try { if (!('caches' in window)) return null; const r = await (await caches.open(DISK)).match('drive-img/' + id); return r ? await r.blob() : null; } catch (e) { return null; } };
+  const diskPut = async (id, blob) => { try { if ('caches' in window) await (await caches.open(DISK)).put('drive-img/' + id, new Response(blob, { headers: { 'content-type': blob.type } })); } catch (e) { /* เครื่องไม่รองรับ/เต็ม — ข้ามได้ */ } };
+  const diskClear = () => { try { if ('caches' in window) caches.delete(DISK); } catch (e) { /* ข้าม */ } };
+  const fileQ = []; let fileActive = 0;
+  const pump = () => { while (fileActive < 4 && fileQ.length) { const job = fileQ.shift(); fileActive++; job().finally(() => { fileActive--; pump(); }); } };
+  const queued = fn => new Promise((res, rej) => { fileQ.push(() => fn().then(res, rej)); pump(); });
+
   // ───── โหมดจริง: Firebase ─────
   function makeCloud() {
     firebase.initializeApp(CFG.firebase);
@@ -758,15 +767,22 @@ const Store = (() => {
           return 'drive:' + r.id;
         }));
       },
+      // รูปจาก Drive: 1) แคชในหน่วยความจำ 2) แคชถาวรในเครื่อง (Cache Storage · เฉพาะรูปภาพ ไม่เก็บ PDF) 3) ดึงผ่าน Apps Script ครั้งละไม่เกิน 4 ไฟล์
       async fileUrl(ref) {
         const s = String(ref || '');
         if (!s.startsWith('drive:')) return s;
         const id = s.slice(6);
-        if (!fileCache.has(id)) fileCache.set(id, callScript('file', { id }).then(r => {
-          const bin = atob(r.data), bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          return URL.createObjectURL(new Blob([bytes], { type: r.mime }));
-        }).catch(e => { fileCache.delete(id); throw e; }));
+        if (!fileCache.has(id)) fileCache.set(id, (async () => {
+          let blob = await diskGet(id);
+          if (!blob) {
+            const r = await queued(() => callScript('file', { id }));
+            const bin = atob(r.data), bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            blob = new Blob([bytes], { type: r.mime });
+            if (/^image\//.test(r.mime)) diskPut(id, blob);
+          }
+          return URL.createObjectURL(blob);
+        })().catch(e => { fileCache.delete(id); throw e; }));
         return fileCache.get(id);
       },
       reset() { location.reload(); }
@@ -894,7 +910,13 @@ const Store = (() => {
     // ── เข้าสู่ระบบ ──
     loginGoogle: email => A.loginGoogle(email),
     loginUsername: (u, p) => A.loginUsername(u, p),
-    logout: () => A.logout(),
+    logout: () => { diskClear(); return A.logout(); },   // ออกจากระบบ = ล้างรูปที่แคชไว้ (เครื่องใช้ร่วมกัน)
+    // โหลดรูปที่ใช้บ่อยไว้ล่วงหน้าตอนว่าง (รูปรถ คนขับ คณะทำงาน) → เปิดหน้าไหนก็ขึ้นทันที
+    warmImages() {
+      if (LOCAL || !me) return;
+      const refs = [...db.vehicles.map(v => (v.photos || [])[0]), ...db.drivers.map(d => d.photo), ...((db.settings.committee || []).map(c => c.photo))].filter(x => typeof x === 'string' && x.startsWith('drive:'));
+      [...new Set(refs)].forEach(ref => A.fileUrl(ref).catch(() => {}));
+    },
     changeOwnPassword: p => A.changeOwnPassword(p),
     async saveProfile(data) {
       const u = { ...me, name: String(data.name || '').trim(), dept: data.dept || '', phone: String(data.phone || '').trim(), position: String(data.position || '').trim(), needsProfile: false, updatedAt: nowISO() };
@@ -1041,8 +1063,14 @@ const Store = (() => {
       return r;
     },
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
-    async tripStatus(id, idx, status, { odo, at } = {}) {
+    async tripStatus(id, idx, status, { odo, at, check = null, note = '' } = {}) {
       const when = at ? new Date(at).toISOString() : nowISO();
+      // คนขับ: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน (แอดมินแก้ย้อนหลังได้)
+      if (!isAdmin(me)) {
+        const cur = request(id);
+        if (status === 'ontrip' && cur && Date.now() < new Date(cur.startAt).getTime() - 30 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 30 นาที)');
+        if (new Date(when).getTime() > Date.now() + 5 * 6e4) throw new Error('เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน');
+      }
       return mutateReq(id, r => {
         const a = r.assignments && r.assignments[idx];
         if (!a) throw new Error('ไม่พบงาน');
@@ -1051,10 +1079,14 @@ const Store = (() => {
         if (!['approved', 'ontrip', 'returned', 'closed'].includes(r.status)) throw new Error('งานนี้ยังไม่ได้รับอนุมัติ');
         if (r.status === 'closed' && status === 'assigned') { r.status = 'ontrip'; r.closedAt = ''; }   // ย้อนสถานะงานที่ปิดอัตโนมัติไปแล้ว
         const vName = (vehicle(a.vehicleId) || {}).name || '';
-        if (status === 'ontrip') { a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo; r.history.push(H('depart', vName)); }
+        if (status === 'ontrip') {
+          a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo;
+          if (check) a.check = { at: nowISO(), by: me.email, ok: !!check.ok, miss: check.miss || [], note: String(check.note || '').trim(), skipped: !!check.skipped };
+          r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '')));
+        }
         else if (status === 'returned') {
           if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
-          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName));
+          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '')));
         } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
         return r;
       });
@@ -1076,6 +1108,8 @@ const Store = (() => {
       const cur = request(id);
       if (!cur) throw new Error('ไม่พบคำขอ');
       if (!canAdd(cur)) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
+      // คนขับบันทึกย้อนหลังได้ภายใน 30 วันหลังปิดงาน (เลยกำหนด ให้แอดมินบันทึกแทน)
+      if (!isAdmin(me) && cur.closedAt && Date.now() - new Date(cur.closedAt) > 30 * DAY) throw new Error('เลยกำหนดบันทึกย้อนหลัง 30 วันแล้ว — กรุณาส่งใบเสร็จให้แอดมินบันทึกแทน');
       const photos = await A.upload(ex.photos || [], { kind: 'receipt', ref: id, label: EXPENSE[ex.type] || 'ใบเสร็จ' });
       const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), by: me.email, byName: me.name, at: nowISO() };
       return mutateReq(id, r => {

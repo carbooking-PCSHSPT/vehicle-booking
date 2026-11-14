@@ -990,6 +990,37 @@ table.roster { width: 100%; border-collapse: separate; border-spacing: 0; font-s
 .dh-s { display: grid; justify-items: end; gap: 8px; color: var(--muted); }
 .dh-empty { padding: 10px; }
 .lt640 .dh-row { grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; padding: 10px 10px 10px 14px; }
+/* อ่านง่าย ไม่ทับกัน: เวลากลับขึ้นบรรทัดใหม่ในกล่อง · สถานะลงไปอยู่ใต้ชื่อสถานที่บนจอแคบ */
+.dh-t { min-width: 0; overflow: hidden; } .dh-t em { white-space: normal !important; text-align: center; line-height: 1.2; font-size: .72rem !important; }
+.dh-m b { line-height: 1.35; }
+.lt640 .dh-row { grid-template-columns: 66px minmax(0, 1fr) 18px; grid-template-areas: "t m go" "t s go"; row-gap: 6px; align-items: center; }
+.lt640 .dh-row .dh-t { grid-area: t; align-self: stretch; align-content: center; } .lt640 .dh-row .dh-m { grid-area: m; }
+.lt640 .dh-row .dh-s { display: contents; } .lt640 .dh-row .dh-s .pill { grid-area: s; justify-self: start; } .lt640 .dh-row .dh-s > .i { grid-area: go; }
+.back-admin { margin-bottom: 10px; }
+/* รูปที่กำลังโหลดจาก Drive: พื้นวิบวับ · ซ่อนข้อความ alt */
+img.ld { color: transparent; background: linear-gradient(100deg, #efe9dc 30%, #faf6ee 50%, #efe9dc 70%) 0 0 / 300% 100%; animation: shimmer 1.2s linear infinite; }
+img.broken { color: transparent; background: #efe9dc; }
+@keyframes shimmer { to { background-position: -150% 0; } }
+.dh-exp { background: #fffbea; border-color: #f8e08e; color: #5c4300; } .dh-exp small { color: #8a6a12; }
+.dh-exp button { all: unset; cursor: pointer; color: #7a5200; font-weight: 600; font-size: .86rem; text-decoration: underline; text-underline-offset: 3px; }
+/* บันทึกค่าใช้จ่ายหลายรายการ */
+.exr { padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fdfaf3; }
+.exr + .exr { margin-top: 10px; }
+.exr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; } .exr-head b { font-family: var(--font-display); color: var(--navy); }
+.exr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; margin-bottom: 8px; }
+.lt640 .exr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.exr-sum { text-align: right; color: var(--ink-2); } .exr-sum:empty { display: none; }
+/* ตรวจรถก่อนออกเดินทาง */
+.chk-box { padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fdfaf3; }
+.chk-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.chk-head b { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); color: var(--navy); } .chk-head .i { width: 18px; height: 18px; }
+.chk-item { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px dashed var(--line); cursor: pointer; font-size: .95rem; }
+.chk-item input { width: 22px; height: 22px; accent-color: var(--ok); flex: none; }
+.chk-item:has(input:checked) span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(4, 120, 87, .5); }
+.btn.is-wait { opacity: 1; background: #eef0f6; color: var(--muted); border-color: transparent; box-shadow: none; cursor: not-allowed; }
+.dcal-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 18px 0 14px; }
+.dcal-nav { display: flex; align-items: center; gap: 8px; } .dcal-nav b { font-family: var(--font-display); min-width: 150px; text-align: center; white-space: nowrap; }
+.lt640 .dcal-head { justify-content: center; } .lt640 .dcal-nav { width: 100%; justify-content: space-between; }
 .lt640 .dh-s .pill { font-size: .7rem; padding: 3px 8px; }
 /* จอกว้าง: สรุป/ตัวเลือกทางซ้าย · รายการทางขวา */
 .ge900 .drv.drv-wide { width: min(100% - 48px, 1120px); }
@@ -1020,9 +1051,25 @@ table.roster { width: 100%; border-collapse: separate; border-spacing: 0; font-s
 .lt1180 .user-chip { padding: 4px; }
 /* max-width 1120px */
 .lt1120 .admin { grid-template-columns: 1fr; }
-.lt1120 .side { position: static; display: flex; gap: 4px; overflow-x: auto; padding: 8px; }
-.lt1120 .side h5 { display: none; }
-.lt1120 .side a { white-space: nowrap; flex: none; }
+/* แท็บเล็ต/มือถือ: เมนูหลังบ้านเป็นปุ่ม → เปิดตารางปุ่มเมนู (ไม่ต้องเลื่อนแนวนอน) */
+.side-toggle { display: none; }
+.lt1120 .side { position: static; padding: 6px; }
+.lt1120 .side-toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 14px; background: none; cursor: pointer; font: inherit; text-align: left; color: var(--ink); }
+.lt1120 .side-toggle > .i:first-child { width: 36px; height: 36px; padding: 8px; border-radius: 11px; background: var(--navy); color: #fff; flex: none; }
+.lt1120 .side-toggle span { display: grid; line-height: 1.25; min-width: 0; } .lt1120 .side-toggle small { color: var(--muted); font-size: .72rem; }
+.lt1120 .side-toggle b { font-family: var(--font-display); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt1120 .side-toggle .cnt { margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 99px; background: #e2552b; color: #fff; font-size: .72rem; text-align: center; line-height: 20px; }
+.lt1120 .side-toggle .chev { width: 18px; height: 18px; margin-left: auto; transition: transform .2s; } .lt1120 .side-toggle .cnt + .chev { margin-left: 6px; }
+.lt1120 .side.open .side-toggle .chev { transform: rotate(180deg); }
+.lt1120 .side-links { display: none; }
+.lt1120 .side.open .side-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 6px 4px 8px; }
+.lt640 .side.open .side-links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lt1120 .side-links h5 { grid-column: 1 / -1; margin: 8px 6px 0; }
+.lt1120 .side-links a { position: relative; flex-direction: column; justify-content: center; gap: 6px; min-height: 76px; padding: 10px 4px; text-align: center; font-size: .76rem; line-height: 1.25; border: 1px solid var(--line); background: #fdfaf3; }
+.lt1120 .side-links a .i { width: 22px; height: 22px; }
+.lt1120 .side-links a.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.lt1120 .side-links a .sl { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lt1120 .side-links a .cnt { position: absolute; top: 4px; right: 4px; margin: 0; }
 /* max-width 1060px */
 .lt1060 .hero-grid, .lt1060 .split, .lt1060 .detail-grid, .lt1060 .dgrid { grid-template-columns: 1fr; }
 .lt1060 .bus-badge { left: 10px; }

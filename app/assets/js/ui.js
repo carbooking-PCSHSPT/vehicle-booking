@@ -139,7 +139,9 @@ const UI = (() => {
   function hydrate(root = document) {
     $$('img[data-file]', root).forEach(img => {
       if (img._h) return; img._h = 1;
-      Store.fileUrl(img.dataset.file).then(u => { img.src = u; }).catch(() => { img.alt = 'โหลดรูปไม่สำเร็จ'; img.classList.add('broken'); });
+      // ระหว่างโหลด: แสดงพื้นวิบวับแทนข้อความ alt (ไม่ให้ชื่อคนล้นวงกลมรูป)
+      img.classList.add('ld');
+      Store.fileUrl(img.dataset.file).then(u => { img.onload = () => img.classList.remove('ld'); img.src = u; if (img.complete) img.classList.remove('ld'); }).catch(() => { img.classList.remove('ld'); img.alt = ''; img.classList.add('broken'); });
     });
     stackTables(root);
   }

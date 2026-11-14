@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ลูกเล่นหน้าแรก 5 แบบ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-2: #3b47b8; --gold: #c9962b; --gold-2: #e8c36a; --cream: #faf6ee; --ink: #1b2147; --muted: #6e6a7c; --line: #e8e1d2; --ok: #10b981; --live: #f97316; --bad: #ef4444; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e4d8; color: var(--ink); font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; }
+h1, h2, h3, b.d { font-family: Prompt, sans-serif; }
+.top { position: sticky; top: 0; z-index: 9; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font-size: 1.05rem; color: var(--navy); }
+.seg { display: inline-flex; padding: 4px; border-radius: 14px; background: #efe8d8; }
+.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font: 500 .88rem Prompt, sans-serif; color: var(--ink); cursor: pointer; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .5); }
+main { padding: 22px 16px 60px; display: grid; gap: 28px; justify-items: center; }
+.opt { width: 100%; max-width: var(--pw, 1200px); transition: max-width .35s; }
+.opt-h { display: flex; align-items: baseline; gap: 10px; margin: 0 4px 10px; flex-wrap: wrap; }
+.opt-h .tag { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--navy); color: #fff; font: 700 1rem Prompt; }
+.opt-h h2 { margin: 0; font-size: 1.15rem; color: var(--navy); }
+.opt-h p { margin: 0; color: var(--muted); font-size: .88rem; flex-basis: 100%; }
+/* กรอบจำลองหน้าแรก */
+.hero { position: relative; overflow: hidden; border-radius: 24px; padding: 28px 26px 26px; background: radial-gradient(700px 400px at 90% 0%, #fff0cf, transparent 70%), var(--cream); border: 1px solid var(--line); box-shadow: 0 20px 40px -30px rgba(40, 30, 10, .5); }
+.hero .eb { color: var(--gold); font: 500 .85rem Prompt; letter-spacing: .04em; }
+.hero h3 { margin: 6px 0 4px; font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.15; color: var(--navy); }
+.hero h3 em { font-style: normal; color: var(--gold); }
+.hero .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.hero .cta a { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 16px; background: var(--navy); color: #fff; font: 600 .95rem Prompt; text-decoration: none; }
+.hero .cta a.g { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #2a1f05; }
+.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.note { margin: 10px 4px 0; font-size: .82rem; color: var(--muted); }
+.note b { color: var(--ink); }
+
+/* ── A: ถนนรถวิ่ง ── */
+.road { position: relative; height: 64px; margin-top: 22px; border-radius: 18px; background: linear-gradient(#3a3f58, #2d3248); overflow: hidden; box-shadow: inset 0 -6px 0 rgba(0, 0, 0, .15); }
+.road::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px; background: repeating-linear-gradient(90deg, #f7c766 0 26px, transparent 26px 50px); animation: lane 1.2s linear infinite; }
+@keyframes lane { to { background-position: -50px 0; } }
+.road .veh { position: absolute; top: 8px; display: grid; place-items: center; width: 54px; height: 22px; animation: drive linear infinite; }
+.road .veh svg { width: 34px; height: 34px; stroke: #fff; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, .4)); }
+.road .veh.b2 { top: 34px; animation-direction: reverse; } .road .veh.b2 svg { stroke: var(--gold-2); transform: scaleX(-1); }
+@keyframes drive { from { left: -60px; } to { left: 100%; } }
+.road .sch { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 99px; background: #fff; font: 600 .74rem Prompt; color: var(--navy); z-index: 2; }
+.road .sch i { width: 26px; height: 26px; border-radius: 50%; background: var(--navy); display: grid; place-items: center; color: #fff; font-style: normal; }
+
+/* ── B: ขบวนรถของโรงเรียน (ตัวเลื่อน) ── */
+.fleet { position: relative; margin-top: 22px; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.fleet .track { display: flex; gap: 10px; width: max-content; animation: marq 28s linear infinite; }
+.fleet:hover .track { animation-play-state: paused; }
+@keyframes marq { to { transform: translateX(-50%); } }
+.chip { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border-radius: 16px; background: #fff; border: 1px solid var(--line); white-space: nowrap; box-shadow: 0 8px 18px -14px rgba(36, 48, 122, .6); }
+.chip .ic { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--c, var(--ok)); color: #fff; }
+.chip b { display: block; font: 600 .92rem Prompt; } .chip small { color: var(--muted); font-size: .76rem; display: flex; align-items: center; gap: 5px; }
+.chip small::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--ok)); }
+
+/* ── C: ฉากรถบัสหน้าโรงเรียน ── */
+.scene { position: relative; margin-top: 22px; height: 170px; border-radius: 20px; overflow: hidden; background: linear-gradient(#cfe4ff, #eef5ff 70%); }
+.scene svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cloud { animation: cloud 30s linear infinite; } .cloud.c2 { animation-duration: 44s; animation-delay: -20s; }
+@keyframes cloud { from { transform: translateX(-160px); } to { transform: translateX(1300px); } }
+.busg { animation: bus 9s cubic-bezier(.45, .05, .35, 1) infinite; }
+@keyframes bus { 0% { transform: translateX(-260px); } 45%, 70% { transform: translateX(var(--stop, 520px)); } 100% { transform: translateX(1400px); } }
+.whl { transform-box: fill-box; transform-origin: center; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.flag { transform-box: fill-box; transform-origin: left center; animation: wave 1.6s ease-in-out infinite alternate; }
+@keyframes wave { to { transform: skewY(6deg) scaleX(.94); } }
+
+/* ── D: หน้าปัดรถยนต์ ── */
+.dash { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+.gauge { padding: 14px 10px 12px; border-radius: 20px; background: linear-gradient(160deg, #1f2766, #2f3c9a); color: #fff; text-align: center; }
+.gauge svg { width: 100%; max-width: 170px; height: auto; }
+.gauge .needle { transform-origin: 100px 100px; animation: needle 2.2s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes needle { from { transform: rotate(-90deg); } to { transform: rotate(var(--a)); } }
+.gauge b { display: block; font: 700 1.5rem Prompt; margin-top: -8px; } .gauge small { opacity: .8; font-size: .78rem; } .gauge > small { display: block; }
+.gauge.g3 { display: grid; align-content: center; justify-items: center; }
+.odo { display: inline-flex; gap: 3px; margin: 14px 0 4px; }
+.odo span { display: inline-block; width: 22px; height: 32px; overflow: hidden; border-radius: 5px; background: #0d1233; font: 700 1.2rem/32px Prompt; color: var(--gold-2); }
+.odo span i { display: block; font-style: normal; animation: roll 2.4s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes roll { from { transform: translateY(-90%); } }
+
+/* ── E: เส้นทาง GPS ── */
+.gps { position: relative; margin-top: 22px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px; border-radius: 20px; background: #fff; border: 1px solid var(--line); }
+.gps svg { display: block; width: 100%; height: auto; max-height: 120px; margin: 4px auto 0; }
+.gps .path { stroke-dasharray: 6 7; animation: dash 1s linear infinite; } @keyframes dash { to { stroke-dashoffset: -13; } }
+.gps .live { font: 600 .82rem Prompt; color: var(--live); display: flex; align-items: center; gap: 6px; } .gps .live::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--live); animation: ping 1.4s infinite; }
+@keyframes ping { 50% { box-shadow: 0 0 0 7px rgba(249, 115, 22, .15); } }
+.gps .side { display: grid; gap: 4px; text-align: right; } .gps .side b { font: 700 1.6rem Prompt; color: var(--navy); line-height: 1; } .gps .side small { color: var(--muted); font-size: .76rem; }
+
+/* มือถือ */
+.narrow .hero { padding: 20px 16px; }
+.narrow .dash { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; } .narrow .gauge { padding: 10px 4px; border-radius: 14px; } .narrow .gauge b { font-size: 1.1rem; } .narrow .gauge small { font-size: .66rem; }
+.narrow .odo span { width: 16px; height: 24px; font-size: .95rem; line-height: 24px; }
+.narrow .scene { height: 130px; --stop: 120px; }
+.narrow .gps { grid-template-columns: 1fr; } .narrow .gps .side { text-align: left; grid-auto-flow: column; justify-content: space-between; align-items: baseline; }
+.narrow .road .sch span { display: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>ลูกเล่นหน้าแรก “รถ / ยานพาหนะ” · เลือก 1 แบบ (หรือผสม 2 แบบ)</h1>
+  <div class="seg" id="w"><button data-w="390" class="on">มือถือ</button><button data-w="820">แท็บเล็ต</button><button data-w="1200">คอม</button></div>
+</div>
+<main id="m"></main>
+<script>
+const I = {
+  van: '<path d="M3 17V7.5A2.5 2.5 0 0 1 5.5 5H15l5.5 6.2V17h-1.6"/><path d="M3 11.5h17.5"/><path d="M9.5 5v6.5"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/><path d="M9 17.5h6"/>',
+  bus: '<path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>',
+  car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 15h6"/><path d="M12 12v6"/>',
+  cal: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>'
+};
+const ic = (k, c = 'i') => `<svg class="${c}" viewBox="0 0 24 24">${I[k]}</svg>`;
+const head = `<div class="eb">ฝ่ายบริหารงานทั่วไป</div><h3>ระบบยานพาหนะ <em>ขอรถส่วนกลาง</em></h3><div class="cta"><a href="#">${ic('file')} ขอใช้รถ</a><a class="g" href="#">${ic('cal')} ตารางรถว่าง</a></div>`;
+const FLEET = [['รถตู้ 01', 'van', 'ว่าง', 'var(--ok)'], ['รถตู้ 02', 'van', 'กำลังเดินทาง', 'var(--live)'], ['รถบัสโดยสาร', 'bus', 'ว่าง', 'var(--ok)'], ['รถตู้ 03', 'van', 'มีคิววันนี้', '#e0a526'], ['รถฟอร์จูนเนอร์', 'car', 'ว่าง', 'var(--ok)'], ['รถกระบะ 09', 'truck', 'ว่าง', 'var(--ok)'], ['รถตู้ 05', 'van', 'ซ่อมบำรุง', 'var(--bad)'], ['รถโดยสาร 6 ล้อ', 'bus', 'ว่าง', 'var(--ok)']];
+const OPTS = [
+  { t: 'ถนนรถวิ่ง', d: 'ถนนเส้นเล็กใต้ปุ่ม มีเส้นจราจรเคลื่อนที่ และรถตู้ / รถบัส / รถเก๋งวิ่งผ่านไปมา — เรียบง่าย ไม่กินพื้นที่ (สูง 64px)',
+    h: `<div class="road"><span class="veh" style="animation-duration:7s">${ic('van')}</span><span class="veh" style="animation-duration:11s;animation-delay:-5s">${ic('bus')}</span><span class="veh b2" style="animation-duration:9s;animation-delay:-2s">${ic('car')}</span><span class="sch"><i>ภ</i><span>โรงเรียน</span></span></div>`,
+    n: 'เหมาะกับ: ทุกมุมมอง · ใช้ทรัพยากรน้อยมาก · <b>ไม่มีข้อมูลจริง</b> เป็นการตกแต่งอย่างเดียว' },
+  { t: 'ขบวนรถของโรงเรียน (ข้อมูลจริง)', d: 'แถบรถทุกคันเลื่อนช้า ๆ พร้อมสถานะสด (ว่าง / กำลังเดินทาง / มีคิว / ซ่อม) — แตะค้างเพื่อหยุด กดรถเพื่อดูข้อมูลรถ',
+    h: `<div class="fleet"><div class="track">${[...FLEET, ...FLEET].map(([n, k, s, c]) => `<div class="chip" style="--c:${c}"><span class="ic">${ic(k)}</span><span><b>${n}</b><small>${s}</small></span></div>`).join('')}</div></div>`,
+    n: 'เหมาะกับ: ทุกมุมมอง · <b>ใช้ข้อมูลจริงจากระบบ</b> (สีตรงกับลานจอดรถ) · ผมแนะนำแบบนี้มากที่สุด' },
+  { t: 'ฉากรถบัสหน้าโรงเรียน', d: 'ภาพวาดอาคารเรียน เสาธงโบก เมฆลอย และรถบัสวิ่งเข้ามาจอดรับ แล้วออกไป — ดูอบอุ่น มีชีวิตชีวา',
+    h: `<div class="scene"><svg viewBox="0 0 1200 170" preserveAspectRatio="xMidYMax slice">
+      <g class="cloud"><ellipse cx="80" cy="40" rx="46" ry="16" fill="#fff"/><ellipse cx="112" cy="32" rx="30" ry="14" fill="#fff"/></g>
+      <g class="cloud c2"><ellipse cx="60" cy="62" rx="36" ry="12" fill="#fff" opacity=".85"/></g>
+      <rect x="760" y="70" width="300" height="80" rx="6" fill="#f3e6c8"/><rect x="760" y="62" width="300" height="12" fill="#c9962b"/>
+      ${Array.from({ length: 6 }, (_, i) => `<rect x="${780 + i * 46}" y="88" width="26" height="20" rx="3" fill="#24307a" opacity=".75"/><rect x="${780 + i * 46}" y="116" width="26" height="20" rx="3" fill="#24307a" opacity=".75"/>`).join('')}
+      <line x1="700" y1="150" x2="700" y2="40" stroke="#8a8fa8" stroke-width="3"/><rect class="flag" x="701" y="42" width="34" height="22" fill="#e04848"/><rect x="701" y="49" width="34" height="8" fill="#fff"/><rect x="701" y="51" width="34" height="4" fill="#24307a"/>
+      <rect x="0" y="150" width="1200" height="20" fill="#5b6276"/><rect x="0" y="158" width="1200" height="2" fill="#f7c766" opacity=".7"/>
+      <g class="busg"><rect x="0" y="104" width="190" height="46" rx="12" fill="#f2b631"/><rect x="0" y="104" width="190" height="10" rx="5" fill="#d99a14"/>
+        ${Array.from({ length: 5 }, (_, i) => `<rect x="${14 + i * 32}" y="116" width="24" height="16" rx="3" fill="#bfe0ff"/>`).join('')}<rect x="168" y="116" width="14" height="22" rx="3" fill="#bfe0ff"/>
+        <text x="20" y="146" font-family="Prompt" font-size="9" font-weight="700" fill="#24307a">PCSHS PATHUM THANI</text>
+        <g class="whl"><circle cx="40" cy="152" r="11" fill="#222"/><circle cx="40" cy="152" r="4" fill="#aaa"/><rect x="39" y="142" width="2" height="20" fill="#666"/></g>
+        <g class="whl"><circle cx="150" cy="152" r="11" fill="#222"/><circle cx="150" cy="152" r="4" fill="#aaa"/><rect x="149" y="142" width="2" height="20" fill="#666"/></g></g>
+    </svg></div>`,
+    n: 'เหมาะกับ: คอม/แท็บเล็ตสวยที่สุด · มือถือย่อฉากให้สูง 130px · <b>ไม่มีข้อมูลจริง</b>' },
+  { t: 'หน้าปัดรถยนต์ (ข้อมูลจริง)', d: 'มาตรวัดแบบหน้าปัดรถ เข็มกวาดขึ้นตอนเปิดหน้า: รถว่างตอนนี้ · เที่ยววันนี้ · และเลขไมล์ "กม. เดือนนี้" หมุนแบบมาตรวัดระยะ',
+    h: `<div class="dash">${[['รถว่างตอนนี้', '8', '/ 14', 8 / 14], ['เที่ยววันนี้', '6', 'เที่ยว', .5]].map(([l, v, u, p]) => `<div class="gauge"><svg viewBox="0 0 200 112"><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="14" stroke-linecap="round"/><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#e8c36a" stroke-width="14" stroke-linecap="round" stroke-dasharray="${251 * p} 300"/><g class="needle" style="--a:${-90 + 180 * p}deg"><line x1="100" y1="100" x2="100" y2="34" stroke="#fff" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="8" fill="#fff"/></svg><b>${v}<small> ${u}</small></b><small>${l}</small></div>`).join('')}
+      <div class="gauge g3"><small>กม. เดือนนี้</small><div class="odo">${'01448'.split('').map((d, i) => `<span><i style="animation-delay:${i * .12}s">${d}</i></span>`).join('')}</div><small>ระยะทางรวมทุกคัน</small></div></div>`,
+    n: 'เหมาะกับ: ทุกมุมมอง · <b>ใช้ข้อมูลจริง</b> แทนตัวเลขสรุป 3 ตัวใต้ปุ่มเดิม — สื่อถึงรถชัดที่สุด' },
+  { t: 'เส้นทาง GPS สด (ข้อมูลจริง)', d: 'การ์ดเส้นทาง: โรงเรียน → ปลายทางของรถที่กำลังเดินทาง มีจุดรถวิ่งตามเส้นจริง — ใช้แทนแผนที่ใหญ่ที่ซ่อนบนมือถือ',
+    h: `<div class="gps"><div><div class="live">กำลังเดินทาง · รถตู้ 02 → ม.เกษตรศาสตร์ บางเขน</div>
+      <svg viewBox="0 0 400 90"><path id="gp" d="M20 70 C 120 10, 220 90, 380 24" fill="none" stroke="#c9d2f5" stroke-width="8" stroke-linecap="round"/><path class="path" d="M20 70 C 120 10, 220 90, 380 24" fill="none" stroke="#24307a" stroke-width="3"/>
+        <circle cx="20" cy="70" r="9" fill="#24307a"/><circle cx="20" cy="70" r="4" fill="#fff"/><path d="M380 8c-7 0-12 5-12 11 0 8 12 17 12 17s12-9 12-17c0-6-5-11-12-11Z" fill="#c9962b"/>
+        <circle r="8" fill="#f97316" stroke="#fff" stroke-width="3"><animateMotion dur="6s" repeatCount="indefinite"><mpath href="#gp"/></animateMotion></circle></svg></div>
+      <div class="side"><small>ออก 10:30</small><b>44 กม.</b><small>ถึงประมาณ 11:25</small></div></div>`,
+    n: 'เหมาะกับ: มือถือเด่นที่สุด · <b>ใช้ข้อมูลจริง</b> (รถที่กำลังเดินทาง ถ้าไม่มี แสดงเที่ยวถัดไป) · คอมใช้คู่กับแผนที่เดิมได้' }
+];
+const m = document.getElementById('m');
+m.innerHTML = OPTS.map((o, i) => `<section class="opt"><div class="opt-h"><span class="tag">${'ABCDE'[i]}</span><h2>${o.t}</h2><p>${o.d}</p></div><div class="hero">${head}${o.h}</div><p class="note">${o.n}</p></section>`).join('');
+const setW = w => { document.documentElement.style.setProperty('--pw', w + 'px'); document.body.classList.toggle('narrow', w < 600); document.querySelectorAll('#w button').forEach(b => b.classList.toggle('on', +b.dataset.w === w)); };
+document.getElementById('w').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setW(+b.dataset.w); });
+setW(innerWidth < 700 ? 390 : 1200);
+</script>
+</body>
+</html>

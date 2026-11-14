@@ -694,6 +694,8 @@ const App = (() => {
     if (view.mount) { try { view.mount(root, ctx); } catch (e) { console.error(e); } }
     UI.hydrate(root); UI.animate(root, { quiet: same }); if ($('#nav')) UI.hydrate($('#nav'));
     if (view.tick) view.tick();   // นาฬิกาแสดงทันที ไม่ว่างรอ 1 วินาที
+    // ครั้งแรกหลังเข้าสู่ระบบ: โหลดรูปรถ/คนขับ/คณะทำงานไว้ล่วงหน้าตอนว่าง
+    if (Store.authState === 'in' && !render._warm) { render._warm = true; setTimeout(() => Store.warmImages && Store.warmImages(), 2500); }
     // กดเลือกวันในปฏิทิน → เลื่อนลงไปที่รายการของวันนั้น
     if (query.pick) { const l = document.getElementById('list'); if (l) setTimeout(() => scrollTo({ top: l.getBoundingClientRect().top + scrollY - 90, behavior: 'smooth' }), 60); }
     onScroll();
