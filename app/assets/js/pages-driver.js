@@ -119,8 +119,8 @@
   // ───────── กติกาเวลา: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · กลับก่อนเวลาที่ขอ ต้องระบุเหตุผล ─────────
   const EARLY_MIN = 30;
   const departFrom = r => new Date(new Date(r.startAt).getTime() - EARLY_MIN * 6e4);
+  // ใช้กับทุกคนในหน้างานคนขับ (รวมแอดมิน) · แอดมินบันทึกแทนนอกเวลาได้จากหน้าคำขอในระบบหลังบ้านเท่านั้น (ต้องใส่เหตุผล)
   function departState(r) {
-    if (S.isAdmin(S.me)) return { ok: true };
     const from = departFrom(r), now = new Date();
     if (now >= from) return { ok: true };
     return { ok: false, msg: `ออกเดินทางได้ ${UI.sameDay(from, now) ? '' : dShort(from) + ' '}${fmt.time(from)}` };
@@ -134,10 +134,11 @@
   const CHECKS = ['น้ำมันเพียงพอสำหรับการเดินทาง', 'ลมยางและสภาพยางปกติ', 'ไฟหน้า ไฟเลี้ยว ไฟเบรก ใช้งานได้', 'เบรก พวงมาลัย ไม่มีไฟเตือนบนหน้าปัด', 'น้ำมันเครื่อง น้ำหล่อเย็น ระดับปกติ', 'อุปกรณ์ฉุกเฉินและเอกสารประจำรถครบ', 'ห้องโดยสารสะอาด เข็มขัดนิรภัยใช้งานได้'];
 
   // ───────── ป๊อปอัปเลขไมล์ / สถานะ ─────────
-  Pages._tripAction = async (r, idx, status) => {
+  // override = แอดมินบันทึกแทนคนขับจากหน้าหลังบ้าน (นอกเวลา/ข้ามการตรวจรถได้ แต่ต้องมีเหตุผล)
+  Pages._tripAction = async (r, idx, status, { override = '' } = {}) => {
     const a = r.assignments[idx], v = S.vehicle(a.vehicleId) || {};
-    const admin = S.isAdmin(S.me), dep = status === 'ontrip';
-    if (dep && !departState(r).ok) return UI.toast(`ยังไม่ถึงเวลา — ${departState(r).msg} (ก่อนเวลาออก ${EARLY_MIN} นาที)`, 'error');
+    const admin = S.isAdmin(S.me) && !!override, dep = status === 'ontrip';
+    if (dep && !override && !departState(r).ok) return UI.toast(`ยังไม่ถึงเวลา — ${departState(r).msg} (ก่อนเวลาออก ${EARLY_MIN} นาที)`, 'error');
     const early = !dep && earlyReturn(r);
     const def = dep ? (a.odoStart ?? lastOdo(a.vehicleId) ?? '') : (a.odoEnd ?? '');
     const res = await UI.modal({
@@ -162,7 +163,7 @@
           check = { ok: !miss.length && !cn, miss, note: cn, skipped: admin && miss.length === CHECKS.length && !cn };
         }
         if (early) { note = el.querySelector('#earlyNote').value.trim(); if (!note && !admin) { UI.toast('กรุณาระบุเหตุผลที่กลับก่อนเวลา', 'error'); return false; } }
-        await S.tripStatus(r.id, idx, status, { odo: el.querySelector('#odoIn').value, at: el.querySelector('#atIn').value, check, note });
+        await S.tripStatus(r.id, idx, status, { odo: el.querySelector('#odoIn').value, at: el.querySelector('#atIn').value, check, note, override });
         return true;
       } }]
     });

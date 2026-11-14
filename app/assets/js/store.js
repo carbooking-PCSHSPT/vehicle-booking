@@ -1084,10 +1084,12 @@ const Store = (() => {
       return r;
     },
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
-    async tripStatus(id, idx, status, { odo, at, check = null, note = '' } = {}) {
+    async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '' } = {}) {
       const when = at ? new Date(at).toISOString() : nowISO();
-      // คนขับ: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน (แอดมินแก้ย้อนหลังได้)
-      if (!isAdmin(me)) {
+      // ทุกคน: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน
+      // ยกเว้นแอดมินบันทึกแทนจากหน้าหลังบ้าน (override = เหตุผล) หรือการย้อนสถานะ
+      const ov = isAdmin(me) && String(override || '').trim();
+      if (!ov && status !== 'assigned') {
         const cur = request(id);
         if (status === 'ontrip' && cur && Date.now() < new Date(cur.startAt).getTime() - 30 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 30 นาที)');
         if (new Date(when).getTime() > Date.now() + 5 * 6e4) throw new Error('เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน');
@@ -1103,11 +1105,11 @@ const Store = (() => {
         if (status === 'ontrip') {
           a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo;
           if (check) a.check = { at: nowISO(), by: me.email, ok: !!check.ok, miss: check.miss || [], note: String(check.note || '').trim(), skipped: !!check.skipped };
-          r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '')));
+          r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         }
         else if (status === 'returned') {
           if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
-          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '')));
+          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
         return r;
       });

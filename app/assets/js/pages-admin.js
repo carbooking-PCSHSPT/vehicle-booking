@@ -336,7 +336,15 @@
             } else if (!note) return UI.toast(action === 'reject' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติในช่องหมายเหตุ' : 'กรุณาระบุสิ่งที่ต้องการให้แก้ไขในช่องหมายเหตุ', 'error');
             return UI.busy(dec, () => S.decide(r.id, { action, note, assignments, category, categoryOther })).then(() => { UI.toast(action === 'approve' ? (canDecide ? 'อนุมัติและมอบหมายรถแล้ว' : 'บันทึกการเปลี่ยนแปลงแล้ว') : action === 'reject' ? 'บันทึกไม่อนุมัติแล้ว' : 'ส่งกลับให้ผู้ขอแก้ไขแล้ว'); App.render(); }).catch(() => {});
           }
-          const go = e.target.closest('[data-go]'); if (go) { await Pages._tripAction(S.request(r.id), +go.dataset.i, go.dataset.go); return App.render(); }
+          // แอดมินบันทึกแทนคนขับ: ต้องระบุเหตุผล (บันทึกในประวัติ) · นอกเวลาที่กำหนดต้องยืนยันเพิ่ม
+          const go = e.target.closest('[data-go]');
+          if (go) {
+            const rr = S.request(r.id), dep = go.dataset.go === 'ontrip', st = dep ? Pages._departState(rr) : { ok: true };
+            const res = await UI.confirm(`${st.ok ? '' : `<b style="color:var(--bad)">ยังไม่ถึงเวลาออกเดินทาง</b> (${esc(st.msg)}) — `}บันทึก <b>"${dep ? 'ออกเดินทาง' : 'กลับถึงโรงเรียน'}"</b> แทนคนขับ ระบบจะบันทึกชื่อแอดมินและเหตุผลไว้ในประวัติ`, { title: 'บันทึกแทนคนขับ', ok: 'ถัดไป', input: { label: 'เหตุผลที่บันทึกแทน', required: true, value: 'คนขับแจ้งทางโทรศัพท์' } });
+            if (!res || !res.value) return;
+            await Pages._tripAction(rr, +go.dataset.i, go.dataset.go, { override: res.value });
+            return App.render();
+          }
           const un = e.target.closest('[data-undo]'); if (un) { if (await UI.confirm('ย้อนสถานะรถคันนี้กลับเป็น "รอออกเดินทาง"?', { title: 'ย้อนสถานะ' })) S.tripStatus(r.id, +un.dataset.undo, 'assigned').then(App.render).catch(err => UI.toast(err.message, 'error')); return; }
           const od = e.target.closest('[data-odo]');
           if (od) { const i = +od.dataset.odo, a = S.request(r.id).assignments[i]; const res = await UI.modal({ title: `${icon('gauge')} เลขไมล์ · ${esc(C.vName(a.vehicleId))}`, body: `<div class="grid2"><div class="field"><label>ตอนออก</label><input id="o1" type="number" value="${a.odoStart ?? Pages._lastOdo(a.vehicleId) ?? ''}"></div><div class="field"><label>ตอนกลับ</label><input id="o2" type="number" value="${a.odoEnd ?? ''}"></div></div>`, actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: async el => { await S.setOdo(r.id, i, { odoStart: el.querySelector('#o1').value, odoEnd: el.querySelector('#o2').value }); return true; } }] }); if (res) { UI.toast('บันทึกเลขไมล์แล้ว'); App.render(); } return; }
