@@ -29,26 +29,38 @@
     const defDate = new Date(r.endAt) < new Date() ? fmt.localDate(a0.returnedAt || r.endAt) : today;
     const minD = fmt.localDate(r.startAt), maxD = fmt.localDate(new Date(Math.max(Date.now(), new Date(r.endAt))));
     let n = 0; const pickers = new Map();
-    // กรอกเท่าที่จำเป็น: ประเภท (ปุ่ม) · ยอดเงิน · ลิตร (เฉพาะน้ำมัน) · รูปบิล (บังคับเฉพาะน้ำมัน)
-    // ราคา/ลิตร คำนวณให้ · วันที่ = วันเดินทาง · วิธีชำระ = จำค่าที่เลือกครั้งก่อน · ที่เหลือพับไว้ใน "รายละเอียดเพิ่มเติม"
-    let lastPay = 'card'; try { lastPay = localStorage.getItem('vb-exp-pay') || 'card'; } catch (e) { /* ค่าเริ่มต้น */ }
+    // ── แต่ละรายการกรอกเฉพาะที่จำเป็นของประเภทนั้น (ไม่มี "รายละเอียดเพิ่มเติม") ──
+    // น้ำมัน : ยอดเงิน* · ลิตร · ปั๊ม* (เลือก) · สาขา · วิธีชำระ · รูปบิล* (บังคับ)
+    // อื่น ๆ : ยอดเงิน* · สถานที่* · วิธีชำระ · รูปบิล (ถ้ามี)
+    // ราคา/ลิตร คำนวณให้ · วันที่ = วันเดินทาง (เลือกได้เฉพาะงานหลายวัน) · วิธีชำระ/ปั๊ม จำค่าที่ใช้ครั้งก่อน
+    const mem = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
     const TYPES = [['fuel', 'fuel', 'น้ำมัน'], ['toll', 'route', 'ทางด่วน'], ['parking', 'pin', 'ที่จอด'], ['other', 'coins', 'อื่น ๆ']];
-    const row = (d = {}) => { const k = n++, ty = d.type || 'fuel'; return `<div class="exr" data-row="${k}">
+    const PLACE = { toll: 'เช่น ด่านบางปะอิน / ทางด่วนศรีรัช', parking: 'เช่น ลานจอด ม.เกษตรศาสตร์', other: 'เช่น ค่าล้างรถ ร้าน…' };
+    const multiDay = fmt.localDate(r.startAt) !== fmt.localDate(r.endAt);
+    const days = (() => { const out = [], d = UI.dayOf(minD), end = UI.dayOf(maxD); while (d <= end && out.length < 60) { out.push(fmt.localDate(d)); d.setDate(d.getDate() + 1); } return out; })();
+    const row = (d = {}) => { const k = n++, ty = d.type || 'fuel', fuel = ty === 'fuel';
+      const pay = d.pay || mem(fuel ? 'vb-exp-pay-fuel' : 'vb-exp-pay-x', fuel ? 'card' : 'cash'), brand = mem('vb-exp-brand', '');
+      return `<div class="exr" data-row="${k}">
       <div class="exr-head"><b>รายการที่ <span class="exr-no"></span></b><button type="button" class="icon-btn sm" data-rmrow aria-label="ลบรายการนี้">${icon('trash')}</button></div>
       <div class="exr-types" role="radiogroup" aria-label="ประเภทค่าใช้จ่าย">${TYPES.map(([t, ic, l]) => `<label class="exr-type"><input type="radio" name="ty${k}" data-k="type" value="${t}" ${t === ty ? 'checked' : ''}><span>${icon(ic)}${l}</span></label>`).join('')}</div>
       <div class="exr-main">
         <div class="field"><label>ยอดเงิน (บาท) <b class="req">*</b></label><input data-k="amount" class="exr-amt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>
         <div class="field fuel-only"><label>จำนวนลิตร</label><input data-k="liters" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"><small class="hint exr-ppl"></small></div>
       </div>
-      ${C.filePicker('exPh' + k, [], { label: 'ถ่ายรูปบิล', capture: true, multiple: true, hint: 'แตะเพื่อถ่ายรูปใบเสร็จ' })}
-      <p class="hint exr-need">${icon('camera')} ค่าน้ำมันต้องมีรูปบิลประกอบ</p>
-      <details class="exr-more"><summary>${icon('plus')} รายละเอียดเพิ่มเติม <span class="exr-sumtxt"></span></summary>
-        <div class="exr-grid">
-          <div class="field"><label>วันที่</label><input data-k="date" type="date" value="${d.date || defDate}" min="${minD}" max="${maxD}"></div>
-          <div class="field"><label>วิธีชำระ</label><select data-k="pay">${Object.entries(S.PAY).map(([t, l]) => `<option value="${t}" ${t === (d.pay || lastPay) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-          <div class="field"><label>ปั๊ม / สถานที่</label><input data-k="station" value="${esc(d.station || '')}" placeholder="(ไม่บังคับ)"></div>
-          <div class="field fuel-only"><label>เลขไมล์ขณะเติม</label><input data-k="odo" type="number" inputmode="numeric" min="0" placeholder="(ไม่บังคับ)"></div>
-        </div></details></div>`; };
+      <div class="fuel-only">
+        <div class="label-sm">ปั๊มน้ำมัน <b class="req">*</b></div>
+        <div class="exr-brands" role="radiogroup" aria-label="ปั๊มน้ำมัน">${S.FUEL_BRANDS.map(b => `<label class="exr-brand"><input type="radio" name="br${k}" data-k="brand" value="${esc(b)}" ${b === brand ? 'checked' : ''}><span>${esc(b)}</span></label>`).join('')}</div>
+        <div class="exr-two">
+          <div class="field exr-brand-other" hidden><input data-k="brandOther" placeholder="ชื่อปั๊ม *"></div>
+          <div class="field"><input data-k="branch" placeholder="สาขา (ไม่บังคับ) เช่น ลาดหลุมแก้ว"></div>
+        </div>
+      </div>
+      <div class="field not-fuel"><label>สถานที่ <b class="req">*</b></label><input data-k="place" data-ph='${JSON.stringify(PLACE)}' placeholder="${esc(PLACE[ty] || '')}"></div>
+      <div class="exr-two">
+        <div class="field"><label>วิธีชำระ</label><select data-k="pay">${Object.entries(S.PAY).map(([t, l]) => `<option value="${t}" ${t === pay ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        ${multiDay ? `<div class="field"><label>วันที่</label><select data-k="date">${days.map(x => `<option value="${x}" ${x === (d.date || defDate) ? 'selected' : ''}>${fmt.dayMonth(UI.dayOf(x))}</option>`).join('')}</select></div>` : `<input type="hidden" data-k="date" value="${d.date || defDate}">`}
+      </div>
+      <div class="exr-pic">${C.filePicker('exPh' + k, [], { label: 'ถ่ายรูปบิล', capture: true, multiple: true })}<p class="hint exr-need"></p></div></div>`; };
     return UI.modal({
       title: `${icon('fuel')} บันทึกค่าใช้จ่าย · ${r.id}`, size: 'lg',
       body: `<div class="stack" id="exM">
@@ -61,15 +73,21 @@
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกทั้งหมด', kind: 'btn-primary', icon: 'check', onClick: async el => {
         const vId = el.querySelector('#exV').value;
         const rows = [...el.querySelectorAll('.exr')].map(x => {
-          const g = k => (x.querySelector(`[data-k="${k}"]:checked`) || x.querySelector(`[data-k="${k}"]:not([type=radio])`) || {}).value || '';
+          const g = k => String((x.querySelector(`[data-k="${k}"]:checked`) || x.querySelector(`[data-k="${k}"]:not([type=radio])`) || {}).value || '').trim();
           const type = g('type'), fuel = type === 'fuel', amt = +g('amount') || 0, lit = fuel ? +g('liters') || 0 : 0;
-          return { vehicleId: vId, type, date: g('date'), amount: g('amount'), liters: fuel ? g('liters') : '', pricePerL: lit && amt ? Math.round(amt / lit * 100) / 100 : '', odo: fuel ? g('odo') : '', station: g('station'), pay: g('pay'), photos: (pickers.get(+x.dataset.row) || (() => []))() };
+          const brand = fuel ? (g('brand') === 'อื่น ๆ' ? g('brandOther') : g('brand')) : '';
+          return { vehicleId: vId, type, date: g('date'), amount: g('amount'), liters: fuel ? g('liters') : '', pricePerL: lit && amt ? Math.round(amt / lit * 100) / 100 : '',
+            brand, branch: fuel ? g('branch') : '', station: fuel ? [brand, g('branch')].filter(Boolean).join(' ') : g('place'), pay: g('pay'), photos: (pickers.get(+x.dataset.row) || (() => []))() };
         });
-        const bad = rows.findIndex(x => !(+x.amount > 0));
-        if (bad >= 0) { UI.toast(`รายการที่ ${bad + 1}: กรุณาระบุยอดเงิน`, 'error'); return false; }
-        const noPic = rows.findIndex(x => x.type === 'fuel' && !x.photos.length);
-        if (noPic >= 0) { UI.toast(`รายการที่ ${noPic + 1}: ค่าน้ำมันต้องถ่ายรูปบิลประกอบ`, 'error'); return false; }
-        try { localStorage.setItem('vb-exp-pay', rows[rows.length - 1].pay); } catch (e) { /* ไม่จำก็ได้ */ }
+        const err = (i, m) => { UI.toast(`รายการที่ ${i + 1}: ${m}`, 'error'); return false; };
+        for (let i = 0; i < rows.length; i++) {
+          const x = rows[i];
+          if (!(+x.amount > 0)) return err(i, 'กรุณาระบุยอดเงิน');
+          if (x.type === 'fuel' && !x.brand) return err(i, 'กรุณาเลือกปั๊มน้ำมัน');
+          if (x.type === 'fuel' && !x.photos.length) return err(i, 'ค่าน้ำมันต้องถ่ายรูปบิลประกอบ');
+          if (x.type !== 'fuel' && !x.station) return err(i, 'กรุณาระบุสถานที่');
+        }
+        try { rows.forEach(x => { localStorage.setItem(x.type === 'fuel' ? 'vb-exp-pay-fuel' : 'vb-exp-pay-x', x.pay); if (x.type === 'fuel' && S.FUEL_BRANDS.includes(x.brand)) localStorage.setItem('vb-exp-brand', x.brand); }); } catch (e) { /* ไม่จำก็ได้ */ }
         for (const x of rows) await S.saveExpense(r.id, x);
         UI.toast(`บันทึกค่าใช้จ่าย ${rows.length} รายการแล้ว`); return true;
       } }],
@@ -79,21 +97,30 @@
           const k = +x.dataset.row; pickers.set(k, C.bindFilePicker(x, 'exPh' + k, []));
           const q = s => x.querySelector(`[data-k="${s}"]:not([type=radio])`);
           const type = () => (x.querySelector('[data-k="type"]:checked') || {}).value;
-          // สรุปสั้นบนหัว "รายละเอียดเพิ่มเติม" เช่น "14 พ.ย. · บัตรเติมน้ำมัน" — ไม่ต้องเปิดดูก็รู้ว่าค่าตั้งต้นถูก
-          const sumTxt = () => { x.querySelector('.exr-sumtxt').textContent = `· ${fmt.dayMonth(UI.dayOf(q('date').value))} · ${S.PAY[q('pay').value] || ''}`; };
-          const sync = () => { const fuel = type() === 'fuel'; x.querySelectorAll('.fuel-only').forEach(f => { f.hidden = !fuel; }); x.querySelector('.exr-need').hidden = !fuel; x.querySelector('.exr-main').classList.toggle('one', !fuel); };
+          const ph = JSON.parse(q('place').dataset.ph || '{}');
+          const sync = () => {
+            const t = type(), fuel = t === 'fuel';
+            x.querySelectorAll('.fuel-only').forEach(f => { f.hidden = !fuel; }); x.querySelectorAll('.not-fuel').forEach(f => { f.hidden = fuel; });
+            x.querySelector('.exr-main').classList.toggle('one', !fuel);
+            q('place').placeholder = ph[t] || '';
+            // ชื่อปุ่มรูปบิล + คำอธิบาย เปลี่ยนตามประเภท (น้ำมัน = บังคับ · อื่น ๆ = ถ้ามี)
+            const lb = x.querySelector('.dropzone b'); if (lb) lb.textContent = fuel ? 'ถ่ายรูปบิลน้ำมัน *' : 'แนบบิล (ถ้ามี)';
+            x.querySelector('.exr-need').textContent = fuel ? 'ค่าน้ำมันต้องมีรูปบิลประกอบ — ถ่ายให้เห็นยอดเงิน ลิตร และวันที่ชัดเจน' : 'ไม่บังคับแนบบิล';
+            x.querySelector('.exr-pic').classList.toggle('opt', !fuel);
+          };
+          const syncBrand = () => { const o = (x.querySelector('[data-k="brand"]:checked') || {}).value === 'อื่น ๆ'; x.querySelector('.exr-brand-other').hidden = !o; if (o) q('brandOther').focus(); };
           const calc = () => { const l = +q('liters').value, a = +q('amount').value; x.querySelector('.exr-ppl').textContent = l && a ? `≈ ${fmt.num(a / l, 2)} บาท/ลิตร` : ''; total(); };
           x.querySelectorAll('[data-k="type"]').forEach(rb => rb.addEventListener('change', sync));
+          x.querySelectorAll('[data-k="brand"]').forEach(rb => rb.addEventListener('change', syncBrand));
           q('liters').addEventListener('input', calc); q('amount').addEventListener('input', calc);
-          q('date').addEventListener('change', sumTxt); q('pay').addEventListener('change', sumTxt);
-          sync(); sumTxt();
+          sync(); syncBrand();
         };
         const renum = () => { [...box.querySelectorAll('.exr')].forEach((x, i) => { x.querySelector('.exr-no').textContent = i + 1; x.querySelector('[data-rmrow]').hidden = box.children.length < 2; }); total(); };
         const total = () => { const s = [...box.querySelectorAll('[data-k="amount"]')].reduce((a, i) => a + (+i.value || 0), 0); el.querySelector('#exSum').innerHTML = box.children.length > 1 ? `รวม ${box.children.length} รายการ · <b>${fmt.money(s)} บาท</b>` : ''; };
         bindRow(box.querySelector('.exr')); renum();
         el.querySelector('#exAdd').addEventListener('click', () => {
           const last = [...box.querySelectorAll('.exr')].pop(), g = k => last ? (last.querySelector(`[data-k="${k}"]:checked`) || last.querySelector(`[data-k="${k}"]:not([type=radio])`) || {}).value : '';
-          box.insertAdjacentHTML('beforeend', row({ date: g('date'), pay: g('pay'), type: g('type') === 'fuel' ? 'toll' : 'other' }));
+          box.insertAdjacentHTML('beforeend', row({ date: g('date'), type: g('type') === 'fuel' ? 'toll' : 'other' }));
           const x = [...box.querySelectorAll('.exr')].pop(); bindRow(x); renum(); x.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         });
         box.addEventListener('click', e => { const b = e.target.closest('[data-rmrow]'); if (!b) return; const x = b.closest('.exr'); pickers.delete(+x.dataset.row); x.remove(); renum(); });

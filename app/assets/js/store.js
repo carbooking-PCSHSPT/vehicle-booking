@@ -53,6 +53,8 @@ const Store = (() => {
   const FEATURES = ['แอร์', 'ไมโครโฟน/ลำโพง', 'จอทีวี', 'ช่องชาร์จ USB', 'ช่องเก็บสัมภาระ', 'เข็มขัดนิรภัยทุกที่นั่ง', 'กล้องหน้ารถ', 'ถังดับเพลิง', 'ชุดปฐมพยาบาล', 'ทางลาด/รองรับวีลแชร์'];
   const EXPENSE = { fuel: 'ค่าน้ำมัน', toll: 'ค่าทางด่วน', parking: 'ค่าที่จอดรถ', other: 'ค่าใช้จ่ายอื่น' };
   const PAY = { cash: 'เงินสด', card: 'บัตรเติมน้ำมัน', transfer: 'โอน/เบิกภายหลัง', credit: 'เครดิตปั๊ม' };
+  // ปั๊มน้ำมัน (ให้คนขับเลือก · "อื่น ๆ" = พิมพ์ชื่อเอง)
+  const FUEL_BRANDS = ['ปตท.', 'พีที (PT)', 'บางจาก', 'เชลล์', 'คาลเท็กซ์', 'ซัสโก้', 'เพียว', 'อื่น ๆ'];
   const RATE_KEYS = { punctual: 'ตรงต่อเวลา', safety: 'ขับขี่ปลอดภัย', manner: 'มารยาทและการบริการ', clean: 'ความสะอาดของรถ' };
   const DEPTS = ['ฝ่ายบริหารงานทั่วไป', 'ฝ่ายบริหารงานวิชาการ', 'ฝ่ายบริหารงานบุคคล', 'ฝ่ายบริหารงานงบประมาณ', 'ฝ่ายกิจการนักเรียนและหอพัก',
     'กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี', 'กลุ่มสาระคณิตศาสตร์', 'กลุ่มสาระภาษาไทย', 'กลุ่มสาระภาษาต่างประเทศ', 'กลุ่มสาระสังคมศึกษาฯ',
@@ -870,7 +872,7 @@ const Store = (() => {
   }
 
   const api = {
-    LOCAL, ROLES, STATUS, ASSIGN, VSTATE, KINDS, PASSENGER_KINDS, FEATURES, EXPENSE, PAY, RATE_KEYS, DEPTS, DOMAINS, UDOMAIN,
+    LOCAL, ROLES, STATUS, ASSIGN, VSTATE, KINDS, PASSENGER_KINDS, FEATURES, EXPENSE, PAY, FUEL_BRANDS, RATE_KEYS, DEPTS, DOMAINS, UDOMAIN,
     get db() { return db; }, get me() { return me; }, get authState() { return authState; }, get authError() { return authError; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     start() { A = LOCAL ? makeLocal() : makeCloud(); return A.start(); },
@@ -1134,7 +1136,7 @@ const Store = (() => {
       // คนขับบันทึกย้อนหลังได้ภายใน 30 วันหลังปิดงาน (เลยกำหนด ให้แอดมินบันทึกแทน)
       if (!isAdmin(me) && cur.closedAt && Date.now() - new Date(cur.closedAt) > 30 * DAY) throw new Error('เลยกำหนดบันทึกย้อนหลัง 30 วันแล้ว — กรุณาส่งใบเสร็จให้แอดมินบันทึกแทน');
       const photos = await A.upload(ex.photos || [], { kind: 'receipt', ref: id, label: EXPENSE[ex.type] || 'ใบเสร็จ' });
-      const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), by: me.email, byName: me.name, at: nowISO() };
+      const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), brand: String(ex.brand || '').trim(), branch: String(ex.branch || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), by: me.email, byName: me.name, at: nowISO() };
       return mutateReq(id, r => {
         if (!canAdd(r)) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
         r.expenses = r.expenses || [];

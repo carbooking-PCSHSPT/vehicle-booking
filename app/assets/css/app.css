@@ -1020,6 +1020,15 @@ img.broken { color: transparent; background: #efe9dc; }
 .exr-main { align-items: start; } .exr-main input { height: 52px; min-height: 52px; font-size: 1.2rem; font-family: var(--font-display); }
 .exr-ppl { display: block; margin-top: 3px; min-height: 1em; }
 .exr-need { margin: 6px 0 0; } .exr-need .i { width: 15px; height: 15px; vertical-align: -2px; }
+.exr .label-sm { margin: 4px 0 6px; font: 500 .9rem var(--font-display); color: var(--ink-2); }
+.exr-brands { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.exr-brand { position: relative; cursor: pointer; } .exr-brand input { position: absolute; opacity: 0; pointer-events: none; }
+.exr-brand span { display: grid; place-items: center; min-height: 40px; padding: 4px 2px; border-radius: 11px; border: 1.5px solid var(--line); background: #fff; font: 500 .82rem var(--font-display); text-align: center; line-height: 1.2; }
+.exr-brand input:checked + span { border-color: #e8590c; background: #fff2e8; color: #b84508; box-shadow: 0 0 0 2px rgba(232, 89, 12, .12); }
+.exr-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; } .exr-two:has(> .field:only-child), .exr-two:has(> input[type=hidden]) { grid-template-columns: 1fr; }
+.exr-two .exr-brand-other[hidden] + .field { grid-column: 1 / -1; }
+.exr .not-fuel { margin-bottom: 8px; }
+.exr-pic.opt .dropzone { background: #fff; border-style: dashed; opacity: .9; }
 .exr .fp .dropzone { display: flex; align-items: center; padding: 12px; min-height: 0; flex-direction: row; gap: 10px; justify-content: center; } .exr .fp .dropzone small { display: none; }
 .exr-more { margin-top: 8px; } .exr-more > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; font: 500 .86rem var(--font-display); color: var(--navy); }
 .exr-more > summary::-webkit-details-marker { display: none; } .exr-more > summary .i { width: 15px; height: 15px; transition: transform .2s; } .exr-more[open] > summary .i { transform: rotate(45deg); }

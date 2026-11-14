@@ -942,7 +942,7 @@
     }).filter(x => x.n || x.trips).sort((a, b) => b.amt - a.amt);
     const allKm = fv.reduce((s, x) => s + x.km, 0);
     const months = (() => { const m = new Map(); fuel.forEach(x => { const k = x.e.date.slice(0, 7); const o = m.get(k) || { k, amt: 0, lit: 0 }; o.amt += x.e.amount; o.lit += +x.e.liters || 0; m.set(k, o); }); return [...m.values()].sort((a, b) => a.k.localeCompare(b.k)); })();
-    const stations = (() => { const m = new Map(); fuel.forEach(x => { const k = (x.e.station || 'ไม่ระบุ').trim(); const o = m.get(k) || { k, n: 0, amt: 0, lit: 0 }; o.n++; o.amt += x.e.amount; o.lit += +x.e.liters || 0; m.set(k, o); }); return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 8); })();
+    const stations = (() => { const m = new Map(); fuel.forEach(x => { const k = (x.e.brand || x.e.station || 'ไม่ระบุ').trim(); const o = m.get(k) || { k, n: 0, amt: 0, lit: 0 }; o.n++; o.amt += x.e.amount; o.lit += +x.e.liters || 0; m.set(k, o); }); return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 8); })();
     const monthLbl = k => new Date(k + '-01T00:00:00').toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
     const statsHTML = () => `
         <div class="kpis" style="margin-bottom:16px">
