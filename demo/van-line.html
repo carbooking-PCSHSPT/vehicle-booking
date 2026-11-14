@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ลายเส้นรถตู้หน้าแรก 5 แบบ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-2: #3b47b8; --gold: #c9962b; --gold-2: #e8c36a; --cream: #faf6ee; --ink: #1b2147; --muted: #6e6a7c; --line: #e8e1d2; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e4d8; color: var(--ink); font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; overflow-x: hidden; }
+.top h1 { flex: 1 1 180px; min-width: 0; }
+.opt { min-width: 0; } .hero { min-width: 0; }
+.top { position: sticky; top: 0; z-index: 9; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font: 600 1.02rem Prompt; color: var(--navy); }
+.seg { display: inline-flex; padding: 4px; border-radius: 14px; background: #efe8d8; }
+.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font: 500 .88rem Prompt; color: var(--ink); cursor: pointer; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .5); }
+main { padding: 22px 16px 60px; display: grid; gap: 30px; justify-items: center; }
+.opt { width: 100%; max-width: var(--pw, 1200px); transition: max-width .35s; }
+.opt-h { display: flex; align-items: baseline; gap: 10px; margin: 0 4px 10px; flex-wrap: wrap; }
+.opt-h .tag { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--navy); color: #fff; font: 700 1rem Prompt; }
+.opt-h h2 { margin: 0; font: 600 1.12rem Prompt; color: var(--navy); }
+.opt-h p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: .88rem; }
+.note { margin: 10px 4px 0; font-size: .82rem; color: var(--muted); } .note b { color: var(--ink); }
+
+/* จำลองส่วนหัวหน้าแรก */
+.hero { position: relative; overflow: hidden; border-radius: 24px; padding: 30px 28px; min-height: 250px; background: radial-gradient(700px 400px at 90% 0%, #fff0cf, transparent 70%), var(--cream); border: 1px solid var(--line); box-shadow: 0 20px 40px -30px rgba(40, 30, 10, .5); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; }
+.hero::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle at 1px 1px, rgba(201, 150, 43, .12) 1px, transparent 0); background-size: 22px 22px; pointer-events: none; }
+.txt { position: relative; z-index: 2; }
+.eb { display: flex; align-items: center; gap: 10px; color: var(--gold); font: 500 .9rem Prompt; } .eb::before { content: ""; width: 44px; height: 1px; background: var(--gold); }
+.hero h3 { margin: 10px 0 6px; font: 700 clamp(1.8rem, 4.2vw, 2.8rem)/1.12 Prompt; color: var(--navy); }
+.hero h3 em { display: block; font-style: normal; color: var(--gold); }
+.lead { margin: 10px 0 0; font-size: .98rem; color: var(--ink); max-width: 30em; }
+.art { position: relative; z-index: 1; width: clamp(150px, 26vw, 300px); }
+.art svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+/* ── ตัวรถ (ลายเส้น) ── */
+.van * { vector-effect: non-scaling-stroke; }
+.van .ln { fill: none; stroke: var(--c, var(--navy)); stroke-width: var(--w, 2.4); stroke-linecap: round; stroke-linejoin: round; }
+.van .soft { opacity: .55; }
+.van .fill-glass { fill: var(--glass, rgba(36, 48, 122, .06)); }
+/* แสงวิ่งตามเส้นขอบ: เส้นสั้น ๆ (dash) เลื่อนรอบเส้นทางที่ปิดเป็นวง */
+.van .trace { fill: none; stroke: var(--t, #e8c36a); stroke-width: calc(var(--w, 2.4) * 1.9); stroke-linecap: round; stroke-dasharray: var(--len, 12) calc(100 - var(--len, 12)); animation: run var(--spd, 5s) linear infinite; filter: drop-shadow(0 0 4px var(--t, #e8c36a)) drop-shadow(0 0 10px var(--t, #e8c36a)); }
+.van .trace.b2 { animation-delay: calc(var(--spd, 5s) / -2); }
+.van .trace.rev { animation-direction: reverse; }
+@keyframes run { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+.van .lamp { fill: var(--lamp, #fff3c4); animation: lamp 3s ease-in-out infinite; }
+@keyframes lamp { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* A ทองหรู */
+.oA { --c: #b8862a; --t: #ffd77a; --glass: rgba(201, 150, 43, .08); --spd: 4.5s; }
+/* B น้ำเงิน + ลำแสงไฟหน้า */
+.oB { --c: var(--navy); --t: #6f8bff; --spd: 5s; --len: 16; }
+.oB .beam { fill: url(#beamG); transform-origin: center; animation: beam 3s ease-in-out infinite; }
+@keyframes beam { 0%, 100% { opacity: .15; } 50% { opacity: .55; } }
+/* C พิมพ์เขียว */
+.oC .art { background: linear-gradient(#24307a, #1d2766); border-radius: 22px; padding: 18px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+.oC .art::before { content: ""; position: absolute; inset: 0; border-radius: 22px; background-image: linear-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .07) 1px, transparent 1px); background-size: 16px 16px; }
+.oC .van { --c: rgba(220, 230, 255, .85); --t: #7ee0ff; --w: 1.6; --glass: rgba(255, 255, 255, .05); --spd: 6s; --len: 10; }
+.oC .dim { fill: none; stroke: rgba(126, 224, 255, .6); stroke-width: 1; stroke-dasharray: 3 3; }
+.oC .dimt { fill: rgba(200, 220, 255, .8); font: 500 9px Prompt; }
+/* D ถนนต่อเนื่องเข้าตัวรถ */
+.oD { --c: var(--navy); --t: #f0a830; --spd: 7s; --len: 9; }
+.oD .road { fill: none; stroke: rgba(36, 48, 122, .25); stroke-width: 1.6; }
+.oD .roadmid { fill: none; stroke: #e8c36a; stroke-width: 2; stroke-dasharray: 8 10; animation: rd 1s linear infinite; }
+@keyframes rd { to { stroke-dashoffset: -18; } }
+/* E ตราสัญลักษณ์ (วงกลม) */
+.oE .art { width: clamp(120px, 18vw, 190px); }
+.oE { --c: var(--navy); --t: var(--gold); --spd: 6s; }
+.oE .ring { fill: #fff; stroke: rgba(201, 150, 43, .45); stroke-width: 1.4; }
+.oE .ringT { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 18 82; animation: run 4s linear infinite; filter: drop-shadow(0 0 5px #e8c36a); }
+.oE .rtxt { fill: var(--gold); font: 600 9.5px Prompt; letter-spacing: 2px; }
+
+/* มือถือ: รถอยู่มุมขวาบน ข้างหัวข้อ (ไม่ดันเนื้อหา) */
+.narrow .hero { grid-template-columns: 1fr; padding: 22px 18px; min-height: 0; }
+.narrow .art { position: absolute; right: 10px; top: 14px; width: 118px; opacity: .95; }
+.narrow .oC .art { width: 124px; padding: 8px; border-radius: 16px; } .narrow .oC .dim, .narrow .oC .dimt { display: none; }
+.narrow .oE .art { width: 96px; top: 12px; }
+.narrow .oD .art { width: 128px; }
+.narrow .hero h3 { padding-right: 112px; }
+.narrow .hero h3 em { white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>ลายเส้นรถตู้หน้าแรก · เลือก 1 แบบ</h1>
+  <div class="seg" id="w"><button data-w="390" class="on">มือถือ</button><button data-w="820">แท็บเล็ต</button><button data-w="1200">คอม</button></div>
+</div>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="beamG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c8" stop-opacity=".9"/><stop offset="1" stop-color="#fff6c8" stop-opacity="0"/></linearGradient>
+</defs></svg>
+<main id="m"></main>
+<script>
+// รถตู้มุมหน้า (viewBox 0 0 240 210) — เส้นขอบตัวรถ (OUT) เป็นวงปิด ใช้ให้แสงวิ่งรอบ
+const OUT = 'M50 168 V80 C50 47 68 31 98 29 H142 C172 31 190 47 190 80 V150 H198 Q204 150 204 156 V170 Q204 178 196 178 H44 Q36 178 36 170 V156 Q36 150 42 150 H50';
+const VAN = (extra = '', traces = 1, rev = false) => `<svg class="van" viewBox="0 0 240 210" aria-hidden="true">
+  ${extra}
+  <path class="fill-glass" d="M64 86 C66 60 80 48 102 46 H138 C160 48 174 60 176 86 Z"/>
+  <path class="ln" d="${OUT}"/>
+  <path class="ln" d="M64 86 C66 60 80 48 102 46 H138 C160 48 174 60 176 86 Z"/>
+  <path class="ln soft" d="M92 84 L108 70 M150 84 L134 70"/>
+  <path class="ln" d="M50 88 L36 90 Q32 90 32 94 V104 Q32 108 36 108 L50 106 M190 88 L204 90 Q208 90 208 94 V104 Q208 108 204 108 L190 106"/>
+  <path class="ln" d="M58 114 H94 L88 130 H58 Q55 130 55 127 V117 Q55 114 58 114 Z M182 114 H146 L152 130 H182 Q185 130 185 127 V117 Q185 114 182 114 Z"/>
+  <path class="lamp" d="M60 117 H90 L86 127 H60 Z M180 117 H150 L154 127 H180 Z"/>
+  <rect class="ln" x="100" y="113" width="40" height="20" rx="5"/>
+  <path class="ln soft" d="M104 120 H136 M104 126 H136"/>
+  <circle class="ln" cx="120" cy="103" r="4.5"/>
+  <rect class="ln" x="99" y="156" width="42" height="14" rx="3"/>
+  <path class="ln soft" d="M44 164 H88 M152 164 H196"/>
+  <rect class="ln" x="54" y="178" width="26" height="14" rx="4"/><rect class="ln" x="160" y="178" width="26" height="14" rx="4"/>
+  <path class="ln soft" d="M98 36 H142"/>
+  <path class="trace ${rev ? 'rev' : ''}" pathLength="100" d="${OUT}"/>
+  ${traces > 1 ? `<path class="trace b2 ${rev ? '' : 'rev'}" pathLength="100" d="${OUT}"/>` : ''}
+</svg>`;
+const hero = (art, cls) => `<div class="hero ${cls}"><div class="txt"><div class="eb">ฝ่ายบริหารงานทั่วไป</div><h3>ระบบยานพาหนะ<em>ขอรถส่วนกลาง</em></h3><p class="lead">บริการรถตู้ รถบัส ให้แก่คุณครูและบุคลากรทุกท่านในโรงเรียน</p></div><div class="art">${art}</div></div>`;
+const OPTS = [
+  { t: 'ทองหรู', cls: 'oA', d: 'ลายเส้นสีทองเข้ากับหัวข้อ “ขอรถส่วนกลาง” แสงทองวิ่งวนรอบตัวรถ ไฟหน้ากะพริบเบา ๆ — ดูหรูและกลมกลืนกับสีเดิมของเว็บ', art: VAN(), n: '<b>ผมแนะนำแบบนี้</b> · กลมกลืนกับธีมทอง-กรมท่าที่สุด · มือถือวางมุมขวาบน ไม่ดันเนื้อหาลง' },
+  { t: 'น้ำเงิน + ลำแสงไฟหน้า', cls: 'oB', d: 'ลายเส้นกรมท่า แสงสีฟ้าวิ่งสวนกัน 2 เส้น และลำแสงไฟหน้าส่องลงพื้น — ดูมีชีวิต เหมือนรถกำลังจะออกเดินทาง', art: VAN('<path class="beam" d="M60 128 L20 210 H96 L88 128 Z M180 128 L220 210 H144 L152 128 Z"/>', 2), n: 'เด่นชัด สื่อ “การเดินทาง” ชัดเจน · แสง 2 เส้นทำให้ดูเคลื่อนไหวตลอด' },
+  { t: 'พิมพ์เขียว (Blueprint)', cls: 'oC', d: 'กรอบสีกรมท่าลายตาราง ลายเส้นขาวแบบแบบแปลน มีเส้นบอกขนาด และแสงสีฟ้าวิ่งรอบ — ดูทันสมัย สื่อถึงวิทยาศาสตร์/เทคโนโลยี', art: VAN('<path class="dim" d="M36 200 H204 M36 196 V204 M204 196 V204"/><text class="dimt" x="98" y="207">1,880 mm</text><path class="dim" d="M222 29 V178 M218 29 H226 M218 178 H226"/>'), n: 'เหมาะกับโรงเรียนวิทยาศาสตร์ · คอนทราสต์สูง เห็นชัดแม้บนพื้นครีม' },
+  { t: 'รถตู้บนถนน', cls: 'oD', d: 'รถตู้ยืนบนถนนที่มีเส้นกลางวิ่งเข้าหา และแสงสีส้มวิ่งรอบตัวรถ — สื่อการเดินทางมากที่สุด', art: VAN('<path class="road" d="M0 206 L80 182 M240 206 L160 182 M-10 210 H250"/><path class="roadmid" d="M120 210 V182"/>'), n: 'เล่าเรื่อง “ออกเดินทาง” ได้ดี · เส้นถนนเคลื่อนไหวเบา ๆ' },
+  { t: 'ตราสัญลักษณ์วงกลม', cls: 'oE', d: 'รถตู้ลายเส้นอยู่ในวงกลมแบบตราประทับ มีข้อความ PCSHS · VEHICLE และแสงทองวิ่งรอบวง — เรียบ เล็ก เป็นทางการ', art: `<svg viewBox="0 0 240 240" aria-hidden="true"><defs><path id="rc" d="M120 120 m-96 0 a96 96 0 1 1 192 0 a96 96 0 1 1 -192 0"/></defs><circle class="ring" cx="120" cy="120" r="110"/><path class="ringT" pathLength="100" d="M120 10 a110 110 0 1 1 -0.1 0"/><text class="rtxt"><textPath href="#rc" startOffset="2%">PCSHS PATHUM THANI · VEHICLE SERVICE · </textPath></text><g transform="translate(36 42) scale(.7)">${VAN().replace('<svg class="van" viewBox="0 0 240 210" aria-hidden="true">', '<g class="van">').replace('</svg>', '</g>')}</g></svg>`, n: 'ขนาดเล็กที่สุด · ดูเป็นโลโก้ของงานยานพาหนะ · ใช้ซ้ำในหน้าอื่นได้' }
+];
+document.getElementById('m').innerHTML = OPTS.map((o, i) => `<section class="opt"><div class="opt-h"><span class="tag">${'ABCDE'[i]}</span><h2>${o.t}</h2><p>${o.d}</p></div>${hero(o.art, o.cls)}<p class="note">${o.n}</p></section>`).join('');
+const setW = w => { document.documentElement.style.setProperty('--pw', w + 'px'); document.body.classList.toggle('narrow', w < 600); document.querySelectorAll('#w button').forEach(b => b.classList.toggle('on', +b.dataset.w === w)); };
+document.getElementById('w').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setW(+b.dataset.w); });
+setW(innerWidth < 700 ? 390 : 1200);
+</script>
+</body>
+</html>
