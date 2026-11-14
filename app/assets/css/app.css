@@ -1010,6 +1010,21 @@ img.broken { color: transparent; background: #efe9dc; }
 .exr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; margin-bottom: 8px; }
 .lt640 .exr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .exr-sum { text-align: right; color: var(--ink-2); } .exr-sum:empty { display: none; }
+/* แบบย่อสำหรับคนขับ: ปุ่มประเภท · ยอดเงิน · ลิตร · รูปบิล · รายละเอียดพับไว้ */
+.exr-types { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.exr-type { position: relative; cursor: pointer; } .exr-type input { position: absolute; opacity: 0; pointer-events: none; }
+.exr-type span { display: grid; justify-items: center; gap: 3px; padding: 9px 2px 7px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font: 500 .8rem var(--font-display); color: var(--ink-2); text-align: center; white-space: nowrap; }
+.exr-type span .i { width: 20px; height: 20px; color: var(--gold); }
+.exr-type input:checked + span { border-color: var(--navy); background: var(--navy); color: #fff; } .exr-type input:checked + span .i { color: var(--gold-2); }
+.exr-main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; } .exr-main.one { grid-template-columns: 1fr; }
+.exr-main { align-items: start; } .exr-main input { height: 52px; min-height: 52px; font-size: 1.2rem; font-family: var(--font-display); }
+.exr-ppl { display: block; margin-top: 3px; min-height: 1em; }
+.exr-need { margin: 6px 0 0; } .exr-need .i { width: 15px; height: 15px; vertical-align: -2px; }
+.exr .fp .dropzone { display: flex; align-items: center; padding: 12px; min-height: 0; flex-direction: row; gap: 10px; justify-content: center; } .exr .fp .dropzone small { display: none; }
+.exr-more { margin-top: 8px; } .exr-more > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; font: 500 .86rem var(--font-display); color: var(--navy); }
+.exr-more > summary::-webkit-details-marker { display: none; } .exr-more > summary .i { width: 15px; height: 15px; transition: transform .2s; } .exr-more[open] > summary .i { transform: rotate(45deg); }
+.exr-more .exr-sumtxt { color: var(--muted); font-family: var(--font-body); font-weight: 400; }
+.exr-more .exr-grid { margin-top: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* ตรวจรถก่อนออกเดินทาง */
 .chk-box { padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fdfaf3; }
 .chk-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
