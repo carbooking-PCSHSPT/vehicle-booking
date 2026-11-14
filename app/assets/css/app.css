@@ -1640,3 +1640,63 @@ details.more > summary::-webkit-details-marker { display: none; } details.more[o
 .print-brand span { font-size: .8rem; color: #444; }
 @media print { .print-brand.print-only { display: flex !important; } }
 .hm.dk { color: #fff; }
+/* ───────── หน้าแรก มือถือ/แท็บเล็ต: เส้นทางขบวนรถ (สว่าง = แวะรับตามจุด · มืด = ยามค่ำคืน) ───────── */
+.route-art, .hero-mode { display: none; }
+.lt1060 .hero .map-wrap { display: none; }
+.lt1060 .hero-txt { display: grid; grid-template-columns: minmax(0, 1fr) 44%; align-items: start; }
+.lt1060 .hero-txt > * { grid-column: 1; position: relative; z-index: 1; min-width: 0; }
+.lt1060 .hero-txt > .eyebrow { grid-row: 1; align-self: center; }
+.lt1060 .hero-txt > h1 { grid-row: 2; grid-column: 1 / -1; }
+.lt1060 .hero-txt > .lead { grid-row: 3; }
+.lt1060 .hero-txt > .stats-inline { grid-row: 4; }
+.lt1060 .hero-txt > .hero-cta { grid-row: 5; grid-column: 1 / -1; }
+.lt1060 .hero-txt > .route-art { display: block; grid-column: 2; grid-row: 2 / 5; z-index: 0; align-self: stretch; min-height: 250px; margin-right: -14px; pointer-events: none; }
+.route-art svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lt1060 .hero-txt > .hero-mode { display: inline-flex; grid-column: 2; grid-row: 1; justify-self: end; align-self: center; z-index: 2; }
+/* แท็บเล็ต: ข้อความ + ปุ่มด้านซ้าย ภาพเส้นทางเต็มความสูงด้านขวา */
+html.lt1060:not(.lt640) .hero-txt { grid-template-columns: minmax(0, 1fr) 40%; column-gap: 20px; }
+html.lt1060:not(.lt640) .hero-txt > .hero-cta { grid-row: 4; grid-column: 1; grid-template-columns: 1fr 1fr; }
+html.lt1060:not(.lt640) .hero-txt .cta-tile.t-primary { grid-column: 1 / -1; }
+html.lt1060:not(.lt640) .hero-txt > .stats-inline { grid-row: 5; }
+html.lt1060:not(.lt640) .hero-txt > .route-art { grid-row: 2 / 6; margin-right: 0; }
+/* มือถือ: ตัวเลขเรียงลงข้างภาพ แล้วปุ่มอยู่ด้านล่างเต็มความกว้าง */
+.lt640 .hero-txt > .lead { margin-top: 10px; }
+.lt640 .hero-txt > .stats-inline { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 14px; }
+.lt640 .hero-txt > .stats-inline div { display: flex; align-items: baseline; gap: 8px; padding-left: 10px; }
+.lt640 .hero-txt > .stats-inline b { font-size: 1.15rem; min-width: 2.2em; white-space: nowrap; }
+.lt640 .hero-txt > .stats-inline small { font-size: .72rem; }
+/* ภาพเส้นทาง */
+.ra-st { fill: none; stroke: #ecdfc2; stroke-width: 6; } .ra-st.s { stroke-width: 3; stroke: #efe5cf; }
+.ra-city { fill: #d9dce8; } .ra-city.b { fill: #c6cbde; } .ra-win { fill: #fff; opacity: .7; }
+.ra-sw { fill: none; stroke: url(#raSw); stroke-width: 7; stroke-linecap: round; }
+.ra-bg { fill: none; stroke: rgba(59, 82, 201, .18); stroke-width: 12; stroke-linecap: round; }
+.ra-rt { fill: none; stroke: #3b52c9; stroke-width: 5; stroke-linecap: round; }
+.ra-dash { fill: none; stroke: #fff; stroke-width: 1.6; stroke-dasharray: 5 7; opacity: .8; }
+.ra-pin path { filter: drop-shadow(0 4px 4px rgba(20, 30, 80, .35)); }
+.ra-nt, .ra-nb { opacity: 0; transition: opacity .5s; }
+/* ปุ่มสลับโหมด */
+.hero-mode { position: relative; align-items: center; justify-content: space-between; width: 66px; height: 34px; padding: 0 9px; border-radius: 99px; border: 1px solid var(--line); background: var(--paper); cursor: pointer; box-shadow: 0 8px 18px -12px rgba(60, 40, 10, .5); }
+.hero-mode::before { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: var(--gold-2); transition: transform .3s, background .3s; }
+.hero-mode svg { position: relative; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hero-mode .sun { color: #6b4c0a; } .hero-mode .moon { color: var(--muted); }
+/* โหมดมืด (เฉพาะมือถือ/แท็บเล็ต) */
+.lt1060 .hero.night { background: radial-gradient(520px 340px at 90% 8%, rgba(242, 193, 78, .16), transparent 70%), linear-gradient(#141a44, #1c2560); }
+.lt1060 .hero.night .hex, .lt1060 .hero.night .contours { opacity: .12; }
+.lt1060 .hero.night h1 { color: #fff; } .lt1060 .hero.night h1 .m path { stroke: var(--gold-2); }
+.lt1060 .hero.night .eyebrow { color: var(--gold-2); } .lt1060 .hero.night .lead { color: #c9cdee; }
+.lt1060 .hero.night .stats-inline b { color: #fff; } .lt1060 .hero.night .stats-inline small { color: #9aa2d6; }
+.lt1060 .hero.night .cta-tile.t-primary { background: #3b52c9; }
+.lt1060 .hero.night .cta-tile.t-plain { background: #222b6a; color: #fff; border-color: #2f3a85; } .lt1060 .hero.night .cta-tile.t-plain .ci { background: rgba(255, 255, 255, .1); }
+.lt1060 .hero.night .cta-tile .cnt { border-color: #141a44; }
+.hero.night .hero-mode { background: #222b6a; border-color: #2f3a85; } .hero.night .hero-mode::before { transform: translateX(32px); background: #3b52c9; }
+.hero.night .hero-mode .sun { color: #9aa2d6; } .hero.night .hero-mode .moon { color: #fff; }
+.hero.night .ra-nt, .hero.night .ra-nb { opacity: 1; }
+.hero.night .ra-st { stroke: rgba(255, 255, 255, .05); } .hero.night .ra-st.s { stroke: rgba(255, 255, 255, .035); }
+.hero.night .ra-city { fill: #232c6b; } .hero.night .ra-city.b { fill: #2a3478; }
+.hero.night .ra-win { fill: #f6d27a; opacity: .85; animation: raFlick 5s ease-in-out infinite; } .hero.night .ra-win:nth-child(3n) { animation-delay: -1.7s; } .hero.night .ra-win:nth-child(5n+1) { animation-delay: -3.1s; } .hero.night .ra-win:nth-child(4n) { opacity: .18; animation: none; }
+@keyframes raFlick { 0%, 100% { opacity: .85; } 50% { opacity: .35; } }
+.hero.night .ra-bg { stroke: rgba(242, 193, 78, .12); stroke-width: 16; } .hero.night .ra-rt { stroke: #7088ff; filter: drop-shadow(0 0 5px #7088ff); } .hero.night .ra-dash { opacity: .5; }
+.hero.night .ra-sw { opacity: .7; } .hero.night .ra-c1 { fill: #5b74ff; }
+html.hero-night.lt1060 .nav:not(.solid) { background: rgba(20, 26, 68, .9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 1px 0 rgba(255, 255, 255, .06); }
+html.hero-night.lt1060 .nav:not(.solid) .brand strong { color: #fff; } html.hero-night.lt1060 .nav:not(.solid) .brand small { color: var(--gold-2); }
+@media (prefers-reduced-motion: reduce) { .hero.night .ra-win { animation: none; } }

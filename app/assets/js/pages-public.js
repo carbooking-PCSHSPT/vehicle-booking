@@ -45,6 +45,41 @@
     return list.length ? `<div class="timeline">${html}</div>` : UI.empty('วันนี้ยังไม่มีรายการใช้รถ', 'calendar');
   }
 
+  // ═════════ หน้าแรก (มือถือ/แท็บเล็ต): เส้นทางขบวนรถ — สว่าง = แวะรับตามจุด · มืด = ขบวนรถยามค่ำคืน ═════════
+  const HERO_KEY = 'vb-hero-mode';
+  let heroPick = null;
+  const heroMode = () => { try { heroPick = localStorage.getItem(HERO_KEY) || heroPick; } catch (e) { /* ใช้ค่าในหน่วยความจำ */ } return heroPick; };
+  // ยังไม่เคยเลือกเอง → มืดอัตโนมัติช่วง 18:00–05:59
+  const heroNight = () => { const m = heroMode(); if (m) return m === 'dark'; const h = new Date().getHours(); return h >= 18 || h < 6; };
+  const routeArt = () => {
+    const R = 'M150 560 C 70 520, 250 470, 170 420 S 50 330, 130 280 S 255 200, 205 150 S 215 90, 236 70';
+    const PINS = [[141.6, 401.4, '#f2b632', 1, 2.64], [128.6, 280.9, '#3b52c9', .8, 1.52], [219.4, 167.9, '#f2b632', 1, .4]]; // x, y, สี, ขนาด, จังหวะที่รถแวะ
+    const CITY = [[150, 470, 22, 90], [176, 440, 26, 120], [206, 455, 20, 105], [230, 420, 30, 140], [264, 445, 26, 115], [120, 490, 24, 70]];
+    const lights = (h, w) => `<circle cx="${h - 1.2}" cy="${-(w - 2.4)}" r="1.4" fill="#fff6c8"/><circle cx="${h - 1.2}" cy="${w - 2.4}" r="1.4" fill="#fff6c8"/><rect x="${-h - .4}" y="${-(w - 1.2)}" width="1.7" height="2.8" rx=".6" fill="#ff5a5a"/><rect x="${-h - .4}" y="${w - 4}" width="1.7" height="2.8" rx=".6" fill="#ff5a5a"/>`;
+    const glow = h => `<g class="ra-nb"><path d="M${h} -4 L${h + 46} -18 L${h + 46} 18 L${h} 4Z" fill="url(#raBeam)"/><circle cx="${-h}" r="8" fill="url(#raTail)"/></g>`;
+    const CARS = [
+      [`<rect x="-15" y="-7" width="30" height="14" rx="4" fill="#24307a" class="ra-c1"/><rect x="8" y="-5.5" width="4.5" height="11" rx="1.6" fill="#bfe0ff"/><rect x="-12" y="-5" width="18" height="10" rx="2" fill="#fff" opacity=".2"/>${lights(15, 7)}`, 15, 0],
+      [`<rect x="-22" y="-7.5" width="44" height="15" rx="3.5" fill="#d9a640"/><rect x="16" y="-6" width="4.5" height="12" rx="1.6" fill="#bfe0ff"/><rect x="-7" y="-4" width="12" height="8" rx="1.5" fill="#fff" opacity=".4"/>${[-18, -13, 8].map(x => `<rect x="${x}" y="-3" width="3.5" height="6" rx="1" fill="#fff" opacity=".28"/>`).join('')}${lights(22, 7.5)}`, 22, -4],
+      [`<rect x="-13" y="-6" width="26" height="12" rx="5" fill="#3b52c9"/><rect x="3" y="-4.8" width="4.5" height="9.6" rx="1.8" fill="#bfe0ff"/><rect x="-9" y="-4.4" width="3" height="8.8" rx="1.4" fill="#bfe0ff" opacity=".8"/><rect x="-5.5" y="-4.6" width="8" height="9.2" rx="2" fill="#fff" opacity=".2"/>${lights(13, 6)}`, 13, -8]
+    ];
+    const STARS = [[30, 20], [80, 60], [150, 10], [20, 140], [110, 120], [280, 120], [60, 230], [270, 260], [180, 70], [10, 330]];
+    return `<svg viewBox="0 -12 300 602" preserveAspectRatio="xMaxYMid meet" focusable="false">
+      <defs><linearGradient id="raSw" x1="0" x2="1"><stop offset="0" stop-color="#f2c14e" stop-opacity="0"/><stop offset=".5" stop-color="#f2c14e"/><stop offset="1" stop-color="#24307a"/></linearGradient>
+        <linearGradient id="raBeam" x1="0" x2="1"><stop offset="0" stop-color="#fff6c8" stop-opacity=".85"/><stop offset="1" stop-color="#fff6c8" stop-opacity="0"/></linearGradient>
+        <radialGradient id="raTail"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".9"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient></defs>
+      <path class="ra-st" d="M-20 120 L320 60 M-20 260 L320 200 M-20 400 L320 330 M60 -10 L20 600 M180 -10 L150 600 M290 -10 L270 600"/><path class="ra-st s" d="M-20 190 L320 130 M-20 330 L320 270 M120 -10 L90 600 M240 -10 L215 600"/>
+      <g class="ra-nt">${STARS.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 ? 1.3 : 2}" fill="#fff"><animate attributeName="opacity" values=".2;1;.2" dur="${2 + (i % 4) * .7}s" begin="-${i * .4}s" repeatCount="indefinite"/></circle>`).join('')}<circle cx="70" cy="40" r="14" fill="#fff3c4" opacity=".9"/><circle cx="76" cy="35" r="12" fill="#18204f"/></g>
+      ${CITY.map(([x, y, w, h], i) => `<g><rect class="ra-city${i % 2 ? ' b' : ''}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/>${Array.from({ length: Math.floor(h / 18) }, (_, k) => `<rect class="ra-win" x="${x + 5}" y="${y + 8 + k * 18}" width="${w - 10}" height="5" rx="1"/>`).join('')}</g>`).join('')}
+      <path class="ra-sw" d="M-30 560 C 80 520, 200 540, 330 470"/>
+      <path class="ra-bg" d="${R}"/><path class="ra-rt" d="${R}"/><path class="ra-dash" d="${R}"/>
+      ${PINS.map(([x, y, c, s, ph]) => `<circle cx="${x}" cy="${y}" r="0" fill="none" stroke="${c}" stroke-width="3"><animate attributeName="r" values="6;24;24" keyTimes="0;.4;1" dur="4s" begin="${ph}s" repeatCount="indefinite"/><animate attributeName="opacity" values=".8;0;0" keyTimes="0;.4;1" dur="4s" begin="${ph}s" repeatCount="indefinite"/></circle><g transform="translate(${x} ${y})"><animateTransform attributeName="transform" type="translate" additive="sum" values="0 0;0 -7;0 0;0 0" keyTimes="0;.08;.16;1" dur="4s" begin="${ph}s" repeatCount="indefinite"/><g class="ra-pin" transform="scale(${s})"><path d="M0 0 C-11 -13 -11 -26 0 -30 C11 -26 11 -13 0 0Z" fill="${c}"/><circle cy="-19" r="4.5" fill="#fff"/></g></g>`).join('')}
+      <g class="ra-pin"><path d="M236 70 C206 40 206 6 236 -6 C266 6 266 40 236 70Z" fill="#3b52c9"/><circle cx="236" cy="22" r="17" fill="#fff"/><g transform="translate(224 10)"><rect x="2" y="3" width="20" height="16" rx="4" fill="#3b52c9"/><rect x="5" y="6" width="14" height="6" rx="1.5" fill="#fff"/><circle cx="7" cy="17" r="1.6" fill="#fff"/><circle cx="17" cy="17" r="1.6" fill="#fff"/></g></g>
+      <path id="raPath" d="${R}" fill="none" stroke="none"/>
+      ${CARS.map(([body, h, b]) => `<g><animateMotion dur="12s" begin="${b}s" repeatCount="indefinite" rotate="auto" keyPoints="0;.32;.32;.56;.56;.8;.8;1;1" keyTimes="0;.22;.30;.46;.54;.70;.78;.92;1" calcMode="linear"><mpath href="#raPath"/></animateMotion>${glow(h)}${body}</g>`).join('')}
+    </svg>`;
+  };
+  const MODE_BTN = `<button class="hero-mode" type="button" data-heromode aria-label="สลับโหมดสว่าง / มืด" title="โหมดสว่าง / มืด"><svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></button>`;
+
   // ═════════ หน้าแรก ═════════
   Pages.home = ({ query }) => {
     const s = S.db.settings, logged = inn();
@@ -67,14 +102,15 @@
     const pct = p => `left:${p[0] / 6}%;top:${p[1] / 4.7}%`;
     const bus = vs.find(v => v.kind === 'bus');
     const html = `
-    <section class="hero">
+    <section class="hero${heroNight() ? ' night' : ''}">
       <div class="hex"></div>
       <svg class="contours" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <path d="M-50 700 C 200 600, 380 760, 620 650 S 1000 520, 1500 640"/><path d="M-50 740 C 220 640, 400 800, 640 690 S 1020 560, 1500 680"/><path d="M-50 780 C 240 680, 420 840, 660 730 S 1040 600, 1500 720"/>
         <path d="M-50 160 C 260 240, 520 80, 760 170 S 1180 260, 1500 140"/><path d="M-50 200 C 260 280, 520 120, 760 210 S 1180 300, 1500 180"/>
       </svg>
       <div class="container hero-grid">
-        <div>
+        <div class="hero-txt">
+          ${MODE_BTN}<div class="route-art" aria-hidden="true">${routeArt()}</div>
           <div class="eyebrow reveal">${esc(s.division)}</div>
           <h1 class="reveal" style="--d:.08s"><span>ระบบยานพาหนะ</span><span class="m">ขอรถส่วนกลาง<svg viewBox="0 0 300 20" preserveAspectRatio="none"><path d="M4 14 C 60 4, 120 18, 180 8 S 270 6, 296 12"/></svg></span></h1>
           <p class="lead reveal" style="--d:.16s">บริการรถตู้ รถบัส ให้แก่คุณครูและบุคลากรทุกท่านในโรงเรียน</p>
@@ -138,6 +174,18 @@
         // เปลี่ยนวันที่แล้ว เลื่อนลงไปที่กระดานเที่ยวรถ
         if (query.date && mountedOnce.home !== query.date) { const b = $('#board', root); if (b) setTimeout(() => scrollTo({ top: b.getBoundingClientRect().top + scrollY - 100, behavior: 'smooth' }), 80); }
         mountedOnce.home = query.date || '';
+        // ปุ่มสลับโหมดสว่าง/มืด (เห็นเฉพาะมือถือ/แท็บเล็ต) — จำค่าที่เลือกไว้ในเครื่อง
+        const hero = $('.hero', root);
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) $('.route-art svg', root)?.pauseAnimations();
+        document.documentElement.classList.toggle('hero-night', !!(hero && hero.classList.contains('night')));
+        $('[data-heromode]', root)?.addEventListener('click', () => {
+          const h = $('.hero'); if (!h) return;
+          const night = !h.classList.contains('night');
+          heroPick = night ? 'dark' : 'light';
+          try { localStorage.setItem(HERO_KEY, heroPick); } catch (e) { /* จำได้เฉพาะรอบนี้ */ }
+          h.classList.toggle('night', night);
+          document.documentElement.classList.toggle('hero-night', night);
+        });
         const typed = $('#typed', root), kmc = $('#kmchip', root);
         let qi = 0, alive = true, timer = 0;
         const loop = () => {
@@ -152,7 +200,10 @@
         };
         loop();
       },
-      tick() { $$('[data-clock]').forEach(el => { el.textContent = new Date().toLocaleTimeString('th-TH', { hour12: false }); }); }
+      tick() {
+        $$('[data-clock]').forEach(el => { el.textContent = new Date().toLocaleTimeString('th-TH', { hour12: false }); });
+        const h = $('.hero'); if (h) document.documentElement.classList.toggle('hero-night', h.classList.contains('night'));
+      }
     };
   };
 
