@@ -106,11 +106,12 @@ service cloud.firestore {
                         && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && request.resource.data.status == resource.data.status
                         && changedOnly(['esign', 'history', 'updatedAt']))
-                    // คนขับ: กดออกเดินทาง/กลับถึง เลขไมล์ ค่าน้ำมัน — เปลี่ยนรถ/คนขับ/รายละเอียดคำขอไม่ได้
+                    // คนขับ: กดออกเดินทาง/กลับถึง (กลับครบทุกคัน = ปิดงานอัตโนมัติ) เลขไมล์ ค่าน้ำมัน (บันทึกได้หลังปิดงาน)
+                    // — เปลี่ยนรถ/คนขับ/รายละเอียดคำขอไม่ได้
                     || (role('driver') && email() in resource.data.driverEmails
-                        && resource.data.status in ['approved', 'ontrip', 'returned']
-                        && request.resource.data.status in ['approved', 'ontrip', 'returned']
-                        && changedOnly(['assignments', 'expenses', 'history', 'status', 'updatedAt'])
+                        && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
+                        && request.resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
+                        && changedOnly(['assignments', 'expenses', 'history', 'status', 'closedAt', 'updatedAt'])
                         && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd']));
       allow delete: if admin();
     }

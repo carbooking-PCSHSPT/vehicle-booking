@@ -110,6 +110,15 @@ const Store = (() => {
     daily: { label: 'ไปหลายวัน ไป-กลับทุกวัน', icon: 'refresh', hint: 'ไม่ค้างคืน รถออกและกลับโรงเรียนทุกวัน ตามเวลาเดียวกัน' }
   };
   const tripType = r => TRIP[r.tripType] ? r.tripType : (sameDay(r.startAt, r.endAt) ? 'day' : 'overnight');
+  // ตัวเลือกในแบบฟอร์ม: แยก "ไปส่ง" กับ "ไปรับ" ให้ชัด (เก็บเป็น tripType 'oneway' + onewayDir 'drop' | 'pick')
+  const TRIP_UI = {
+    day: TRIP.day,
+    drop: { label: 'ไปส่งอย่างเดียว', icon: 'arrowUR', hint: 'รถไปส่งคณะแล้วกลับโรงเรียนเลย ไม่รอรับกลับ' },
+    pick: { label: 'ไปรับอย่างเดียว', icon: 'arrowDL', hint: 'รถออกไปรับคณะที่ปลายทาง แล้วพากลับโรงเรียน' },
+    overnight: TRIP.overnight, daily: TRIP.daily
+  };
+  const tripUI = r => tripType(r) === 'oneway' ? (r.onewayDir === 'pick' ? 'pick' : 'drop') : tripType(r);
+  const tripLabel = r => TRIP_UI[tripUI(r)].label;
   // ช่วงเวลาที่รถ/คนขับไม่ว่าง: ไป-กลับทุกวัน = แยกเป็นรายวัน (กลางคืนรถว่าง) · แบบอื่น = ช่วงเดียวตั้งแต่ออกจนกลับ
   function windows(r) {
     const s = new Date(r.startAt), e = new Date(r.endAt);
@@ -130,7 +139,7 @@ const Store = (() => {
     const t = tripType(r), n = Math.round((new Date(new Date(r.endAt).toDateString()) - new Date(new Date(r.startAt).toDateString())) / 864e5) + 1;
     if (t === 'overnight') return { cls: 'night', icon: 'moon', text: `ค้างคืน ${n} วัน ${n - 1} คืน` };
     if (t === 'daily') return { cls: 'navy', icon: 'refresh', text: `ไป-กลับทุกวัน ${n} วัน` };
-    if (t === 'oneway') return { cls: '', icon: 'arrowUR', text: 'ไปส่ง/รับอย่างเดียว' };
+    if (t === 'oneway') return r.onewayDir === 'pick' ? { cls: '', icon: 'arrowDL', text: 'ไปรับอย่างเดียว' } : r.onewayDir === 'drop' ? { cls: '', icon: 'arrowUR', text: 'ไปส่งอย่างเดียว' } : { cls: '', icon: 'arrowUR', text: 'ไปส่ง/รับอย่างเดียว' };
     return null;
   }
   function rollup(r) {
@@ -138,7 +147,8 @@ const Store = (() => {
     const a = r.assignments || [];
     if (!a.length) return 'approved';
     if (a.some(x => x.status === 'ontrip')) return 'ontrip';
-    if (a.every(x => x.status === 'returned')) return 'returned';
+    // รถทุกคันกลับถึงโรงเรียน = ปิดงานอัตโนมัติ (ไม่มีขั้น "รอปิดงาน" · ค่าใช้จ่ายยังบันทึก/แก้ได้หลังปิดงาน)
+    if (a.every(x => x.status === 'returned')) return 'closed';
     return a.some(x => x.status === 'returned') ? 'ontrip' : 'approved';
   }
   // ws (ไม่บังคับ) = ช่วงเวลาของคำขอที่กำลังจัด จาก windows(r) — ใช้แทน start/end เมื่อเป็นแบบไป-กลับทุกวัน
@@ -233,7 +243,7 @@ const Store = (() => {
     // ครั้งแรกที่ใช้เครื่องนี้: นับเป็น "ใหม่" เฉพาะความเคลื่อนไหว 3 วันล่าสุด
     let seen = localStorage.getItem(SEEN_KEY());
     if (!seen) { seen = new Date(Date.now() - 3 * DAY).toISOString(); localStorage.setItem(SEEN_KEY(), seen); }
-    const out = [];
+    const out = [], nowStr = nowISO();   // เวลาในอนาคต (นาฬิกาเครื่องเพี้ยน) ไม่นับเป็น "ใหม่" ค้างตลอด
     const myDriver = driverOfUser(me);
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
@@ -247,16 +257,25 @@ const Store = (() => {
         if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
         if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
-        if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen });
+        if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen && h.at <= nowStr });
       });
     });
+    // งานที่ต้องทำ (task): แสดงในรายการจนกว่าจะทำเสร็จ · นับในตัวเลขกระดิ่งเฉพาะที่ยังไม่เคยเปิดดู
+    let seenTasks = []; try { seenTasks = JSON.parse(localStorage.getItem(SEEN_KEY() + '-tasks') || '[]'); } catch (e) { /* ใช้ค่าว่าง */ }
+    const task = o => out.push({ ...o, task: true, unread: !seenTasks.includes(o.id) });
     // ผู้ลงนามอิเล็กทรอนิกส์: มีบันทึกข้อความรอลงนาม
-    signerRoles(me).forEach(ro => { const n = db.requests.filter(r => needsMySign(r, ro)).length; if (n) out.push({ id: 'esign-' + ro + n, at: nowISO(), title: `บันทึกข้อความรอลงนาม ${n} ฉบับ`, body: ro === 'head' ? 'ในฐานะหัวหน้างานยานพาหนะ' : 'ในฐานะรองผู้อำนวยการฝ่ายบริหารงานทั่วไป', link: `#/admin/esign?role=${ro}`, unread: true }); });
-    memoDebts(me.email).forEach(r => out.push({ id: 'memo' + r.id, at: r.createdAt, title: 'ค้างบันทึกข้อความ — กรุณาแนบ', body: `${r.id} · ${destName(r)} · ต้องแนบก่อนจึงจะขอใช้รถครั้งต่อไปได้`, link: `#/my/${r.id}`, unread: true }));
-    pendingRatings().forEach(p => out.push({ id: 'rate' + p.r.id + p.i, at: p.a.returnedAt, title: 'ประเมินคนขับรถ', body: `${p.r.id} · ${destName(p.r)} · ${(driver(p.a.driverId) || {}).name || ''}`, link: `#/rate/${p.r.id}/${p.i}`, unread: true, rate: true }));
+    signerRoles(me).forEach(ro => { const n = db.requests.filter(r => needsMySign(r, ro)).length; if (n) task({ id: 'esign-' + ro + n, at: nowISO(), title: `บันทึกข้อความรอลงนาม ${n} ฉบับ`, body: ro === 'head' ? 'ในฐานะหัวหน้างานยานพาหนะ' : 'ในฐานะรองผู้อำนวยการฝ่ายบริหารงานทั่วไป', link: `#/admin/esign?role=${ro}` }); });
+    memoDebts(me.email).forEach(r => task({ id: 'memo' + r.id, at: r.createdAt, title: 'ค้างบันทึกข้อความ — กรุณาแนบ', body: `${r.id} · ${destName(r)} · ต้องแนบก่อนจึงจะขอใช้รถครั้งต่อไปได้`, link: `#/my/${r.id}` }));
+    pendingRatings().forEach(p => task({ id: 'rate' + p.r.id + p.i, at: p.a.returnedAt, title: 'ประเมินคนขับรถ', body: `${p.r.id} · ${destName(p.r)} · ${(driver(p.a.driverId) || {}).name || ''}`, link: `#/rate/${p.r.id}/${p.i}`, rate: true }));
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
   }
-  function markSeen() { localStorage.setItem(SEEN_KEY(), nowISO()); emit(); }
+  // เปิดกระดิ่ง = อ่านแล้ว · silent: ไม่วาดหน้าใหม่ทันที (รายการที่กำลังเปิดดูยังอยู่ จนกว่าจะปิด/เปลี่ยนหน้า)
+  function markSeen(silent) {
+    const tasks = notifications().filter(n => n.task).map(n => n.id);
+    localStorage.setItem(SEEN_KEY(), nowISO());
+    localStorage.setItem(SEEN_KEY() + '-tasks', JSON.stringify(tasks));
+    if (!silent) emit();
+  }
   function pendingRatings() {
     if (!me) return [];
     const out = [];
@@ -760,7 +779,7 @@ const Store = (() => {
   const driverEmailsOf = list => (list || []).map(a => (driver(a.driverId) || {}).email).filter(Boolean);
   // ปิดท้ายทุกครั้งที่บันทึกคำขอ: เวลาแก้ไข + สถานะรวม
   // driverEmails คำนวณใหม่เฉพาะแอดมิน (ผู้มอบหมายงาน) — กฎ Firestore ห้ามคนขับแตะฟิลด์นี้
-  const finishReq = r => { r.updatedAt = nowISO(); r.status = rollup(r); if (isAdmin(me) || !r.driverEmails) r.driverEmails = driverEmailsOf(r.assignments); return r; };
+  const finishReq = r => { r.updatedAt = nowISO(); const was = r.status; r.status = rollup(r); if (r.status === 'closed' && was !== 'closed') r.closedAt = nowISO(); if (isAdmin(me) || !r.driverEmails) r.driverEmails = driverEmailsOf(r.assignments); return r; };
   // ผูก/เปลี่ยนอีเมลคนขับ (เช่น สร้างบัญชีให้คนขับหลังอนุมัติงานไปแล้ว) → อัปเดต driverEmails ในงานที่ยังไม่จบ
   // ไม่งั้นคนขับกดออกเดินทาง/กลับถึงไม่ได้ เพราะกฎ Firestore ตรวจสิทธิ์คนขับจาก driverEmails
   async function syncDriverEmails(driverId, email) {
@@ -785,8 +804,11 @@ const Store = (() => {
     ...(() => {
       const one = sameDay(x.startAt, x.endAt);
       // วันเดียว: ไป-กลับ หรือ ไปส่ง/รับอย่างเดียว · หลายวัน: ค้างคืน หรือ ไป-กลับทุกวัน
-      const t = one ? (x.tripType === 'oneway' ? 'oneway' : 'day') : (x.tripType === 'daily' ? 'daily' : 'overnight');
-      return { tripType: t, overnight: t === 'overnight', lodging: t === 'overnight' ? String(x.lodging || '').trim() : '' };
+      // แบบฟอร์มส่งค่า drop / pick มา (หรือ oneway + onewayDir จากข้อมูลเดิม)
+      const ow = ['drop', 'pick', 'oneway'].includes(x.tripType);
+      const t = one ? (ow ? 'oneway' : 'day') : (x.tripType === 'daily' ? 'daily' : 'overnight');
+      const dir = t === 'oneway' ? (x.tripType === 'pick' || (x.tripType === 'oneway' && x.onewayDir === 'pick') ? 'pick' : 'drop') : '';
+      return { tripType: t, onewayDir: dir, overnight: t === 'overnight', lodging: t === 'overnight' ? String(x.lodging || '').trim() : '' };
     })(),
     teachers: +x.teachers || 0, students: +x.students || 0, others: +x.others || 0, passengerNames: String(x.passengerNames || '').trim(),
     pickup: String(x.pickup || '').trim(), contactPhone: String(x.contactPhone || '').trim(), note: String(x.note || '').trim(), attachments: x.attachments || []
@@ -822,7 +844,7 @@ const Store = (() => {
     vehicle, driver, user, request, has, isAdmin, isSuper, isExec, isDriver, isBack, driverOfUser, emailOf, usernameOf, isUsernameEmail,
     categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
-    TRIP, tripType, windows, tripTag, paxText,
+    TRIP, TRIP_UI, tripType, tripUI, tripLabel, windows, tripTag, paxText,
     DEFAULT_QUICK, isQuickCat, quickHours, needsMemo, memoDebts, userByName,
     needsSign, memoSigners, signerRoles, needsMySign,
     // ลายเซ็น: อ่านจากแคช (ใช้ตอนวาดเอกสาร) / โหลดล่วงหน้า / บันทึกของตัวเอง
@@ -1026,7 +1048,8 @@ const Store = (() => {
         if (!a) throw new Error('ไม่พบงาน');
         const d = driver(a.driverId);
         if (!isAdmin(me) && !(d && d.email === me.email)) throw new Error('เฉพาะคนขับของงานนี้หรือแอดมิน');
-        if (!['approved', 'ontrip', 'returned'].includes(r.status)) throw new Error('งานนี้ยังไม่ได้รับอนุมัติ');
+        if (!['approved', 'ontrip', 'returned', 'closed'].includes(r.status)) throw new Error('งานนี้ยังไม่ได้รับอนุมัติ');
+        if (r.status === 'closed' && status === 'assigned') { r.status = 'ontrip'; r.closedAt = ''; }   // ย้อนสถานะงานที่ปิดอัตโนมัติไปแล้ว
         const vName = (vehicle(a.vehicleId) || {}).name || '';
         if (status === 'ontrip') { a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo; r.history.push(H('depart', vName)); }
         else if (status === 'returned') {

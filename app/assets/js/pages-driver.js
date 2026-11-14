@@ -190,7 +190,7 @@
     const { r, a } = j, s = new Date(r.startAt), e = new Date(r.endAt), multi = nDays(r) > 1, cont = s < from, t = S.tripType(r);
     const time = cont ? `<b>ต่อ</b><em>ถึง ${multi ? fmt.dayMonth(e) : fmt.time(e)}</em>`
       : `<b>${fmt.time(s).replace(' น.', '')}</b><em>${multi ? `ถึง ${e.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' })}` : `ถึง ${fmt.time(e).replace(' น.', '')}`}</em>`;
-    const kind = t === 'overnight' ? 'ค้างคืน' : t === 'daily' ? 'ไป-กลับทุกวัน' : t === 'oneway' ? 'ไปส่ง/ไปรับ' : '';
+    const kind = t === 'overnight' ? 'ค้างคืน' : t === 'daily' ? 'ไป-กลับทุกวัน' : t === 'oneway' ? (r.onewayDir === 'pick' ? 'ไปรับ' : r.onewayDir === 'drop' ? 'ไปส่ง' : 'ไปส่ง/ไปรับ') : '';
     return `<a class="dh-row ${tone(j)}" style="--c:${TONE_C[tone(j)]}" href="${jobHref(j)}">
       <span class="dh-t num">${time}</span>
       <span class="dh-m"><b>${esc(S.destName(r))}</b><small>${multi ? `${nDays(r)} วัน · ${fmt.dayMonth(s)} – ${fmt.dayMonth(e)}` : 'ไป-กลับวันเดียว'}${kind && t !== 'day' ? ` · ${kind}` : ''}</small><small>${icon(kindIcon((S.vehicle(a.vehicleId) || {}).kind))} ${esc(C.vName(a.vehicleId))}</small></span>

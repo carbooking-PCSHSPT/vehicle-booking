@@ -183,10 +183,10 @@ const C = (() => {
     return `<div class="pk">
       <div class="pk-lot" style="--cols:${cols}">${f.map(({ v, s }, i) => `<a class="pk-bay ${i < cols ? 'top' : 'bot'}" href="#/vehicles/${v.id}" title="${esc(v.name)} · ${esc(s.label)} · ${esc(s.note)}">${s.key === 'ontrip' ? `<span class="pk-gone">${icon('route')}</span>` : `<span class="pk-car" style="--c:${PK[s.key] || PK.free}">${icon(s.key === 'maint' ? 'wrench' : kindIcon(v.kind))}</span>`}<span class="pk-nm">${esc(v.name)}</span></a>`).join('')}</div>
       <div class="pk-leg">
-        <div><span><i style="background:${PK.free}"></i>ว่าง</span><b class="num">${n('free')}</b></div>
-        <div><span><i style="background:#f97316"></i>กำลังเดินทาง</span><b class="num">${n('ontrip')}</b></div>
-        <div><span><i style="background:${PK.booked}"></i>มีคิววันนี้</span><b class="num">${n('booked')}</b></div>
-        <div><span><i style="background:${PK.maint}"></i>ซ่อม / งดให้บริการ</span><b class="num">${n('maint') + n('off')}</b></div>
+        <div><span><i style="background:${PK.free}"></i><em class="lf">ว่าง</em><em class="ls">ว่าง</em></span><b class="num">${n('free')}</b></div>
+        <div><span><i style="background:#f97316"></i><em class="lf">กำลังเดินทาง</em><em class="ls">เดินทาง</em></span><b class="num">${n('ontrip')}</b></div>
+        <div><span><i style="background:${PK.booked}"></i><em class="lf">มีคิววันนี้</em><em class="ls">มีคิว</em></span><b class="num">${n('booked')}</b></div>
+        <div><span><i style="background:${PK.maint}"></i><em class="lf">ซ่อม / งดให้บริการ</em><em class="ls">ซ่อม/งด</em></span><b class="num">${n('maint') + n('off')}</b></div>
       </div></div>`;
   }
 
@@ -208,9 +208,9 @@ const C = (() => {
         <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${S().tripTag(r) ? ` · ${S().tripTag(r).text}` : ''}</small><small>${esc(r.purpose)}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
         <td>${esc(r.requester.name)}</td>
         <td><span class="bd-ppl"><span>${icon('teacher')}${r.teachers}</span><span>${icon('student')}${r.students}</span>${+r.others ? `<span title="บุคคลอื่น">${icon('users')}${r.others}</span>` : ''}</span></td>
-        <td>${as.length ? as.map(a => `${esc(vName(a.vehicleId))}<small>${esc(vPlate(a.vehicleId))}</small>`).join('') : '<span class="bd-wait">รอแอดมินจัดรถ</span>'}</td>
+        <td>${as.length ? as.map(a => `<span class="bd-v">${esc(vName(a.vehicleId))}<small>${esc(vPlate(a.vehicleId))}</small></span>`).join('') : '<span class="bd-wait">รอแอดมินจัดรถ</span>'}</td>
         <td>${as.length ? as.map(a => `${esc(dName(a.driverId))}${dPhone(a.driverId) ? `<small><a href="tel:${esc(dPhone(a.driverId))}">${esc(dPhone(a.driverId))}</a></small>` : ''}`).join('') : '—'}</td>
-        <td><span class="bd-st ${st[0]}"><span>${st[1]}<em>${st[2]}</em></span></span></td></tr>`;
+        <td><span class="bd-st ${st[0]}"><span><i class="en">${st[1]}</i><em>${st[2]}</em></span></span></td></tr>`;
     }).join('') + (placed ? '' : `<tr class="bd-now"><td colspan="8"><span>ตอนนี้ ${fmt.time(now)} น.</span></td></tr>`);
     return `<div class="bd"><div class="bd-scroll"><table><thead><tr><th>ออก</th><th>กลับ</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>ผู้เดินทาง</th><th>รถ</th><th>คนขับ</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
@@ -413,7 +413,55 @@ const C = (() => {
     await S().loadSignatures(sigEmails(list));
     UI.printDoc(list.map(memoHTML).join(''), { title: list.length === 1 ? `บันทึกข้อความขอใช้รถ ${list[0].id}` : `บันทึกข้อความขอใช้รถ ${list.length} ฉบับ ${list[0].id} ถึง ${list[list.length - 1].id}`, ...MEMO_PAGE });
   }
-  function memoHTML(r) {
+  // ── พิมพ์รวมเป็นไฟล์เดียว: เลือกรูปแบบ (บันทึกข้อความมีครุฑ / หัวกระดาษโรงเรียน / ตารางสรุป) + หน้าปก + หน้าคั่นตามหมวด ──
+  const PDLG = 'vb-print-dlg';
+  async function printDialog(list, { title = 'รายงานการขอใช้รถส่วนกลาง', sub = '' } = {}) {
+    if (!list.length) return;
+    let sv = {}; try { sv = JSON.parse(localStorage.getItem(PDLG) || '{}'); } catch (e) { /* ค่าเริ่มต้น */ }
+    const one = list.length === 1;
+    const fmtOpt = (v, ic, t, d) => `<label class="pf-opt"><input type="radio" name="fmt" value="${v}" ${(sv.fmt || 'memo') === v ? 'checked' : ''}><span>${icon(ic)}<b>${t}</b><small>${d}</small></span></label>`;
+    const opt = await UI.modal({
+      title: `พิมพ์รวมเป็นไฟล์เดียว<small class="pf-sub">${list.length} รายการ${sub ? ' · ' + esc(sub) : ''}</small>`, size: 'lg',
+      body: `<form id="pf" class="stack" style="gap:14px">
+        <div class="label">รูปแบบเอกสาร</div>
+        <div class="pf-opts">${fmtOpt('memo', 'file', 'บันทึกข้อความ', 'มีตราครุฑ ตามแบบฟอร์มราชการ รายการละ 1 หน้า')}${fmtOpt('letter', 'printer', 'หัวกระดาษโรงเรียน', 'ไม่มีตราครุฑ ใช้ตราโรงเรียน รายการละ 1 หน้า')}${one ? '' : fmtOpt('table', 'clipboard', 'ตารางสรุป', 'หลายรายการต่อหน้า เหมาะสำหรับรายงาน')}</div>
+        ${one ? '' : `<label class="check"><input type="checkbox" name="sec" ${sv.sec !== false ? 'checked' : ''}> แยกเป็นส่วนตามหมวดงาน พร้อมหน้าคั่น</label>
+        <label class="check"><input type="checkbox" name="cover" ${sv.cover !== false ? 'checked' : ''}> มีหน้าปกสรุปจำนวนตามสถานะและหมวดงาน</label>`}
+        <div class="field"><label>หัวข้อเอกสาร ${one ? '<span class="hint">(ใช้เป็นชื่อไฟล์ PDF)</span>' : ''}</label><input class="input" name="title" value="${esc(sv.title || title)}"></div>
+      </form>`,
+      actions: [{ label: 'ยกเลิก', value: null }, { label: 'เปิดหน้าพิมพ์', kind: 'btn-primary', icon: 'printer', onClick: el => UI.formData(el.querySelector('#pf')) }]
+    });
+    if (!opt) return;
+    try { localStorage.setItem(PDLG, JSON.stringify({ fmt: opt.fmt, sec: !!opt.sec, cover: !!opt.cover, title: opt.title })); } catch (e) { /* ไม่บันทึกก็ได้ */ }
+    const docTitle = String(opt.title || title).trim() || title;
+    const rs = list.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const memoOk = opt.fmt !== 'table';
+    const items = memoOk ? rs.filter(r => !['rejected', 'cancelled'].includes(r.status)) : rs;
+    if (!items.length) return UI.toast('ไม่มีรายการที่พิมพ์เป็นบันทึกข้อความได้ (ยกเลิก/ไม่อนุมัติทั้งหมด)', 'error');
+    await S().loadSignatures(sigEmails(items));
+    const groups = opt.sec && !one ? [...items.reduce((m, r) => { const k = S().catName(r) || 'ไม่ระบุหมวด'; (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map())] : [['', items]];
+    const range = `${UI.fmt.date(items[0].startAt)} – ${UI.fmt.date(items[items.length - 1].startAt)}`;
+    const body = (grp) => opt.fmt === 'table' ? summaryTable(grp) : grp.map(r => memoHTML(r, { krut: opt.fmt === 'memo' })).join('');
+    const html = (opt.cover && !one ? coverPage(items, docTitle, range) : '')
+      + groups.map(([k, grp]) => (k ? `<section class="pd-divider"><small>ส่วนที่ ${groups.findIndex(g => g[0] === k) + 1}</small><h1>${esc(k)}</h1><p>${grp.length} รายการ · ${esc(range)}</p></section>` : '') + body(grp)).join('');
+    UI.printDoc(html, { title: one ? `${docTitle} ${items[0].id}` : `${docTitle} ${items.length} รายการ`, ...(opt.fmt === 'table' ? { landscape: true } : MEMO_PAGE) });
+  }
+  function coverPage(items, docTitle, range) {
+    const st = S().db.settings, cnt = f => items.filter(f).length;
+    const byStatus = Object.entries(S().STATUS).map(([k, v]) => [v.label, cnt(r => r.status === k)]).filter(x => x[1]);
+    const byCat = [...items.reduce((m, r) => { const k = S().catName(r) || 'ไม่ระบุหมวด'; m.set(k, (m.get(k) || 0) + 1); return m; }, new Map())];
+    return `<section class="pd-cover">
+      <img src="images/logo.png" alt=""><h1>${esc(docTitle)}</h1><p>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')}<br>${esc(st.schoolName || '')}</p>
+      <p class="pd-range">${esc(range)} · ทั้งหมด ${items.length} รายการ</p>
+      <div class="pd-cover-grid"><table class="pd-tbl"><thead><tr><th>สถานะ</th><th class="r">จำนวน</th></tr></thead><tbody>${byStatus.map(([l, n]) => `<tr><td>${esc(l)}</td><td class="r">${n}</td></tr>`).join('')}</tbody></table>
+        <table class="pd-tbl"><thead><tr><th>หมวดงาน</th><th class="r">จำนวน</th></tr></thead><tbody>${byCat.map(([l, n]) => `<tr><td>${esc(l)}</td><td class="r">${n}</td></tr>`).join('')}</tbody></table></div>
+      <p class="pd-foot">พิมพ์จากระบบยานพาหนะ เมื่อ ${UI.fmt.dt(new Date().toISOString())}</p></section>`;
+  }
+  function summaryTable(rs) {
+    return `<table class="pd-tbl pd-sum"><thead><tr><th class="c">ที่</th><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th class="r">คน</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
+      <tbody>${rs.map((r, i) => `<tr><td class="c">${i + 1}</td><td class="nw">${r.id}</td><td class="nw">${UI.fmt.date(r.startAt)}<small>${UI.fmt.time(r.startAt)}–${UI.fmt.when(r.endAt)}</small></td><td>${esc(S().destName(r))}<small>${esc(r.purpose || '')}</small></td><td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td><td class="r">${S().passengers(r)}</td><td>${(r.assignments || []).map(a => `${esc(vName(a.vehicleId))}<small>${esc(dName(a.driverId))}</small>`).join('') || '-'}</td><td class="nw">${esc(S().STATUS[r.status].label)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  function memoHTML(r, { krut = true } = {}) {
     const s = S(), st = s.db.settings, M = memoSettings();
     const dTh = d => new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
     const tm = d => `${UI.fmt.time(d)} น.`;
@@ -436,7 +484,8 @@ const C = (() => {
     const depSig = E.deputy ? { img: s.sigOf(E.deputy.email), at: E.deputy.at } : null;
     const dateLine = es => es ? `<p class="mm-date">วันที่ ${dTh(es.at)}</p>` : `<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p>`;
     const html = `<div class="memo-doc">
-      <div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>
+      ${krut ? `<div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>`
+        : `<div class="mm-lh"><img src="images/logo.png" alt=""><div><b>${esc(st.schoolName || '')}</b><span>${esc(st.division || '')} · ${esc(st.unit || 'งานยานพาหนะ')}</span></div></div><h1 class="mm-lh-t">บันทึกข้อความ</h1>`}
       <div class="mm-line"><b>ส่วนราชการ</b><span data-fit>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
       <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${r.id}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(r.createdAt)}</span></div></div>
       <div class="mm-line"><b>เรื่อง</b><span>ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน</span></div>
@@ -445,7 +494,7 @@ const C = (() => {
       <p class="mm-p">ด้วยข้าพเจ้า ${esc(r.requester.name)}${pos ? ` ตำแหน่ง ${esc(pos)}` : ''}${r.requester.dept ? ` ${esc(r.requester.dept)}` : ''} มีความประสงค์ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน เพื่อ${esc(r.purpose || '')}${r.project ? ` (${esc(r.project)})` : ''} โดยมีรายละเอียดดังนี้</p>
       <ol class="mm-list">
         <li><b>สถานที่ไปราชการ</b> ${esc(dests)}</li>
-        <li><b>กำหนดเดินทาง</b> ${when} (${esc(s.TRIP[t].label)}${t === 'overnight' && r.lodging ? ` · ที่พัก ${esc(r.lodging)}` : ''})</li>
+        <li><b>กำหนดเดินทาง</b> ${when} (${esc(s.tripLabel(r))}${t === 'overnight' && r.lodging ? ` · ที่พัก ${esc(r.lodging)}` : ''})</li>
         <li><b>ผู้เดินทาง</b> รวม ${pax} คน${paxParts ? ` (${paxParts})` : ''}${r.passengerNames ? ` ได้แก่ ${esc(r.passengerNames)}` : ''}</li>
         <li><b>จุดขึ้นรถ</b> ${esc(r.pickup || '-')} · <b>โทรศัพท์ติดต่อระหว่างเดินทาง</b> ${esc(r.contactPhone || r.requester.phone || '-')}</li>
         ${r.note ? `<li><b>หมายเหตุ</b> ${esc(r.note)}</li>` : ''}
@@ -470,7 +519,7 @@ const C = (() => {
     return html;
   }
 
-  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, canMemo, memoSettings, memoHTML, sigEmails };
+  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {
@@ -513,7 +562,8 @@ const App = (() => {
     const me = Store.me, inn = Store.authState === 'in';
     const act = p => (p === '/' ? path === '/' : path.startsWith(p)) ? 'active' : '';
     const back = Store.isBack(me), drv = Store.isDriver(me), onlyDriver = drv && !Store.has(me, 'teacher') && !back;
-    const notifs = inn ? Store.notifications() : [];
+    // แสดงเฉพาะรายการใหม่ + งานที่ยังต้องทำ (อ่านแล้ว = หายไป)
+    const notifs = inn ? Store.notifications().filter(n => n.unread || n.task) : [];
     const unread = notifs.filter(n => n.unread).length;
     const pendingAdmin = Store.isAdmin(me) ? Store.db.requests.filter(r => r.status === 'pending').length : 0;
     return `
@@ -538,10 +588,11 @@ const App = (() => {
         </nav>
         <div class="nav-actions">${inn ? `
           <div class="dd" data-open="false">
-            <button class="icon-btn" data-dd aria-label="การแจ้งเตือน ${unread} รายการใหม่" aria-expanded="false">${icon('bell')}${unread ? `<span class="bell-count">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
+            <button class="icon-btn" data-dd data-bell aria-label="การแจ้งเตือน ${unread} รายการใหม่" aria-expanded="false">${icon('bell')}${unread ? `<span class="bell-count">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
             <div class="dd-panel right notif-panel">
-              <div class="dd-head"><strong>การแจ้งเตือน</strong>${unread ? '<button class="link" data-seen style="font-size:.82rem">อ่านทั้งหมด</button>' : ''}</div>
-              ${notifs.map(n => `<a href="${n.link}" class="notif ${n.unread ? 'unread' : ''}"><span class="dot"></span><span><strong>${esc(n.title)}</strong><small>${esc(n.body)}</small><small class="t">${UI.fmt.ago(n.at)}</small></span></a>`).join('') || '<div class="empty" style="padding:26px">ยังไม่มีการแจ้งเตือน</div>'}
+              <div class="dd-head"><strong>การแจ้งเตือน</strong></div>
+              ${(() => { const tk = notifs.filter(n => n.task), nw = notifs.filter(n => !n.task); const row = n => `<a href="${n.link}" class="notif ${n.unread ? 'unread' : ''}"><span class="dot"></span><span><strong>${esc(n.title)}</strong><small>${esc(n.body)}</small><small class="t">${UI.fmt.ago(n.at)}</small></span></a>`;
+                return (tk.length ? `<div class="notif-sec">ต้องดำเนินการ</div>${tk.map(row).join('')}` : '') + (nw.length ? `${tk.length ? '<div class="notif-sec">ใหม่</div>' : ''}${nw.map(row).join('')}` : '') || `<div class="empty" style="padding:26px">${icon('checkCircle')}<p>ไม่มีการแจ้งเตือนใหม่</p></div>`; })()}
             </div>
           </div>
           <div class="dd" data-open="false">
@@ -703,12 +754,15 @@ const App = (() => {
     document.addEventListener('click', e => {
       const dd = e.target.closest('[data-dd]');
       document.querySelectorAll('.dd[data-open="true"]').forEach(d => { if (!dd || d !== dd.parentElement) d.dataset.open = 'false'; });
-      if (dd) { const p = dd.parentElement; p.dataset.open = p.dataset.open === 'true' ? 'false' : 'true'; dd.setAttribute('aria-expanded', p.dataset.open); }
+      if (dd) { const p = dd.parentElement; p.dataset.open = p.dataset.open === 'true' ? 'false' : 'true'; dd.setAttribute('aria-expanded', p.dataset.open);
+        // เปิดกระดิ่ง = อ่านแล้ว: ตัวเลขหายทันที · รายการที่อ่านแล้วหายไปเมื่อปิด/เปลี่ยนหน้า
+        if (dd.hasAttribute('data-bell') && p.dataset.open === 'true') { Store.markSeen(true); dd.querySelector('.bell-count')?.remove(); }
+        // ปิดกระดิ่ง → วาดแถบเมนูใหม่ (เอารายการที่อ่านแล้วออก)
+        else if (dd.hasAttribute('data-bell')) refreshNav(); }
       const mt = e.target.closest('[data-menu-toggle]');
       if (mt) { const m = $('#menu'); m.classList.toggle('open'); mt.setAttribute('aria-expanded', m.classList.contains('open')); }
       else if (e.target.closest('.menu a')) $('#menu')?.classList.remove('open');
       if (e.target.closest('[data-logout]')) { Store.logout().then(() => go('#/')); }
-      if (e.target.closest('[data-seen]')) { e.preventDefault(); Store.markSeen(); }
       if (e.target.closest('[data-reset]')) UI.confirm('ล้างข้อมูลทั้งหมดในโหมดทดลอง แล้วสร้างข้อมูลตัวอย่างใหม่?', { title: 'ล้างข้อมูลตัวอย่าง', ok: 'ล้างข้อมูล', danger: true }).then(ok => ok && Store.reset());
       const vm = e.target.closest('[data-vmode]');
       if (vm) { const m = vm.dataset.vmode; if (m !== ViewMode.get()) { ViewMode.set(m); UI.toast(m === 'auto' ? 'ปรับมุมมองอัตโนมัติตามขนาดจอ' : `เปลี่ยนเป็นมุมมอง${ViewMode.MODES[m].label}แล้ว`); } return; }

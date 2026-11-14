@@ -25,13 +25,14 @@
     const isToday = UI.sameDay(day, new Date());
     const used = new Set(list.filter(r => r.status !== 'pending').flatMap(r => (r.assignments || []).map(a => a.vehicleId)));
     const states = isToday ? vs.map(v => S.vehicleState(v).key) : [];
+    // s = ป้ายสั้น (มือถือ/แท็บเล็ต: ตัวเลข 5 ช่องในแถวเดียว ไม่ตกบรรทัด)
     return `<div class="strip">${[
-      { ic: 'route', l: isToday ? 'การเดินทางวันนี้' : 'การเดินทางวันนั้น', v: list.length, u: 'รายการ' },
-      isToday ? { ic: 'activity', l: 'กำลังเดินทาง', v: states.filter(k => k === 'ontrip').length, u: 'คัน' } : { ic: 'van', l: 'รถที่มีคิว', v: used.size, u: 'คัน' },
-      isToday ? { ic: 'van', l: 'รถว่างตอนนี้', v: states.filter(k => k === 'free').length, u: `/ ${vs.length}` } : { ic: 'checkCircle', l: 'รถไม่มีคิว', v: vs.filter(v => !used.has(v.id)).length, u: `/ ${vs.length}` },
-      { ic: 'student', l: 'นักเรียนเดินทาง', v: p.s, u: 'คน' },
-      { ic: 'teacher', l: 'ครูเดินทาง', v: p.t, u: 'คน' }
-    ].map(k => `<div><small>${icon(k.ic)}${k.l}</small><b class="num"><span data-count="${k.v}">0</span><em>${k.u}</em></b></div>`).join('')}</div>`;
+      { ic: 'route', l: isToday ? 'การเดินทางวันนี้' : 'การเดินทางวันนั้น', s: 'เที่ยว', v: list.length, u: 'รายการ' },
+      isToday ? { ic: 'activity', l: 'กำลังเดินทาง', s: 'กำลังไป', v: states.filter(k => k === 'ontrip').length, u: 'คัน' } : { ic: 'van', l: 'รถที่มีคิว', s: 'มีคิว', v: used.size, u: 'คัน' },
+      isToday ? { ic: 'van', l: 'รถว่างตอนนี้', s: 'รถว่าง', v: states.filter(k => k === 'free').length, u: `/ ${vs.length}` } : { ic: 'checkCircle', l: 'รถไม่มีคิว', s: 'ว่าง', v: vs.filter(v => !used.has(v.id)).length, u: `/ ${vs.length}` },
+      { ic: 'student', l: 'นักเรียนเดินทาง', s: 'นักเรียน', v: p.s, u: 'คน' },
+      { ic: 'teacher', l: 'ครูเดินทาง', s: 'ครู', v: p.t, u: 'คน' }
+    ].map(k => `<div><small><span class="lf">${icon(k.ic)}${k.l}</span><span class="ls">${k.s}</span></small><b class="num"><span data-count="${k.v}">0</span><em>${k.u}</em></b></div>`).join('')}</div>`;
   }
   function timeline(list) {
     const n = new Date();
@@ -118,7 +119,7 @@
         </div>
         ${logged ? `
           ${summaryStrip(today, day)}
-          <div class="rail-head"><h3>${icon('grid')} ลานจอดรถตอนนี้ <small>ช่องว่าง = รถออกไปปฏิบัติภารกิจ</small></h3><a class="btn btn-ghost btn-sm" href="#/schedule?tab=calendar">${icon('calendar')} ดูปฏิทินการใช้รถทั้งหมด</a></div>
+          <div class="rail-head"><h3>${icon('grid')} ลานจอดรถตอนนี้ <small class="lf">ช่องว่าง = รถออกไปปฏิบัติภารกิจ</small></h3><a class="btn btn-ghost btn-sm" href="#/schedule?tab=calendar">${icon('calendar')} <span class="lf">ดูปฏิทินการใช้รถทั้งหมด</span><span class="ls">ปฏิทิน</span></a></div>
           ${C.parkBoard(vs)}
           <div class="rail-head" id="board">
             <h3>${icon('route')} ${isToday ? 'กระดานเที่ยวรถวันนี้' : `กระดานเที่ยวรถ ${fmt.date(day)}`} <small>${today.length} เที่ยว</small></h3>
@@ -287,6 +288,15 @@
     box.addEventListener('change', () => { const v = (box.querySelector('input:checked') || {}).value; other.hidden = v !== 'other'; if (v === 'other') other.focus(); });
   }
   Pages._catPicker = { html: catPicker, bind: bindCatPicker };
+  // ตัวเลือกแบบเลื่อนลง (แสดงเฉพาะจอมือถือ) ผูกกับกลุ่มปุ่มตัวเลือก (radio) ชื่อเดียวกัน — ค่าจริงยังอยู่ที่ radio
+  const mPick = (name, opts, sel, ph) => `<select class="input m-pick" data-mirror="${name}" aria-label="${esc(ph || name)}">${ph ? `<option value="">${esc(ph)}</option>` : ''}${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  function bindMirrors(root) {
+    root.querySelectorAll('[data-mirror]').forEach(s => {
+      const name = s.dataset.mirror;
+      s.addEventListener('change', () => { const r = [...root.querySelectorAll(`[name="${name}"]`)].find(x => x.value === s.value); if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); } });
+      root.addEventListener('change', e => { if (e.target.name === name && e.target.type === 'radio' && s.value !== e.target.value) s.value = e.target.value; });
+    });
+  }
 
   // ── เลือกเวลา: ชั่วโมงแยกตามช่วงวัน + นาทีทีละ 5 + พิมพ์เองได้ · บอกช่วงเวลา (เช้า/บ่าย/ค่ำ) กันเลือกผิด ──
   const pad2 = n => String(n).padStart(2, '0');
@@ -350,10 +360,10 @@
         <div class="row"><select class="input" id="copyFrom" style="flex:1;min-width:240px"><option value="">เลือกคำขอเดิม…</option>${copies.map(c => `<option value="${c.id}">${fmt.date(c.startAt)} · ${esc(S.destName(c))} · ${esc(c.purpose)}</option>`).join('')}</select><button type="button" class="btn btn-ghost" id="copyBtn">${icon('copy')} คัดลอก</button></div></div>` : ''}
       <div class="form-section"><h3><span class="n">1</span>ภารกิจ</h3>
         <div class="field" style="margin-bottom:14px"><label>หมวดงาน <b class="req">*</b> <span class="hint" style="font-weight:400">(ใช้ทำสถิติแยกตามหมวด)</span></label>
-          ${catPicker(v.category, v.categoryOther)}</div>
+          ${mPick('category', S.categories().map(c => [c.id, c.id === 'other' ? 'อื่น ๆ (ระบุเอง)' : c.name]), v.category, 'เลือกหมวดงาน…')}${catPicker(v.category, v.categoryOther)}</div>
         <div class="grid2">
           <div class="field full"><label>วัตถุประสงค์ในการขอใช้รถ <b class="req">*</b></label><input name="purpose" required value="${esc(v.purpose || '')}" placeholder="เช่น นำนักเรียนเข้าร่วมการแข่งขันโครงงานวิทยาศาสตร์"></div>
-          <div class="field full"><label>ชื่องาน / โครงการ</label><input name="project" value="${esc(v.project || '')}" placeholder="(ถ้ามี)"></div>
+          ${admin ? '' : `<div class="field full"><label>ชื่องาน / โครงการ</label><input name="project" value="${esc(v.project || '')}" placeholder="(ถ้ามี)"></div>`}
         </div></div>
       <div class="form-section"><h3><span class="n">2</span>สถานที่ปลายทาง</h3>
         <div class="dest-list" id="dests"></div>
@@ -361,35 +371,48 @@
         <p class="hint" id="kmInfo" style="margin-top:10px"></p></div>
       <div class="form-section"><h3><span class="n">3</span>วันและเวลา</h3>
         <div class="field"><label>ลักษณะการเดินทาง <b class="req">*</b></label>
-          <div class="trip-pick">${Object.entries(S.TRIP).map(([k, t]) => `<label class="trip-opt"><input type="radio" name="tripType" value="${k}" ${k === (v.startAt ? S.tripType(v) : (v.tripType || 'day')) ? 'checked' : ''}><span>${icon(t.icon)}<b>${t.label}</b><small>${t.hint}</small></span></label>`).join('')}</div></div>
+          ${(() => { const cur = v.startAt ? S.tripUI(v) : (S.TRIP_UI[v.tripType] ? v.tripType : 'day'); return mPick('tripType', Object.entries(S.TRIP_UI).map(([k, x]) => [k, x.label]), cur) + `<p class="hint m-pick-hint" id="tripHint">${esc(S.TRIP_UI[cur].hint)}</p>`
+            + `<div class="trip-pick">${Object.entries(S.TRIP_UI).map(([k, x]) => `<label class="trip-opt"><input type="radio" name="tripType" value="${k}" ${k === cur ? 'checked' : ''}><span>${icon(x.icon)}<b>${x.label}</b><small>${x.hint}</small></span></label>`).join('')}</div>`; })()}</div>
         <input type="hidden" name="startAt" value="${fmt.local(v.startAt)}"><input type="hidden" name="endAt" value="${fmt.local(v.endAt)}">
         <div class="dt-grid">
           <div class="dt-box"><div class="dt-head">${icon('navigation')} <span data-lbl="out">ออกเดินทาง</span></div>
             <div class="dt-row">
-              <div class="field"><label for="dDate">วันที่ <b class="req">*</b></label><input type="date" id="dDate" value="${fmt.localDate(v.startAt)}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
+              <div class="field"><label for="dDate">วันที่ <b class="req">*</b></label><input type="date" id="dDate" value="${v.startAt ? fmt.localDate(v.startAt) : admin ? fmt.localDate(new Date()) : ''}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
               <div class="field"><label data-lbl="sTime">เวลาออก <b class="req">*</b></label>${timeField('sTime', v.startAt ? fmt.time(v.startAt) : '08:00')}</div>
             </div><small class="dt-th" id="dTh"></small></div>
           <div class="dt-box"><div class="dt-head">${icon('home')} <span data-lbl="back">กลับถึงโรงเรียน</span></div>
             <div class="dt-row">
-              <div class="field" id="rDateF"><label for="rDate" data-lbl="rDate">วันที่กลับ <b class="req">*</b></label><input type="date" id="rDate" value="${fmt.localDate(v.endAt)}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
+              <div class="field" id="rDateF"><label for="rDate" data-lbl="rDate">วันที่กลับ <b class="req">*</b></label><input type="date" id="rDate" value="${v.endAt ? fmt.localDate(v.endAt) : admin ? fmt.localDate(new Date()) : ''}" ${!admin ? `min="${fmt.localDate(minD)}"` : ''}></div>
               <div class="field"><label data-lbl="eTime">เวลากลับถึง <b class="req">*</b></label>${timeField('eTime', v.endAt ? fmt.time(v.endAt) : '16:00')}</div>
             </div><small class="dt-th" id="rTh"></small></div>
         </div>
         <div class="field" id="lodgeF" hidden style="margin-top:14px"><label>${icon('moon')} สถานที่พัก (ค้างคืน)</label><input name="lodging" value="${esc(v.lodging || '')}" placeholder="เช่น โรงแรม/ที่พักของหน่วยงานผู้จัด"></div>
         <div class="trip-sum" id="dayInfo"></div>
         <div class="note-box warn-y" id="timeWarn" hidden style="margin-top:10px"></div>
-        <div class="note-box navy" id="onewayNote" hidden style="margin-top:12px">${icon('info')}<div><b>ต้องไปรับกลับในภายหลัง?</b> ให้ส่งคำขออีก 1 รายการสำหรับเที่ยวรับ (ใช้ "คัดลอกจากคำขอเดิม" ด้านบนได้ ไม่ต้องกรอกใหม่) เพื่อให้แอดมินจัดรถได้ถูกช่วงเวลา และรถว่างให้งานอื่นระหว่างรอ</div></div>
+        <div class="note-box navy" id="onewayNote" hidden style="margin-top:12px">${icon('info')}<div><b>ต้องไปรับกลับในภายหลัง?</b> ให้ส่งคำขออีก 1 รายการ เลือก <b>"ไปรับอย่างเดียว"</b> (ใช้ "คัดลอกจากคำขอเดิม" ด้านบนได้ ไม่ต้องกรอกใหม่) เพื่อให้แอดมินจัดรถได้ถูกช่วงเวลา และรถว่างให้งานอื่นระหว่างรอ</div></div>
+        <div class="note-box navy" id="pickNote" hidden style="margin-top:12px">${icon('info')}<div><b>ไปรับอย่างเดียว:</b> "เวลารถออก" = เวลารถออกจากโรงเรียน (เผื่อเวลาเดินทางให้ถึงจุดรับทัน) · ระบุ<b>เวลานัดรับที่ปลายทาง</b>ในช่องหมายเหตุ</div></div>
         ${!admin ? `<p class="hint" id="leadHint" style="margin-top:10px" data-normal="ต้องขอใช้รถล่วงหน้าอย่างน้อย ${lead} วัน (ออกเดินทางได้ตั้งแต่ ${esc(fmt.dateMid(minD))}) · กรณีเร่งด่วนโทรหาแอดมิน" data-quick="งานประจำ (${esc(S.categories().filter(c => S.isQuickCat(c.id)).map(c => c.name).join(' / '))}) ขอในวันเดียวกันได้ แต่ต้องก่อนเวลาออกอย่างน้อย ${S.quickHours()} ชั่วโมง · ด่วนกว่านี้โทรหาแอดมิน"></p>` : ''}</div>
       <div class="form-section"><h3><span class="n">4</span>ผู้เดินทาง</h3>
         <div class="grid3">
           <div class="field"><label>จำนวนครู/บุคลากร <b class="req">*</b></label><input name="teachers" type="number" min="0" required value="${v.teachers ?? 1}"></div>
           <div class="field"><label>จำนวนนักเรียน</label><input name="students" type="number" min="0" value="${v.students ?? 0}"></div>
           <div class="field"><label>บุคคลภายนอก/อื่น ๆ</label><input name="others" type="number" min="0" value="${v.others ?? 0}"></div>
-          <div class="field full"><label>รายชื่อผู้ร่วมเดินทาง</label><textarea name="passengerNames" rows="2" placeholder="(ไม่บังคับ) เช่น ครูสมชาย, ครูสมหญิง, นักเรียน ม.5/1 จำนวน 10 คน">${esc(v.passengerNames || '')}</textarea></div>
-          <div class="field"><label>จุดนัดขึ้นรถ</label><input name="pickup" value="${esc(v.pickup || 'หน้าอาคารอำนวยการ')}"></div>
-          <div class="field"><label>เบอร์ติดต่อระหว่างเดินทาง <b class="req">*</b></label><input name="contactPhone" type="tel" required value="${esc(v.contactPhone || (S.me || {}).phone || '')}"></div>
+          ${admin ? '' : `<div class="field full"><label>รายชื่อผู้ร่วมเดินทาง</label><textarea name="passengerNames" rows="2" placeholder="(ไม่บังคับ) เช่น ครูสมชาย, ครูสมหญิง, นักเรียน ม.5/1 จำนวน 10 คน">${esc(v.passengerNames || '')}</textarea></div>
+          <div class="field"><label>จุดนัดขึ้นรถ</label><input name="pickup" value="${esc(v.pickup || 'หน้าอาคารอำนวยการ')}"></div>`}
+          <div class="field ${admin ? 'full' : ''}"><label>เบอร์ติดต่อระหว่างเดินทาง <b class="req">*</b></label><input name="contactPhone" type="tel" required value="${esc(v.contactPhone || (admin ? '' : (S.me || {}).phone) || '')}"></div>
         </div>
         <div class="seat-meter" id="paxInfo" style="margin-top:14px"></div></div>
+      ${admin ? `<details class="form-section more"><summary>${icon('plus')} รายละเอียดเพิ่มเติม <span class="hint">(ไม่บังคับ — ชื่องาน รายชื่อผู้เดินทาง จุดนัด หมายเหตุ)</span></summary>
+        <div class="grid2" style="margin-top:14px">
+          <div class="field full"><label>ชื่องาน / โครงการ</label><input name="project" value="${esc(v.project || '')}"></div>
+          <div class="field full"><label>รายชื่อผู้ร่วมเดินทาง</label><textarea name="passengerNames" rows="2">${esc(v.passengerNames || '')}</textarea></div>
+          <div class="field"><label>จุดนัดขึ้นรถ</label><input name="pickup" value="${esc(v.pickup || 'หน้าอาคารอำนวยการ')}"></div>
+          <div class="field"><label>หมายเหตุ</label><input name="note" value="${esc(v.note || '')}"></div>
+        </div></details>` : ''}
+      ${admin ? `<div class="form-section"><h3><span class="n">5</span>บันทึกข้อความ <span class="hint" style="font-weight:400">(ไม่บังคับ — แนบภายหลังได้)</span></h3>
+        <div class="note-box navy" style="margin-bottom:12px">${icon('info')}<div>ยังไม่มีบันทึกข้อความ? <b>บันทึกไปก่อนได้</b> — ระบบจะขึ้นสถานะ <b>"ค้างบันทึกข้อความ"</b> ให้ติดตามในรายการคำขอ และผู้ขอต้องแนบก่อนจึงจะขอรถครั้งต่อไปได้ (หมวดงานประจำไม่ต้องแนบ)</div></div>
+        <span id="memoOpt" hidden></span><div id="quickMemo" hidden></div><div id="memoNeed" hidden></div>
+        ${C.filePicker('att', v.attachments || [], { label: 'แนบบันทึกข้อความ (ถ้ามี)', pdf: true })}</div>` : `
       <div class="form-section"><h3><span class="n">5</span>บันทึกข้อความขออนุญาตใช้รถ <span class="hint" id="memoOpt" style="font-weight:400" hidden>(ไม่บังคับ)</span></h3>
         <div class="note-box green" id="quickMemo" hidden style="margin-bottom:12px">${icon('checkCircle')}<div><b>หมวดงานนี้เป็นงานประจำ ไม่ต้องแนบบันทึกข้อความ</b> (ถ้ามีเอกสารประกอบ แนบได้)</div></div>
         <div id="memoNeed">
@@ -398,7 +421,7 @@
           <ul><li>ใช้ไฟล์ <b>PDF จากเครื่องสแกน</b> หรือแอปสแกนเอกสาร ดีที่สุด</li><li>ถ้าถ่ายรูป: วางกระดาษบนพื้นเรียบ ถ่าย<b>ตรง ๆ เต็มหน้า</b> ในที่สว่าง ไม่มีเงาบัง ไม่เบลอ</li><li>ต้องเห็น <b>เลขที่หนังสือ วันที่ และลายเซ็น</b> ชัดเจน · ถ้ามีหลายหน้า แนบให้ครบทุกหน้า</li></ul></div></div></div>
         ${C.filePicker('att', v.attachments || [], { label: 'แนบบันทึกข้อความ', pdf: true })}</div>
       <div class="form-section"><h3><span class="n">6</span>หมายเหตุเพิ่มเติม</h3>
-        <div class="field"><textarea name="note" rows="3" placeholder="เช่น มีสัมภาระ/อุปกรณ์แข่งขันจำนวนมาก, ต้องการแวะรับวิทยากร">${esc(v.note || '')}</textarea></div></div>`;
+        <div class="field"><textarea name="note" rows="3" placeholder="เช่น มีสัมภาระ/อุปกรณ์แข่งขันจำนวนมาก, ต้องการแวะรับวิทยากร">${esc(v.note || '')}</textarea></div></div>`}`;
   }
   // ผูกการทำงานของฟอร์มขอใช้รถ คืนค่าฟังก์ชันอ่านข้อมูล
   function bindRequestForm(root, r) {
@@ -417,7 +440,8 @@
     const multi = t => t === 'overnight' || t === 'daily';
     const LBL = {
       day: { out: 'ออกจากโรงเรียน', back: 'กลับถึงโรงเรียน', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
-      oneway: { out: 'รถออกจากโรงเรียน', back: 'รถกลับถึงโรงเรียน (ประมาณ)', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
+      drop: { out: 'รถออกจากโรงเรียน (ไปส่ง)', back: 'รถกลับถึงโรงเรียน (ประมาณ)', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
+      pick: { out: 'รถออกจากโรงเรียน (ไปรับ)', back: 'กลับถึงโรงเรียนพร้อมคณะ', sTime: 'เวลารถออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
       overnight: { out: 'วันแรก · ออกจากโรงเรียน', back: 'วันสุดท้าย · กลับถึงโรงเรียน', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันที่กลับ' },
       daily: { out: 'วันแรก · ออกทุกวันเวลา', back: 'วันสุดท้าย · กลับทุกวันเวลา', sTime: 'เวลาออก', eTime: 'เวลากลับถึง', rDate: 'วันสุดท้าย' }
     };
@@ -431,7 +455,8 @@
       else if (d && (!el('rDate').value || el('rDate').value <= d)) el('rDate').value = addDays(d, 1);
       if (d) el('rDate').min = multi(t) ? addDays(d, 1) : d;
       el('lodgeF').hidden = t !== 'overnight';
-      el('onewayNote').hidden = t !== 'oneway';
+      el('onewayNote').hidden = t !== 'drop'; el('pickNote').hidden = t !== 'pick';
+      const th = el('tripHint'); if (th && S.TRIP_UI[t]) th.textContent = S.TRIP_UI[t].hint;
       el('dayInfo').closest('.form-section').dataset.trip = t;
     };
     const drawDays = () => {
@@ -454,7 +479,8 @@
       const hrs = fmt.dur(b - a);
       box.innerHTML = {
         day: `${icon('route')} <b>ไป-กลับวันเดียว</b> · ${s}–${e} น. (รวม ${hrs})`,
-        oneway: `${icon('arrowUR')} <b>ไปส่ง/ไปรับอย่างเดียว</b> · รถออก ${s} น. กลับถึงประมาณ ${e} น.`,
+        drop: `${icon('arrowUR')} <b>ไปส่งอย่างเดียว</b> · รถออก ${s} น. กลับถึงโรงเรียนประมาณ ${e} น.`,
+        pick: `${icon('arrowDL')} <b>ไปรับอย่างเดียว</b> · รถออก ${s} น. กลับถึงโรงเรียนพร้อมคณะ ${e} น.`,
         overnight: `${icon('moon')} <b>รวม ${n} วัน ค้างคืน ${n - 1} คืน</b> · ออก ${fmt.dayMonth(a)} ${s} น. → กลับ ${fmt.dayMonth(b)} ${e} น.`,
         daily: `${icon('refresh')} <b>ไป-กลับทุกวัน ${n} วัน</b> (${fmt.dayMonth(a)} – ${fmt.dayMonth(b)}) · ออก ${s} น. กลับ ${e} น. ทุกวัน · ไม่ค้างคืน`
       }[t];
@@ -499,7 +525,7 @@
     });
     form.addEventListener('input', e => { if (/teachers|students|others/.test(e.target.name)) drawPax(); });
     drawDests(); drawDays(); drawPax();
-    bindCatPicker(root);
+    bindCatPicker(root); bindMirrors(root);
     return {
       read() {
         const f = UI.formData(form);
@@ -517,8 +543,8 @@
       fill(src) {
         ['purpose', 'project', 'teachers', 'students', 'others', 'passengerNames', 'pickup', 'contactPhone', 'lodging', 'note'].forEach(k => { const el = form.querySelector(`[name=${k}]`); if (el && src[k] != null) el.value = src[k]; });
         dests = (src.destinations || []).map(d => ({ ...d })); drawDests(); drawPax();
-        const tt = form.querySelector(`[name=tripType][value="${src.startAt ? S.tripType(src) : src.tripType}"]`);
-        if (tt) { tt.checked = true; syncTrip(); drawDays(); }
+        const tt = form.querySelector(`[name=tripType][value="${src.startAt ? S.tripUI(src) : src.tripType}"]`);
+        if (tt) { tt.checked = true; tt.dispatchEvent(new Event('change', { bubbles: true })); syncTrip(); drawDays(); }
         if (src.category) { const rb = form.querySelector(`[name=category][value="${src.category}"]`); if (rb) { rb.checked = true; rb.dispatchEvent(new Event('change', { bubbles: true })); syncCat(); } const o = form.querySelector('[name=categoryOther]'); if (o) o.value = src.categoryOther || ''; }
       }
     };
@@ -530,7 +556,7 @@
     const row = (lbl, d, ic) => `<div class="dc-row"><span class="dc-ic">${icon(ic)}</span><div><small>${lbl}</small><b>${esc(fmt.dateLong(d))}</b></div>${tm(d)}</div>`;
     const days = fmt.days(a, b);
     const body = `<div class="dt-confirm">
-      <div class="dc-trip">${icon(S.TRIP[t].icon)} <b>${esc(S.TRIP[t].label)}</b>${t === 'overnight' ? ` · ${days} วัน ${days - 1} คืน` : t === 'daily' ? ` · ${days} วัน (ออก-กลับ ตามเวลานี้ทุกวัน)` : ''}</div>
+      <div class="dc-trip">${icon((S.TRIP_UI[t] || S.TRIP_UI.day).icon)} <b>${esc((S.TRIP_UI[t] || S.TRIP_UI.day).label)}</b>${t === 'overnight' ? ` · ${days} วัน ${days - 1} คืน` : t === 'daily' ? ` · ${days} วัน (ออก-กลับ ตามเวลานี้ทุกวัน)` : ''}</div>
       ${row(t === 'daily' ? 'วันแรก · ออกจากโรงเรียน' : 'ออกจากโรงเรียน', a, 'navigation')}
       ${row(t === 'daily' ? 'วันสุดท้าย · กลับถึงโรงเรียน' : 'กลับถึงโรงเรียน', b, 'home')}
       ${oddTime(fmt.time(a)) || oddTime(fmt.time(b)) ? `<div class="note-box warn-y" style="margin-top:4px">${icon('alert')}<div>มีเวลาที่อยู่ช่วง<b>กลางคืน/เช้ามืด</b> — ถ้าตั้งใจเป็นช่วงบ่าย ให้กด "กลับไปแก้" (เช่น บ่ายสี่โมง = 16:00 น.)</div></div>` : ''}
@@ -737,7 +763,9 @@
       </div></div>`
     };
   };
-  function requestInfo(r) {
+  // hideDocs: หน้าแอดมินที่เปิดเอกสารด้านซ้ายอยู่แล้ว → ไม่แสดงรูปไฟล์ซ้ำ (แสดงเฉพาะสถานะเมื่อไม่มีไฟล์)
+  function requestInfo(r, { hideDocs = false } = {}) {
+    const docsOnLeft = hideDocs && (r.attachments || []).length > 0;
     return `
       <div class="card"><div class="card-head"><h3>${icon('flag')} ภารกิจ</h3>${C.statusPill(r, 'lg')}</div>
         <dl class="kv">
@@ -754,8 +782,8 @@
           <dt>เบอร์ติดต่อ</dt><dd>${r.contactPhone ? `<a class="link" href="tel:${esc(r.contactPhone)}">${esc(r.contactPhone)}</a>` : '-'}</dd>
           ${r.note ? `<dt>หมายเหตุ</dt><dd>${esc(r.note)}</dd>` : ''}
         </dl>
-        <div class="divider"></div><div class="label">${icon('paperclip')} บันทึกข้อความขออนุญาตใช้รถ</div>
-        <div class="thumbs">${(r.attachments || []).map(a => UI.thumb(a)).join('') || (S.needsMemo(r) ? `<span class="pill tone-bad">ค้างบันทึกข้อความ</span>${S.isAdmin(S.me) && location.hash.startsWith('#/admin') ? ` <a class="btn btn-ghost btn-xs" href="#/my/${r.id}">${icon('upload')} แนบแทนผู้ขอ</a>` : ''}` : r.memoWaived ? `<span class="hint">${icon('shield')} แอดมินยกเว้น — ${esc(r.memoWaived.note)} (${esc(r.memoWaived.byName)})</span>` : S.isQuickCat(r.category) ? '<span class="hint">ไม่ต้องแนบ (งานประจำ)</span>' : '<span class="hint">ไม่มีไฟล์แนบ</span>')}</div>
+        ${docsOnLeft ? '' : `<div class="divider"></div><div class="label">${icon('paperclip')} บันทึกข้อความขออนุญาตใช้รถ</div>
+        <div class="thumbs">${(r.attachments || []).map(a => UI.thumb(a)).join('') || (S.needsMemo(r) ? `<span class="pill tone-bad">ค้างบันทึกข้อความ</span>${S.isAdmin(S.me) && location.hash.startsWith('#/admin') ? ` <a class="btn btn-ghost btn-xs" href="#/my/${r.id}">${icon('upload')} แนบแทนผู้ขอ</a>` : ''}` : r.memoWaived ? `<span class="hint">${icon('shield')} แอดมินยกเว้น — ${esc(r.memoWaived.note)} (${esc(r.memoWaived.byName)})</span>` : S.isQuickCat(r.category) ? '<span class="hint">ไม่ต้องแนบ (งานประจำ)</span>' : '<span class="hint">ไม่มีไฟล์แนบ</span>')}</div>`}
       </div>`;
   }
   Pages._requestInfo = requestInfo;
@@ -800,7 +828,7 @@
           </div>
         </div></div></div>`,
       mount(root) {
-        $('#memoPrint', root)?.addEventListener('click', () => C.printMemo(S.request(r.id)));
+        $('#memoPrint', root)?.addEventListener('click', () => C.printDialog([S.request(r.id)], { title: 'บันทึกข้อความขอใช้รถ' }));
         if ($('#memoSave', root)) {
           const getMemo = C.bindFilePicker(root, 'memoLate', [], { pdf: true });
           $('#memoSave', root).addEventListener('click', e => {

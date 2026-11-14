@@ -31,6 +31,8 @@
     arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     arrowL: '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
     arrowUR: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',
+    arrowDL: '<path d="M17 7 7 17"/><path d="M16 17H7V8"/>',
+    share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4"/><path d="m15.4 6.5-6.8 4"/>',
     route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
     gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
     star: '<path d="M12 2.5l2.94 5.96 6.56.95-4.75 4.63 1.12 6.54L12 17.5l-5.87 3.08 1.12-6.54L2.5 9.41l6.56-.95L12 2.5z"/>',

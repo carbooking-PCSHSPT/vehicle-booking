@@ -43,7 +43,8 @@
       if (p.insurance && p.insurance.expiry) { const d = daysTo(p.insurance.expiry); if (d <= 30) alerts.push({ red: d <= 7, ic: 'shield', t: `${v.name} · ประกันภัย ${d < 0 ? 'หมดอายุแล้ว' : `จะหมดอายุในอีก ${d} วัน`} (${fmt.date(p.insurance.expiry)})`, h: `#/admin/vehicles/${v.id}?tab=private` }); }
     });
     S.db.drivers.forEach(d => { if (d.licenseExpiry && daysTo(d.licenseExpiry) <= 30) alerts.push({ red: daysTo(d.licenseExpiry) <= 7, ic: 'user', t: `ใบขับขี่ ${d.name} ${daysTo(d.licenseExpiry) < 0 ? 'หมดอายุแล้ว' : `จะหมดอายุในอีก ${daysTo(d.licenseExpiry)} วัน`}`, h: '#/admin/drivers' }); });
-    const toClose = rs.filter(r => r.status === 'returned');
+    // กลับถึงแล้ว (ปิดงานอัตโนมัติ) แต่ยังไม่มีค่าน้ำมัน/ค่าใช้จ่าย ภายใน 3 วัน → เตือนให้บันทึก
+    const toClose = rs.filter(r => ['returned', 'closed'].includes(r.status) && !(r.expenses || []).length && (r.status === 'returned' || (r.closedAt && Date.now() - new Date(r.closedAt) < 3 * DAY)));
     return {
       layout: 'admin',
       html: `${head('ระบบหลังบ้าน', 'ภาพรวมวันนี้', fmt.dateLong(now), `<a class="btn btn-ghost btn-sm" href="#/admin/new">${icon('alert')} บันทึกคำขอเร่งด่วน</a>`)}
@@ -58,7 +59,7 @@
         <div class="split" style="margin-top:18px">
           <div class="card"><div class="card-head"><h3>${icon('clipboard')} คำขอรอตรวจสอบ</h3><a class="link" href="#/admin/requests?f=pending">ดูทั้งหมด</a></div>
             <div class="stack">${pending.slice(0, 6).map(r => C.reqCard(r, `#/admin/requests/${r.id}`)).join('') || UI.empty('ไม่มีคำขอรอตรวจสอบ', 'checkCircle')}</div>
-            ${toClose.length ? `<div class="divider"></div><div class="card-head"><h3>${icon('check')} กลับถึงแล้ว รอปิดงาน / บันทึกค่าใช้จ่าย</h3><span class="pill tone-done">${toClose.length}</span></div><div class="stack">${toClose.slice(0, 5).map(r => C.reqCard(r, `#/admin/requests/${r.id}`)).join('')}</div>` : ''}
+            ${toClose.length ? `<div class="divider"></div><div class="card-head"><h3>${icon('fuel')} กลับถึงแล้ว ยังไม่บันทึกค่าน้ำมัน</h3><span class="pill tone-done">${toClose.length}</span></div><div class="stack">${toClose.slice(0, 5).map(r => C.reqCard(r, `#/admin/requests/${r.id}`)).join('')}</div>` : ''}
           </div>
           <div class="card"><div class="card-head"><h3>${icon('grid')} ลานจอดรถตอนนี้</h3><a class="link" href="#/schedule">ตารางรถ</a></div>${C.lot(vs, { list: false })}
             <div class="divider"></div><div class="card-head"><h3>${icon('route')} วันนี้</h3></div>
@@ -112,31 +113,36 @@
 
   // ═════════ รายการคำขอ ═════════
   Pages.adminRequests = ({ query }) => {
-    const f = query.f || 'pending', q = (query.q || '').trim(), m = query.m || '', cf = query.c || '', sg = query.sg || '';
-    const G = { pending: ['pending'], revise: ['revise'], approved: ['approved'], ontrip: ['ontrip'], returned: ['returned'], closed: ['closed'], rejected: ['rejected', 'cancelled'], all: null };
+    const f = query.md ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', cf = query.c || '', sg = query.sg || '', md = query.md || '';
+    // กลับถึงโรงเรียน = ปิดงานอัตโนมัติ (ไม่มีแท็บ "รอปิดงาน" · ข้อมูลเก่าสถานะ returned รวมอยู่ใน "ปิดงานแล้ว")
+    const G = { pending: ['pending'], revise: ['revise'], approved: ['approved'], ontrip: ['ontrip'], closed: ['returned', 'closed'], rejected: ['rejected', 'cancelled'], all: null };
     let list = S.db.requests.filter(r => !G[f] || G[f].includes(r.status));
     if (m) list = list.filter(r => r.startAt.slice(0, 7) === m);
     if (cf) list = list.filter(r => (r.category || '') === (cf === 'none' ? '' : cf));
     // ฉบับลงนาม: no = อนุมัติแล้วแต่ยังไม่แนบฉบับลงนาม · yes = เก็บฉบับลงนามแล้ว
     const hasSig = r => (r.signed || []).length > 0;
     if (sg) list = list.filter(r => C.canMemo(r) && (sg === 'yes' ? hasSig(r) : !hasSig(r)));
+    // ติดตามคำขอเร่งด่วนที่ยังค้างบันทึกข้อความ
+    const debtN = S.db.requests.filter(S.needsMemo).length;
+    if (md) list = list.filter(S.needsMemo);
     if (q) list = list.filter(r => [r.id, r.purpose, r.requester.name, r.requester.dept, S.destName(r)].join(' ').toLowerCase().includes(q.toLowerCase()));
     list.sort((a, b) => f === 'pending' || f === 'approved' ? a.startAt.localeCompare(b.startAt) : b.startAt.localeCompare(a.startAt));
     const cnt = k => S.db.requests.filter(r => !G[k] || G[k].includes(r.status)).length;
-    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, c: cf, sg, ...o });
-    const printable = list.filter(C.canMemo);
+    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, c: cf, sg, md, ...o });
+    const printable = list;
     return {
       layout: 'admin',
-      html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a>`)}
-        <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['returned', 'รอปิดงาน'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k })}"><button class="${f === k ? 'on' : ''}" tabindex="-1">${l} ${cnt(k)}</button></a>`).join('')}</div></div>
+      html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a>`)}
+        <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '' })}"><button class="${f === k && !md ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
+          ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}</div>
         <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><input class="input" type="month" id="m" value="${esc(m)}" style="width:auto"><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
           <select class="input" id="sg" style="width:auto" title="บันทึกข้อความฉบับลงนาม"><option value="">ฉบับลงนาม: ทั้งหมด</option><option value="no" ${sg === 'no' ? 'selected' : ''}>ยังไม่มีฉบับลงนาม</option><option value="yes" ${sg === 'yes' ? 'selected' : ''}>เก็บฉบับลงนามแล้ว</option></select>
-          <button class="btn btn-primary btn-sm" id="memoBatch" ${printable.length ? '' : 'disabled'}>${icon('printer')} <span>พิมพ์บันทึกข้อความ</span></button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
-        ${printable.length ? `<p class="hint" style="margin:-4px 0 10px">${icon('info')} ติ๊กเลือกรายการที่ต้องการพิมพ์บันทึกข้อความ (เฉพาะที่อนุมัติแล้ว) — ไม่เลือก = พิมพ์ทั้งหมด ${printable.length} ฉบับในรายการนี้</p>` : ''}
+          <button class="btn btn-primary btn-sm" id="memoBatch" ${printable.length ? '' : 'disabled'}>${icon('printer')} <span>พิมพ์ / PDF</span></button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
+        ${printable.length ? `<p class="hint" style="margin:-4px 0 10px">${icon('info')} ติ๊กเลือกรายการที่ต้องการพิมพ์ (บันทึกข้อความมีครุฑ / หัวกระดาษโรงเรียน / ตารางสรุป) — ไม่เลือก = พิมพ์ทั้งหมด ${printable.length} รายการในรายการนี้</p>` : ''}
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th class="ck">${printable.length ? `<input type="checkbox" id="pickAll" aria-label="เลือกทั้งหมด">` : ''}</th><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
-          <tbody>${list.map(r => `<tr class="click" data-href="#/admin/requests/${r.id}">
-            <td class="ck">${C.canMemo(r) ? `<input type="checkbox" data-pick="${r.id}" aria-label="เลือก ${r.id}">` : ''}</td>
+          <tbody>${list.map(r => `<tr class="click rs-${r.status}" data-href="#/admin/requests/${r.id}">
+            <td class="ck"><input type="checkbox" data-pick="${r.id}" aria-label="เลือก ${r.id}"></td>
             <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}${C.canMemo(r) ? (hasSig(r) ? '<small style="color:var(--ok)">✓ มีฉบับลงนาม</small>' : '<small style="color:var(--gold-700)">ยังไม่มีฉบับลงนาม</small>') : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
             <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${S.tripTag(r) ? `<small>${S.tripTag(r).text}</small>` : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
@@ -149,19 +155,19 @@
         root.addEventListener('click', e => { if (e.target.closest('.ck')) return; const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; });
         // เลือกหลายรายการ → พิมพ์บันทึกข้อความต่อกัน (1 ฉบับต่อหน้า)
         const picked = () => $$('[data-pick]:checked', root).map(x => x.dataset.pick);
-        const syncBtn = () => { const n = picked().length; $('#memoBatch span', root).textContent = n ? `พิมพ์บันทึกข้อความ (${n} ฉบับ)` : 'พิมพ์บันทึกข้อความ'; const all = $('#pickAll', root); if (all) { const t = $$('[data-pick]', root).length; all.checked = n > 0 && n === t; all.indeterminate = n > 0 && n < t; } };
+        const syncBtn = () => { const n = picked().length; $('#memoBatch span', root).textContent = n ? `พิมพ์ / PDF (${n} รายการ)` : 'พิมพ์ / PDF'; const all = $('#pickAll', root); if (all) { const t = $$('[data-pick]', root).length; all.checked = n > 0 && n === t; all.indeterminate = n > 0 && n < t; } };
         root.addEventListener('change', e => {
           if (e.target.id === 'pickAll') $$('[data-pick]', root).forEach(x => { x.checked = e.target.checked; });
           if (e.target.id === 'pickAll' || e.target.dataset.pick) syncBtn();
         });
         $('#memoBatch', root).addEventListener('click', async () => {
           const ids = picked();
-          let rs = ids.length ? ids.map(S.request).filter(Boolean) : printable;
-          if (!ids.length && !(await UI.confirm(`ไม่ได้เลือกรายการ — พิมพ์บันทึกข้อความทั้งหมด <b>${printable.length} ฉบับ</b> ในรายการนี้ใช่ไหม?`, { title: 'พิมพ์บันทึกข้อความ', ok: 'พิมพ์ทั้งหมด' }))) return;
-          rs = rs.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
-          C.printMemos(rs);
+          const rs = ids.length ? ids.map(S.request).filter(Boolean) : printable;
+          const tabName = { pending: 'รอตรวจสอบ', revise: 'ส่งกลับแก้ไข', approved: 'อนุมัติแล้ว', ontrip: 'กำลังเดินทาง', closed: 'ปิดงานแล้ว', rejected: 'ไม่อนุมัติ/ยกเลิก', all: 'ทุกสถานะ' }[f] || '';
+          C.printDialog(rs, { sub: ids.length ? 'รายการที่เลือก' : `${cf ? S.catName({ category: cf }) : 'ทุกหมวด'} · ${tabName}` });
         });
         $('#sg', root).addEventListener('change', e => { location.hash = qs({ sg: e.target.value }); });
+        $('#daySum', root).addEventListener('click', () => dailySummary(new Date()));
         $('#q', root).addEventListener('input', UI.debounce(e => { location.hash = qs({ q: e.target.value }); }, 450));
         $('#m', root).addEventListener('change', e => { location.hash = qs({ m: e.target.value }); });
         $('#cf', root).addEventListener('change', e => { location.hash = qs({ c: e.target.value }); });
@@ -222,17 +228,17 @@
       layout: 'admin', live: false,
       html: `<a class="crumb" href="#/admin/requests">${icon('arrowL')} รายการคำขอ</a>
         ${head(`${r.id}${r.emergency ? ' · เร่งด่วน' : ''}`, esc(S.destName(r)), `ส่งเมื่อ ${fmt.dt(r.createdAt)} · ${esc(r.requester.name)}`,
-          `${C.canMemo(r) ? `<button class="btn btn-primary btn-sm" data-memo>${icon('printer')} พิมพ์บันทึกข้อความ</button>` : ''}${docs.length ? `<button class="btn btn-ghost btn-sm dv-toggle" id="dvToggle" aria-pressed="${dvOpen}">${icon('file')} <span>${dvOpen ? 'ซ่อนบันทึกข้อความ' : 'แสดงบันทึกข้อความคู่กัน'}</span></button>` : ''}${['pending', 'revise', 'approved'].includes(r.status) ? `<a class="btn btn-ghost btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขข้อมูล</a>` : ''}${['pending', 'revise', 'approved'].includes(r.status) && r.assignments.every(a => a.status === 'assigned') ? `<button class="btn btn-ghost btn-sm" id="aCancel">${icon('xCircle')} ยกเลิก</button>` : ''}${r.status === 'returned' ? `<button class="btn btn-ok btn-sm" id="aClose">${icon('check')} ปิดงาน</button>` : ''}${r.status === 'closed' ? `<button class="btn btn-ghost btn-sm" id="aReopen">${icon('refresh')} เปิดงานอีกครั้ง</button>` : ''}`)}
+          `${C.canMemo(r) ? `<button class="btn btn-primary btn-sm" data-memo>${icon('printer')} พิมพ์บันทึกข้อความ</button>` : ''}${docs.length ? `<button class="btn btn-ghost btn-sm dv-toggle" id="dvToggle" aria-pressed="${dvOpen}">${icon('file')} <span>${dvOpen ? 'ซ่อนบันทึกข้อความ' : 'แสดงบันทึกข้อความคู่กัน'}</span></button>` : ''}${['pending', 'revise', 'approved'].includes(r.status) ? `<a class="btn btn-ghost btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขข้อมูล</a>` : ''}${['pending', 'revise', 'approved'].includes(r.status) && r.assignments.every(a => a.status === 'assigned') ? `<button class="btn btn-ghost btn-sm" id="aCancel">${icon('xCircle')} ยกเลิก</button>` : ''}${r.status === 'returned' ? `<button class="btn btn-ok btn-sm" id="aClose">${icon('check')} ปิดงาน</button>` : ''}`)}
         <div class="rq-split ${docs.length ? 'has-doc' : ''} ${docs.length && dvOpen ? 'dv-open' : ''}">
         ${docs.length ? `<div class="rq-doc">${C.docSlot()}</div>
           <button type="button" class="dv-fab no-print" id="dvFab">${icon('file')} บันทึกข้อความ${docs.length > 1 ? ` (${docs.length})` : ''}</button>` : ''}
         <div class="rq-main">
         <div style="margin-bottom:18px">${Pages._decisionBox(r)}</div>
         ${canDecide || canReassign ? `
-        <div class="req-top">${Pages._requestInfo(r)}</div>
+        <div class="req-top">${Pages._requestInfo(r, { hideDocs: true })}</div>
         <div class="card" style="margin-bottom:18px;border-color:var(--navy);box-shadow:0 0 0 4px var(--navy-50)">
           <div class="card-head"><h3>${icon(canDecide ? 'clipboard' : 'refresh')} ${canDecide ? 'พิจารณาคำขอ' : 'ปรับรถ / คนขับ'}</h3><span class="hint">${fmt.range(r.startAt, r.endAt)} · ผู้เดินทาง ${S.passengers(r)} คน</span></div>
-          ${canDecide ? `<div class="note-box navy" style="margin-bottom:14px">${icon('paperclip')}<div>ตรวจบันทึกข้อความ (ลายเซ็นผู้อำนวยการ/ผู้รักษาราชการแทน · วันที่ · สถานที่ ตรงกับคำขอ) ${(r.attachments || []).map(a => UI.thumb(a, 'sm')).join(' ') || '<b style="color:var(--bad)">ไม่มีไฟล์แนบ</b>'}</div></div>` : ''}
+          ${canDecide ? `<div class="note-box navy" style="margin-bottom:14px">${icon('paperclip')}<div>ตรวจบันทึกข้อความ (ลายเซ็นผู้อำนวยการ/ผู้รักษาราชการแทน · วันที่ · สถานที่ ตรงกับคำขอ) ${docs.length ? `<b>— เปิดดูที่ช่องเอกสาร${docs.length > 1 ? ` (${docs.length} ไฟล์)` : ''}</b>` : '<b style="color:var(--bad)">ไม่มีไฟล์แนบ</b>'}</div></div>` : ''}
           <div class="field" style="margin-bottom:14px"><label>${icon('flag')} หมวดงาน <span class="hint" style="font-weight:400">(แก้ได้ถ้าผู้ขอเลือกผิด)</span></label>${Pages._catPicker.html(r.category, r.categoryOther, 'dcat')}</div>
           <div class="label" style="margin-bottom:8px">เลือกรถ (เลือกได้หลายคัน) · คนขับ · หมายเหตุรายคัน</div>
           ${vehiclePickerHTML(r, r.assignments)}
@@ -242,7 +248,7 @@
           </div>
         </div>` : ''}
         <div class="detail-grid ${canDecide || canReassign ? 'side-only' : ''}">
-          ${canDecide || canReassign ? '' : Pages._requestInfo(r)}
+          ${canDecide || canReassign ? '' : Pages._requestInfo(r, { hideDocs: true })}
           <div class="stack" style="gap:18px">
             ${(r.assignments || []).length ? `<div class="card"><div class="card-head"><h3>${icon('van')} สถานะการเดินทาง</h3></div>
               ${C.assignList(r)}
@@ -272,7 +278,7 @@
       mount(root) {
         const P = (canDecide || canReassign) ? bindVehiclePicker(root, () => S.passengers(r)) : null;
         const getSig = $('#sigSave', root) ? C.bindFilePicker(root, 'sig', [], { pdf: true }) : null;
-        root.querySelectorAll('[data-memo]').forEach(b => b.addEventListener('click', () => C.printMemo(S.request(r.id))));
+        root.querySelectorAll('[data-memo]').forEach(b => b.addEventListener('click', () => C.printDialog([S.request(r.id)], { title: 'บันทึกข้อความขอใช้รถ' })));
         $('#sigSave', root)?.addEventListener('click', e => {
           const files = getSig(); if (!files.length) return UI.toast('กรุณาเลือกไฟล์ที่สแกน', 'error');
           UI.busy(e.currentTarget, () => S.attachSigned(r.id, files)).then(() => { UI.toast('เก็บบันทึกข้อความฉบับลงนามแล้ว'); App.render(); }).catch(() => {});
@@ -335,6 +341,99 @@
       }
     };
   };
+
+  // ═════════ สรุปการใช้รถรายวัน (รูปภาพ · แชร์ LINE / บันทึกลงเครื่อง) ═════════
+  // วาดลงผืนผ้าใบ (canvas) โดยตรง → คมชัด ไม่ตกบรรทัด (ข้อความยาวตัดด้วย …) ไม่ต้องใช้ไลบรารีเพิ่ม
+  const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+  async function dailyCanvas(day) {
+    const st = S.db.settings, ymd = fmt.localDate(day);
+    const s0 = new Date(day); s0.setHours(0, 0, 0, 0); const s1 = new Date(s0); s1.setDate(s1.getDate() + 1);
+    const list = S.db.requests.filter(r => ['pending', 'approved', 'ontrip', 'returned', 'closed'].includes(r.status) && new Date(r.startAt) < s1 && new Date(r.endAt) >= s0).sort((a, b) => a.startAt.localeCompare(b.startAt));
+    try { await Promise.all([document.fonts.load('600 30px Prompt'), document.fonts.load('400 20px "IBM Plex Sans Thai"'), document.fonts.load('600 20px "IBM Plex Sans Thai"')]); } catch (e) { /* ใช้ฟอนต์สำรอง */ }
+    const logo = await loadImg('images/logo.png');
+    const W = 1200, P = 36, HEAD = 176, TH = 50, RH = 70, FOOT = 64;
+    const H = HEAD + 34 + TH + Math.max(1, list.length) * RH + 24 + FOOT;
+    const k = 2, cv = document.createElement('canvas'); cv.width = W * k; cv.height = H * k;
+    const g = cv.getContext('2d'); g.scale(k, k);
+    const F = (w, px, fam = '"IBM Plex Sans Thai", Prompt, sans-serif') => { g.font = `${w} ${px}px ${fam}`; };
+    const D = (w, px) => F(w, px, 'Prompt, "IBM Plex Sans Thai", sans-serif');
+    const fit = (t, max) => { t = String(t || ''); if (g.measureText(t).width <= max) return t; while (t.length && g.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; };
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    // พื้นหลัง
+    g.fillStyle = '#eef0f7'; g.fillRect(0, 0, W, H);
+    // หัว (กรมท่า → น้ำเงิน) + แถบส้มล่าง
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#1d2766'); gr.addColorStop(1, '#2f55d4');
+    rr(16, 16, W - 32, HEAD - 16, 24); g.fillStyle = gr; g.fill();
+    g.fillStyle = '#f08a24'; g.fillRect(16, HEAD - 6, W - 32, 6);
+    if (logo) { rr(P + 4, 40, 96, 96, 18); g.fillStyle = '#fff'; g.fill(); const r0 = Math.min(80 / logo.width, 80 / logo.height); g.drawImage(logo, P + 4 + (96 - logo.width * r0) / 2, 40 + (96 - logo.height * r0) / 2, logo.width * r0, logo.height * r0); }
+    const tx = P + 124;
+    g.fillStyle = '#fff'; D('600', 32); g.fillText('สรุปการใช้รถประจำวัน', tx, 76);
+    g.fillStyle = '#f7c766'; D('600', 24); g.fillText(day.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), tx, 112);
+    g.fillStyle = 'rgba(255,255,255,.78)'; F('400', 16); g.fillText(fit(`${st.unit || 'งานยานพาหนะ'} · ${st.division || ''} · ${st.schoolName || ''}`, W - tx - 200), tx, 142);
+    D('600', 18); const badge = `${list.length} รายการ`, bw = g.measureText(badge).width + 36;
+    rr(W - P - bw, 56, bw, 40, 20); g.fillStyle = 'rgba(255,255,255,.18)'; g.fill(); g.fillStyle = '#fff'; g.fillText(badge, W - P - bw + 18, 82);
+    // การ์ดตาราง
+    const top = HEAD + 18, cardH = TH + Math.max(1, list.length) * RH + 16;
+    rr(P - 8, top, W - 2 * P + 16, cardH, 18); g.fillStyle = '#fff'; g.fill();
+    const cols = [['ที่', 44], ['เวลา', 128], ['ปลายทาง / ภารกิจ', 330], ['ผู้ขอใช้รถ', 200], ['ผู้เดินทาง', 92], ['รถ / คนขับ', 210], ['สถานะ', 124]];
+    let x = P + 8; const cx = cols.map(([, w]) => { const v = x; x += w; return v; });
+    g.fillStyle = '#f3f5fb'; g.fillRect(P - 8, top + 8, W - 2 * P + 16, TH - 8);
+    g.fillStyle = '#5b6380'; F('600', 16); cols.forEach(([t], i) => g.fillText(t, cx[i] + (i === 0 ? 4 : 0), top + 40));
+    const ST = { pending: ['รอจัดรถ', '#7c3aed', '#f1ebff'], approved: ['อนุมัติแล้ว', '#047857', '#dcf5e9'], ontrip: ['กำลังเดินทาง', '#c2410c', '#ffeadb'], returned: ['กลับแล้ว', '#475569', '#eceef3'], closed: ['กลับแล้ว', '#475569', '#eceef3'] };
+    if (!list.length) { g.fillStyle = '#8a90a6'; F('400', 20); g.fillText('ไม่มีรายการใช้รถในวันนี้', W / 2 - 110, top + TH + 44); }
+    list.forEach((r, i) => {
+      const y = top + TH + i * RH, mid = y + 30;
+      if (i) { g.strokeStyle = '#eceef4'; g.lineWidth = 1; g.beginPath(); g.moveTo(P, y + 4); g.lineTo(W - P, y + 4); g.stroke(); }
+      const sd = UI.sameDay(r.startAt, day), ed = UI.sameDay(r.endAt, day);
+      g.fillStyle = '#8a90a6'; F('400', 18); g.fillText(String(i + 1), cx[0] + 8, mid);
+      const tt = `${sd ? fmt.time(r.startAt) : 'ต่อ'}–${ed ? fmt.time(r.endAt) : fmt.dayMonth(r.endAt)}`;
+      g.fillStyle = '#e8590c'; D('600', 20); if (g.measureText(tt).width > cols[1][1] - 10) D('600', 16); g.fillText(fit(tt, cols[1][1] - 10), cx[1], mid);
+      g.fillStyle = '#8a90a6'; F('400', 14); g.fillText(fit(S.tripTag(r) ? S.tripTag(r).text : 'ไป-กลับวันเดียว', cols[1][1] - 12), cx[1], mid + 24);
+      g.fillStyle = '#1b2147'; F('600', 19); g.fillText(fit(S.destName(r), cols[2][1] - 16), cx[2], mid);
+      g.fillStyle = '#6b7190'; F('400', 15); g.fillText(fit(r.purpose, cols[2][1] - 16), cx[2], mid + 24);
+      g.fillStyle = '#1b2147'; F('400', 17); g.fillText(fit(r.requester.name, cols[3][1] - 14), cx[3], mid);
+      g.fillStyle = '#8a90a6'; F('400', 14); g.fillText(fit(r.requester.dept || '', cols[3][1] - 14), cx[3], mid + 24);
+      g.fillStyle = '#1b2147'; F('600', 18); g.fillText(`${S.passengers(r)} คน`, cx[4], mid);
+      g.fillStyle = '#8a90a6'; F('400', 14); g.fillText(fit(`ครู ${r.teachers} นร. ${r.students}`, cols[4][1] - 8), cx[4], mid + 24);
+      const as = r.assignments || [];
+      g.fillStyle = as.length ? '#1b2147' : '#7c3aed'; F('600', 17); g.fillText(fit(as.length ? as.map(a => C.vName(a.vehicleId)).join(', ') : 'รอแอดมินจัดรถ', cols[5][1] - 12), cx[5], mid);
+      g.fillStyle = '#6b7190'; F('400', 14); g.fillText(fit(as.map(a => C.firstName(C.dName(a.driverId))).join(', '), cols[5][1] - 12), cx[5], mid + 24);
+      const [sl, sc, sb] = ST[r.status] || ST.approved; F('600', 15); const pw = g.measureText(sl).width + 26;
+      rr(cx[6], mid - 22, pw, 32, 16); g.fillStyle = sb; g.fill(); g.fillStyle = sc; g.fillText(sl, cx[6] + 13, mid);
+    });
+    // ท้าย
+    const fy = H - FOOT / 2 + 4;
+    g.fillStyle = '#7a8099'; F('400', 15); g.fillText(`ข้อมูล ณ ${new Date().toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} น. · ระบบยานพาหนะ ${st.unit || ''}`, P, fy);
+    g.fillStyle = '#2f55d4'; F('600', 15); const nt = 'เฉพาะรายการที่ใช้รถจริง (ไม่รวมที่ยกเลิก/ไม่อนุมัติ)'; g.fillText(nt, W - P - g.measureText(nt).width, fy);
+    return { cv, n: list.length, ymd };
+  }
+  async function dailySummary(start = new Date()) {
+    let day = new Date(start); day.setHours(0, 0, 0, 0);
+    let cur = null;
+    await UI.modal({
+      title: `${icon('image')} สรุปการใช้รถรายวัน`, size: 'lg',
+      body: `<div class="ds-nav"><button type="button" class="icon-btn" data-dd-day="-1" aria-label="วันก่อนหน้า">${icon('chevL')}</button><input type="date" class="input" id="dsDate" value="${fmt.localDate(day)}"><button type="button" class="icon-btn" data-dd-day="1" aria-label="วันถัดไป">${icon('chevR')}</button><button type="button" class="btn btn-ghost btn-sm" data-dd-day="0">วันนี้</button></div>
+        <div class="ds-prev" id="dsPrev"><div class="hint">กำลังสร้างรูป…</div></div>
+        <p class="hint" style="margin-top:8px">${icon('info')} รูปนี้ส่งในกลุ่ม LINE ได้ทันที · แสดงเวลา ปลายทาง ผู้ขอ จำนวนคน รถ/คนขับ และสถานะของทุกเที่ยวในวันนั้น</p>`,
+      actions: [{ label: 'ปิด', value: null }, { label: 'แชร์', icon: 'share', onClick: async () => {
+        if (!cur) return false;
+        const blob = await new Promise(r => cur.cv.toBlob(r, 'image/png'));
+        const file = new File([blob], `สรุปการใช้รถ-${cur.ymd}.png`, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: `สรุปการใช้รถ ${fmt.date(day)}` }); } catch (e) { /* ผู้ใช้ยกเลิก */ } }
+        else { const a = document.createElement('a'); a.href = cur.cv.toDataURL('image/png'); a.download = file.name; a.click(); UI.toast('อุปกรณ์นี้แชร์โดยตรงไม่ได้ — บันทึกรูปลงเครื่องแล้ว', 'info'); }
+        return false;
+      } }, { label: 'บันทึกรูปลงเครื่อง', kind: 'btn-primary', icon: 'download', onClick: () => {
+        if (!cur) return false;
+        const a = document.createElement('a'); a.href = cur.cv.toDataURL('image/png'); a.download = `สรุปการใช้รถ-${cur.ymd}.png`; a.click(); UI.toast('บันทึกรูปแล้ว'); return false;
+      } }],
+      onOpen(el) {
+        const draw = async () => { $('#dsPrev', el).innerHTML = '<div class="hint">กำลังสร้างรูป…</div>'; cur = await dailyCanvas(day); const im = new Image(); im.src = cur.cv.toDataURL('image/png'); im.alt = 'สรุปการใช้รถรายวัน'; $('#dsPrev', el).innerHTML = ''; $('#dsPrev', el).appendChild(im); $('#dsDate', el).value = fmt.localDate(day); };
+        el.addEventListener('click', e => { const b = e.target.closest('[data-dd-day]'); if (!b) return; const n = +b.dataset.ddDay; if (n === 0) { day = new Date(); day.setHours(0, 0, 0, 0); } else day.setDate(day.getDate() + n); draw(); });
+        $('#dsDate', el).addEventListener('change', e => { if (e.target.value) { day = UI.dayOf(e.target.value); draw(); } });
+        draw();
+      }
+    });
+  }
 
   // ═════════ บันทึกข้อความรอลงนาม (หัวหน้างานยานพาหนะ / รองผู้อำนวยการ) ═════════
   Pages.adminEsign = ({ query }) => {
@@ -408,7 +507,7 @@
     const users = S.db.users.filter(u => (u.roles || []).includes('teacher') && u.active !== false).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
     return {
       layout: 'admin', live: false,
-      html: `${head('กรณีเร่งด่วน', 'บันทึกคำขอใช้รถโดยแอดมิน', 'ไม่ติดกฎขอล่วงหน้า · อนุมัติและมอบหมายรถได้ทันที')}
+      html: `${head('กรณีเร่งด่วน', 'บันทึกคำขอใช้รถโดยแอดมิน', 'กรอกเท่าที่จำเป็น · เลือกรถและคนขับได้ในหน้านี้ · บันทึกแล้วเข้างานของคนขับทันที')}
         <form id="ef" novalidate>
           <div class="form-section"><h3><span class="n">0</span>ผู้ขอใช้รถ</h3>
             <div class="grid2">
@@ -420,10 +519,10 @@
             <p class="hint" id="nameLink" hidden style="margin-top:8px"></p>
             <div class="note-box red" id="debtWarn" hidden style="margin-top:12px">${icon('alert')}<div><b>ผู้ขอคนนี้ยังค้างบันทึกข้อความ:</b> <span></span> — แอดมินบันทึกต่อได้ แต่ควรติดตามให้แนบก่อน</div></div></div>
           ${Pages._requestForm.html(null, { admin: true })}
-          <div class="form-section"><h3><span class="n">7</span>มอบหมายรถและคนขับ <span class="hint" style="font-weight:400">(ไม่เลือก = บันทึกเป็น "รอตรวจสอบ")</span></h3>
+          <div class="form-section" style="border-color:var(--navy);box-shadow:0 0 0 4px var(--navy-50)"><h3><span class="n">6</span>เลือกรถและคนขับ <span class="hint" style="font-weight:400">(เลือกแล้ว = อนุมัติทันที และเข้างานของคนขับ · ไม่เลือก = รอจัดรถ)</span></h3>
             <div id="pickBox"><p class="hint">ระบุวันเวลาก่อน แล้วระบบจะแสดงรถที่ว่าง</p></div>
-            <div class="field" style="margin-top:14px"><label>หมายเหตุถึงผู้ขอใช้รถ</label><textarea name="dNote" rows="2"></textarea></div></div>
-          <div class="form-actions"><a class="btn btn-ghost" href="#/admin">ยกเลิก</a><button class="btn btn-primary" type="submit">${icon('check')} บันทึกคำขอ</button></div>
+            <div class="field" style="margin-top:14px"><label>หมายเหตุถึงผู้ขอ / คนขับ</label><textarea name="dNote" rows="2" placeholder="เช่น รับเอกสารที่ฝ่ายการเงิน ก่อนออก 10 นาที"></textarea></div></div>
+          <div class="form-actions"><a class="btn btn-ghost" href="#/admin/requests">ยกเลิก</a><button class="btn btn-primary" type="submit" id="efSubmit">${icon('check')} <span>บันทึก (รอจัดรถ)</span></button></div>
         </form>`,
       mount(root) {
         const F = Pages._requestForm.bind(root, null);
@@ -437,8 +536,12 @@
           const tripType = (form.querySelector('[name=tripType]:checked') || {}).value;
           $('#pickBox', root).innerHTML = vehiclePickerHTML({ id: '__new', tripType, startAt: new Date(a).toISOString(), endAt: new Date(b).toISOString() }, keep);
           P = bindVehiclePicker(root, pax);
+          syncSubmit();
         };
-        form.addEventListener('change', e => { if (e.target.name === 'tripType' || ['dDate', 'rDate', 'sTime', 'eTime'].includes(e.target.id)) setTimeout(drawPick, 10); if (/teachers|students|others/.test(e.target.name) && P) P.meter(); });
+        // ปุ่มบันทึกบอกผลลัพธ์ชัดเจน: เลือกรถแล้ว = อนุมัติทันที
+        const syncSubmit = () => { const n = P ? P.read().length : 0; $('#efSubmit span', root).textContent = n ? `บันทึกและอนุมัติ (${n} คัน)` : 'บันทึก (รอจัดรถ)'; };
+        form.addEventListener('change', e => { if (e.target.name === 'tripType' || ['dDate', 'rDate', 'sTime', 'eTime'].includes(e.target.id)) setTimeout(drawPick, 10); if (/teachers|students|others/.test(e.target.name) && P) P.meter(); if (e.target.closest('#avPick')) syncSubmit(); });
+        setTimeout(drawPick, 30);   // วันที่ตั้งต้น = วันนี้ → แสดงรถว่างทันที
         const showDebts = u => { const debts = u ? S.memoDebts(u.email) : []; $('#debtWarn', root).hidden = !debts.length; $('#debtWarn', root).querySelector('span').textContent = debts.map(r => r.id).join(', '); };
         // พิมพ์ชื่อเอง → จับคู่กับบัญชีผู้ใช้ให้อัตโนมัติ (ถ้าไม่พบ ระบบติดตามบันทึกข้อความค้างของคนนี้ไม่ได้)
         const linkName = () => {
@@ -456,7 +559,7 @@
           const f = UI.formData(form);
           if (!f.reqName.trim()) return UI.toast('กรุณาระบุชื่อผู้ขอใช้รถ', 'error');
           UI.busy(form.querySelector('[type=submit]'), () => S.createEmergency(data, { requester: { email: f.reqEmail, name: f.reqName, dept: f.reqDept, phone: f.reqPhone }, assignments: P ? P.read() : [], note: f.dNote }))
-            .then(r => { UI.toast(`บันทึก ${r.id} แล้ว`); App.go(`#/admin/requests/${r.id}`); }).catch(() => {});
+            .then(r => { UI.toast(r.status === 'approved' ? `บันทึกและอนุมัติ ${r.id} แล้ว — เข้างานของคนขับแล้ว` : `บันทึก ${r.id} แล้ว (รอจัดรถ)`); App.go(`#/admin/requests/${r.id}`); }).catch(() => {});
         });
       }
     };
@@ -808,13 +911,47 @@
     const by = k => rows.filter(x => x.e.type === k).reduce((s, x) => s + x.e.amount, 0);
     const total = rows.reduce((s, x) => s + x.e.amount, 0), liters = rows.reduce((s, x) => s + (+x.e.liters || 0), 0);
     const qs = o => '#/admin/expenses?' + new URLSearchParams({ ...query, ...o });
+    const view = query.view === 'stats' ? 'stats' : 'list';
+    // ── สรุปสถิติค่าน้ำมัน: ราคาเฉลี่ย/ลิตร · กม./ลิตร · บาท/กม. · รายเดือน · รายคัน · ปั๊มที่ใช้บ่อย ──
+    const fuel = rows.filter(x => x.e.type === 'fuel');
+    const fuelAmt = fuel.reduce((s, x) => s + x.e.amount, 0), fuelL = fuel.reduce((s, x) => s + (+x.e.liters || 0), 0);
+    const kmOf = (r, vid) => { const a = (r.assignments || []).find(x => x.vehicleId === vid); if (a && a.odoStart != null && a.odoEnd != null && a.odoEnd > a.odoStart) return a.odoEnd - a.odoStart; return (r.assignments || []).length === 1 ? (+r.totalKm || 0) : 0; };
+    const trips = S.db.requests.filter(r => ['returned', 'closed'].includes(r.status) && inPer(r.startAt, per) && (!cf || (r.category || '') === (cf === 'none' ? '' : cf)));
+    const vehIds = [...new Set([...fuel.map(x => x.e.vehicleId), ...trips.flatMap(r => (r.assignments || []).map(a => a.vehicleId))])].filter(id => !vf || id === vf);
+    const fv = vehIds.map(id => {
+      const fs = fuel.filter(x => x.e.vehicleId === id), lit = fs.reduce((s, x) => s + (+x.e.liters || 0), 0), amt = fs.reduce((s, x) => s + x.e.amount, 0);
+      const ts = trips.filter(r => (r.assignments || []).some(a => a.vehicleId === id)), km = ts.reduce((s, r) => s + kmOf(r, id), 0);
+      return { id, n: fs.length, trips: ts.length, lit, amt, km, ppl: lit ? amt / lit : 0, kmpl: lit && km ? km / lit : 0, bpk: km ? amt / km : 0 };
+    }).filter(x => x.n || x.trips).sort((a, b) => b.amt - a.amt);
+    const allKm = fv.reduce((s, x) => s + x.km, 0);
+    const months = (() => { const m = new Map(); fuel.forEach(x => { const k = x.e.date.slice(0, 7); const o = m.get(k) || { k, amt: 0, lit: 0 }; o.amt += x.e.amount; o.lit += +x.e.liters || 0; m.set(k, o); }); return [...m.values()].sort((a, b) => a.k.localeCompare(b.k)); })();
+    const stations = (() => { const m = new Map(); fuel.forEach(x => { const k = (x.e.station || 'ไม่ระบุ').trim(); const o = m.get(k) || { k, n: 0, amt: 0, lit: 0 }; o.n++; o.amt += x.e.amount; o.lit += +x.e.liters || 0; m.set(k, o); }); return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 8); })();
+    const monthLbl = k => new Date(k + '-01T00:00:00').toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
+    const statsHTML = () => `
+        <div class="kpis" style="margin-bottom:16px">
+          <div class="kpi" style="--kb:var(--gold-50);--kc:var(--gold-700)"><span class="k-ic">${icon('fuel')}</span><b class="num">${fmt.num(fuelL, 1)}<em>ลิตร</em></b><span class="l">น้ำมันรวม · ${fuel.length} ครั้ง · ${fmt.money(fuelAmt)} ฿</span></div>
+          <div class="kpi"><span class="k-ic">${icon('coins')}</span><b class="num">${fuelL ? fmt.num(fuelAmt / fuelL, 2) : '-'}<em>฿/ลิตร</em></b><span class="l">ราคาเฉลี่ยต่อลิตร</span></div>
+          <div class="kpi" style="--kb:#d9f5e8;--kc:#047857"><span class="k-ic">${icon('gauge')}</span><b class="num">${fuelL && allKm ? fmt.num(allKm / fuelL, 1) : '-'}<em>กม./ลิตร</em></b><span class="l">อัตราสิ้นเปลืองเฉลี่ย · ${fmt.num(allKm)} กม.</span></div>
+          <div class="kpi"><span class="k-ic">${icon('route')}</span><b class="num">${allKm ? fmt.num(fuelAmt / allKm, 2) : '-'}<em>฿/กม.</em></b><span class="l">ค่าน้ำมันต่อกิโลเมตร</span></div>
+        </div>
+        <div class="split">
+          <div class="card"><div class="card-head"><h3>${icon('chart')} ค่าน้ำมันรายเดือน</h3><span class="hint">แท่ง = บาท · เส้น = ลิตร</span></div>${months.length ? '<div class="chart-box"><canvas id="chFuelM"></canvas></div>' : UI.empty('ไม่มีข้อมูลในช่วงนี้', 'fuel')}</div>
+          <div class="card"><div class="card-head"><h3>${icon('pin')} ปั๊มที่เติมบ่อย</h3></div>${stations.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>ปั๊ม</th><th class="r">ครั้ง</th><th class="r">ลิตร</th><th class="r">฿/ลิตร</th></tr></thead><tbody>${stations.map(x => `<tr><td><b>${esc(x.k)}</b></td><td class="r">${x.n}</td><td class="r">${fmt.num(x.lit, 1)}</td><td class="r">${x.lit ? fmt.num(x.amt / x.lit, 2) : '-'}</td></tr>`).join('')}</tbody></table></div>` : UI.empty('ไม่มีข้อมูล', 'pin')}</div>
+        </div>
+        <div class="card" style="margin-top:18px"><div class="card-head"><h3>${icon('van')} สรุปค่าน้ำมันรายคัน</h3><span class="hint">กม. จากเลขไมล์ (ถ้าไม่มี ใช้ระยะทางในคำขอ)</span></div>
+          ${fv.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>รถ</th><th class="r">เที่ยว</th><th class="r">เติม (ครั้ง)</th><th class="r">ลิตร</th><th class="r">ค่าน้ำมัน (฿)</th><th class="r">฿/ลิตร</th><th class="r">กม.</th><th class="r">กม./ลิตร</th><th class="r">฿/กม.</th></tr></thead>
+            <tbody>${fv.map(x => `<tr><td><b>${esc(C.vName(x.id))}</b><small>${esc(C.vPlate(x.id) || '')}</small></td><td class="r">${x.trips}</td><td class="r">${x.n}</td><td class="r">${fmt.num(x.lit, 1)}</td><td class="r"><b>${fmt.money(x.amt)}</b></td><td class="r">${x.ppl ? fmt.num(x.ppl, 2) : '-'}</td><td class="r">${fmt.num(x.km)}</td><td class="r">${x.kmpl ? `<span class="pill ${x.kmpl < 6 ? 'tone-bad' : x.kmpl < 9 ? 'tone-warn' : 'tone-ok'}">${fmt.num(x.kmpl, 1)}</span>` : '-'}</td><td class="r">${x.bpk ? fmt.num(x.bpk, 2) : '-'}</td></tr>`).join('')}</tbody>
+            <tfoot><tr><td>รวม</td><td class="r">${fv.reduce((s, x) => s + x.trips, 0)}</td><td class="r">${fuel.length}</td><td class="r">${fmt.num(fuelL, 1)}</td><td class="r">${fmt.money(fuelAmt)}</td><td class="r">${fuelL ? fmt.num(fuelAmt / fuelL, 2) : '-'}</td><td class="r">${fmt.num(allKm)}</td><td class="r">${fuelL && allKm ? fmt.num(allKm / fuelL, 1) : '-'}</td><td class="r">${allKm ? fmt.num(fuelAmt / allKm, 2) : '-'}</td></tr></tfoot></table></div>
+            <p class="hint" style="margin-top:8px">${icon('info')} สี กม./ลิตร: <span class="pill tone-ok">9 ขึ้นไป</span> ปกติ · <span class="pill tone-warn">6–9</span> ควรสังเกต · <span class="pill tone-bad">ต่ำกว่า 6</span> ตรวจสอบรถ/การกรอกเลขไมล์</p>` : UI.empty('ไม่มีข้อมูลในช่วงนี้', 'van')}</div>`;
     return {
       layout: 'admin',
       html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="pdf" ${rows.length ? '' : 'disabled'}>${icon('printer')} พิมพ์ / PDF</button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
         ${periodBar('#/admin/expenses', per, query)}${histNote(hist)}
+        <div class="toolbar"><div class="seg"><a href="${qs({ view: 'list' })}"><button class="${view === 'list' ? 'on' : ''}" tabindex="-1">${icon('clipboard')} รายการ</button></a><a href="${qs({ view: 'stats' })}"><button class="${view === 'stats' ? 'on' : ''}" tabindex="-1">${icon('chart')} สรุปสถิติค่าน้ำมัน</button></a></div></div>
         <div class="toolbar"><select class="input" id="vf" style="width:auto"><option value="">รถทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}" ${v.id === vf ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
           <select class="input" id="tf" style="width:auto"><option value="">ทุกประเภท</option>${Object.entries(S.EXPENSE).map(([k, l]) => `<option value="${k}" ${k === tf ? 'selected' : ''}>${l}</option>`).join('')}</select>
           <select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select></div>
+        ${view === 'stats' ? statsHTML() : `
         <div class="kpis" style="margin-bottom:16px">
           <div class="kpi" style="--kb:var(--navy-50)"><span class="k-ic">${icon('coins')}</span><b class="num">${fmt.money(total)}<em>฿</em></b><span class="l">รวมทั้งหมด (${rows.length} รายการ)</span></div>
           <div class="kpi" style="--kb:var(--gold-50);--kc:var(--gold-700)"><span class="k-ic">${icon('fuel')}</span><b class="num">${fmt.money(by('fuel'))}<em>฿</em></b><span class="l">ค่าน้ำมัน · ${fmt.num(liters, 1)} ลิตร</span></div>
@@ -825,9 +962,14 @@
           <thead><tr><th>วันที่</th><th>ประเภท</th><th>รถ</th><th>คำขอ</th><th>รายละเอียด</th><th>บิล</th><th class="r">ยอดเงิน (฿)</th></tr></thead>
           <tbody>${rows.map(({ r, e }) => `<tr><td>${fmt.date(e.date)}</td><td>${S.EXPENSE[e.type]}</td><td>${esc(C.vName(e.vehicleId))}</td><td><a class="link" href="#/admin/requests/${r.id}">${r.id}</a><small>${esc(S.destName(r))}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td><td>${esc(e.station || '')}<small>${e.liters ? `${fmt.num(e.liters, 2)} ล. × ${fmt.num(e.pricePerL, 2)} ฿` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''}</small></td><td>${(e.photos || []).map(p => UI.thumb(p, 'sm')).join('') || '<small>—</small>'}</td><td class="r"><b>${fmt.money(e.amount)}</b></td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการในช่วงนี้', 'fuel')}</td></tr>`}</tbody>
           ${rows.length ? `<tfoot><tr><td colspan="6">รวม</td><td class="r">${fmt.money(total)}</td></tr></tfoot>` : ''}
-        </table></div></div>`,
+        </table></div></div>`}`,
       mount(root) {
         bindPeriod(root, '#/admin/expenses', query);
+        if (view === 'stats' && months.length) {
+          const draw = () => { if (!window.Chart || !$('#chFuelM', root)) return; Chart.defaults.font.family = '"IBM Plex Sans Thai", Prompt, sans-serif';
+            new Chart($('#chFuelM', root), { data: { labels: months.map(x => monthLbl(x.k)), datasets: [{ type: 'bar', label: 'ค่าน้ำมัน (บาท)', data: months.map(x => Math.round(x.amt)), backgroundColor: '#c9962b', borderRadius: 8, yAxisID: 'y' }, { type: 'line', label: 'ลิตร', data: months.map(x => +x.lit.toFixed(1)), borderColor: '#24307a', backgroundColor: '#24307a', tension: .35, yAxisID: 'y1' }] }, options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true }, y1: { beginAtZero: true, position: 'right', grid: { display: false } } } } }); };
+          if (window.Chart) draw(); else { let n = 0; const t = setInterval(() => { if (window.Chart || ++n > 40) { clearInterval(t); draw(); } }, 150); }
+        }
         $('#vf', root).addEventListener('change', e => { location.hash = qs({ v: e.target.value }); });
         $('#tf', root).addEventListener('change', e => { location.hash = qs({ t: e.target.value }); });
         $('#cf', root).addEventListener('change', e => { location.hash = qs({ c: e.target.value }); });
