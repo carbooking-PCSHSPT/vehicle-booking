@@ -15,209 +15,295 @@ body { margin: 0; background: #ece7db; color: var(--ink); font-family: 'IBM Plex
 .top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .top h1 { margin: 0; font: 600 1.05rem Prompt; color: var(--navy); }
 .seg { display: inline-flex; flex-wrap: wrap; padding: 4px; border-radius: 14px; background: #efe8d8; gap: 2px; }
-.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font: 500 .9rem Prompt; color: var(--ink); cursor: pointer; }
+.seg button { border: 0; background: none; padding: 8px 13px; border-radius: 10px; font: 500 .88rem Prompt; color: var(--ink); cursor: pointer; }
 .seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .5); }
-main { max-width: 1180px; margin: 0 auto; padding: 22px 16px 70px; }
+main { max-width: 1200px; margin: 0 auto; padding: 22px 16px 70px; }
 .view { display: none; } .view.on { display: block; }
-.intro { display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; background: #fff; border: 1px solid var(--line); margin-bottom: 22px; }
-.intro h2 { margin: 0; font: 600 1.1rem Prompt; color: var(--navy); }
-.intro ol { margin: 0; padding-left: 1.3em; line-height: 1.8; font-size: .93rem; }
-.rule { display: flex; flex-wrap: wrap; gap: 8px; } .rule span { padding: 5px 12px; border-radius: 99px; background: var(--gold-50); color: #7a5410; font: 500 .8rem Prompt; border: 1px solid #f1dfb4; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 16px; }
+.card h2 { margin: 0 0 4px; font: 600 1.08rem Prompt; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.hint { color: var(--muted); font-size: .84rem; line-height: 1.65; }
 .i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: -3px; }
-.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 9px 16px; border-radius: 99px; font: 500 .9rem Prompt; cursor: pointer; }
-.btn.p { background: var(--navy); color: #fff; border-color: var(--navy); } .btn.g { background: linear-gradient(135deg, #f6d27a, var(--gold)); border: 0; }
-.btn.sm { padding: 6px 12px; font-size: .82rem; }
-.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 99px; font: 500 .74rem Prompt; white-space: nowrap; }
-.pill.wait { background: #fff4d6; color: var(--warn); } .pill.ok { background: #dcf5ea; color: var(--ok); } .pill.auto { background: var(--navy-50); color: var(--navy); } .pill.man { background: #f3e8ff; color: #6d28d9; }
-
-/* ── มือถือคนขับ ── */
-.phone-wrap { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 26px; align-items: start; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; border-radius: 99px; font: 500 .86rem Prompt; cursor: pointer; white-space: nowrap; }
+.btn.p { background: var(--navy); color: #fff; border-color: var(--navy); } .btn.sm { padding: 5px 11px; font-size: .78rem; }
+.btn.okb { background: #dcf5ea; color: var(--ok); border-color: #b5e6cf; } .btn.nob { background: #fff1f1; color: var(--bad); border-color: #f5c9c9; }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; font: 500 .72rem Prompt; white-space: nowrap; }
+.pill.work { background: var(--navy-50); color: var(--navy); } .pill.hol { background: #fde8e8; color: var(--bad); } .pill.duty { background: #e6f4ff; color: #0369a1; }
+.pill.ok { background: #dcf5ea; color: var(--ok); } .pill.wait { background: #fff4d6; color: var(--warn); } .pill.flag { background: #fff1e6; color: #c2410c; } .pill.man { background: #f3e8ff; color: #6d28d9; }
+input, select { font: 400 .9rem 'IBM Plex Sans Thai'; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+input[type=number] { width: 80px; } input[type=time] { width: 110px; }
+.rules { display: grid; gap: 10px; margin-top: 10px; }
+.rule { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fdfbf6; }
+.rule > b { font: 600 .95rem Prompt; }
+.rule .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: .88rem; }
+.days { display: flex; flex-wrap: wrap; gap: 6px; }
+.days label { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-size: .82rem; }
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.roster div { display: grid; gap: 4px; padding: 10px; border-radius: 12px; border: 1px solid #cfe4f5; background: #f3f9fe; font-size: .84rem; }
+.roster b { font: 600 .88rem Prompt; color: #0369a1; }
+.hols { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.hols span { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 99px; background: #fde8e8; color: var(--bad); font-size: .82rem; }
+.hols span button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; }
+.law { padding: 12px 14px; border-radius: 14px; background: var(--gold-50); border: 1px solid #f1dfb4; font-size: .86rem; line-height: 1.7; }
+.guard { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.guard div { padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fdfbf6; font-size: .86rem; line-height: 1.6; }
+.guard b { display: block; font: 600 .92rem Prompt; color: var(--navy); margin-bottom: 4px; }
+.phone-wrap { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 22px; align-items: start; }
 .phone { width: 390px; max-width: 100%; border-radius: 34px; background: var(--cream); border: 8px solid #1b1f3b; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(20, 20, 60, .6); }
-.ph-bar { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #fff; border-bottom: 1px solid var(--line); font: 600 .95rem Prompt; color: var(--navy); }
-.ph-body { padding: 14px; display: grid; gap: 12px; max-height: 760px; overflow: auto; }
-.ot-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.ot-sum div { padding: 10px; border-radius: 14px; background: #fff; border: 1px solid var(--line); text-align: center; }
-.ot-sum b { display: block; font: 700 1.3rem Prompt; color: var(--navy); } .ot-sum small { font-size: .72rem; color: var(--muted); }
-.ot-card { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid var(--line); display: grid; gap: 6px; }
-.ot-card .h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.ot-card .h b { font: 600 .95rem Prompt; }
-.ot-card .t { display: flex; gap: 10px; align-items: center; font-size: .86rem; }
-.ot-card .t em { font-style: normal; font: 600 .95rem Prompt; color: var(--navy); }
-.ot-card small { color: var(--muted); font-size: .8rem; }
-.hrs { margin-left: auto; padding: 3px 10px; border-radius: 10px; background: var(--gold-50); color: #7a5410; font: 600 .82rem Prompt; }
-.hint { color: var(--muted); font-size: .84rem; line-height: 1.6; }
-.note { padding: 14px 16px; border-radius: 16px; background: #fff; border: 1px solid var(--line); font-size: .9rem; line-height: 1.7; }
-.note h3 { margin: 0 0 6px; font: 600 1rem Prompt; color: var(--navy); }
-.form { display: grid; gap: 10px; padding: 14px; border-radius: 16px; background: #fff; border: 1.5px dashed #c9cde0; }
-.form label { display: grid; gap: 4px; font: 500 .8rem Prompt; color: var(--muted); }
-.form input, .form select, .tools input, .tools select { font: 400 .92rem 'IBM Plex Sans Thai'; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); width: 100%; }
-.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-
-/* ── หลังบ้าน ── */
-.card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
-.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
-.tools label { display: grid; gap: 4px; font: 500 .78rem Prompt; color: var(--muted); }
-.tools input, .tools select { width: auto; }
+.ph-bar { padding: 14px 16px; background: #fff; border-bottom: 1px solid var(--line); font: 600 .92rem Prompt; color: var(--navy); }
+.ph-body { padding: 14px; display: grid; gap: 10px; }
+.modal { padding: 14px; border-radius: 18px; background: #fff; border: 2px solid #f5c08a; display: grid; gap: 8px; box-shadow: 0 16px 30px -18px rgba(0, 0, 0, .4); }
+.modal h4 { margin: 0; font: 600 .98rem Prompt; color: #c2410c; }
+.modal p { margin: 0; font-size: .86rem; line-height: 1.55; }
+.modal .chips { display: flex; flex-wrap: wrap; gap: 6px; } .modal .chips span { padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); font-size: .8rem; }
+.gps { padding: 8px 10px; border-radius: 12px; background: #dcf5ea; color: var(--ok); font-size: .82rem; }
+.ot-card { padding: 11px 13px; border-radius: 16px; background: #fff; border: 1px solid var(--line); display: grid; gap: 4px; font-size: .86rem; }
+.ot-card .h { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.ot-card .h b { font: 600 .92rem Prompt; }
+.sum3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sum3 div { padding: 9px; border-radius: 14px; background: #fff; border: 1px solid var(--line); text-align: center; }
+.sum3 b { display: block; font: 700 1.15rem Prompt; color: var(--navy); } .sum3 small { font-size: .7rem; color: var(--muted); }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
+.tools label { display: grid; gap: 4px; font: 500 .76rem Prompt; color: var(--muted); }
 .tbl-wrap { overflow-x: auto; }
-table.t { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 820px; }
-.t th, .t td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-.t th { font: 600 .78rem Prompt; color: var(--muted); background: #fbf8f1; }
-.t td small { display: block; color: var(--muted); font-size: .76rem; }
+table.t { width: 100%; border-collapse: collapse; font-size: .86rem; min-width: 980px; }
+.t th, .t td { padding: 8px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.t th { font: 600 .76rem Prompt; color: var(--muted); background: #fbf8f1; }
+.t td small { display: block; color: var(--muted); font-size: .75rem; }
 .t .r { text-align: right; } .t .nw { white-space: nowrap; }
-.t tfoot td { font: 600 .9rem Prompt; background: var(--navy-50); }
-.drv-sum { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
-.drv-sum div { padding: 10px 14px; border-radius: 14px; background: var(--cream); border: 1px solid var(--line); font-size: .86rem; }
-.drv-sum b { font: 600 1rem Prompt; color: var(--navy); }
-
-/* ── เอกสาร (ตามแบบฟอร์มของฝ่ายการเงิน) ── */
-.paper-scroll { overflow-x: auto; padding: 16px 0; }
-.paper { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 10mm 12mm; background: #fff; box-shadow: 0 20px 50px -24px rgba(0, 0, 0, .5); font-family: 'THSarabunNew', sans-serif; font-size: 15pt; color: #000; line-height: 1.25; }
-.doc-h { display: flex; align-items: center; gap: 10px; }
-.doc-h img { width: 17mm; }
-.doc-h b { font-weight: 700; font-size: 15pt; } .doc-h p { font-size: 14.5pt; } .doc-tbl td.pl { font-size: 13.5pt; line-height: 1.1; } .doc-tbl th, .doc-tbl td.c { white-space: nowrap; } .doc-tbl th { font-size: 14pt; padding: 2px 3px; }
-.doc-h p { margin: 0; }
-.doc-tbl { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
-.doc-tbl th, .doc-tbl td { border: 1px solid #000; padding: 1px 6px; height: 9.4mm; font-size: 14.5pt; vertical-align: middle; }
-.doc-tbl th { height: auto; font-weight: 400; padding: 2px 6px; }
-.doc-tbl td.c, .doc-tbl th { text-align: center; }
-.doc-tbl td .one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.doc-sign { margin: 10mm 8mm 0 auto; width: 95mm; text-align: center; }
-.doc-sign p { margin: 0 0 2px; }
-.doc-sign .ln { display: flex; justify-content: space-between; }
-.fill { display: inline-block; min-width: 10mm; padding: 0 3px; border-bottom: 1px dotted #000; text-align: center; }
-.cap { margin: 14px 0 0; text-align: center; color: var(--muted); font-size: .86rem; }
-@media (max-width: 900px) { .phone-wrap { grid-template-columns: 1fr; } .phone { margin: 0 auto; } }
+.t tr.flagged td { background: #fffaf3; }
+.t .why { margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: #fff1e6; color: #9a3412; font-size: .76rem; line-height: 1.45; }
+.t .acts { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.t tfoot td { font: 600 .88rem Prompt; background: var(--navy-50); }
+.paper-scroll { overflow-x: auto; padding: 8px 0 16px; }
+.paper { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 9mm 12mm; background: #fff; box-shadow: 0 20px 50px -24px rgba(0, 0, 0, .5); font-family: 'THSarabunNew', sans-serif; font-size: 15pt; color: #000; line-height: 1.25; }
+.doc-h { display: flex; align-items: center; gap: 10px; } .doc-h img { width: 16mm; } .doc-h p { margin: 0; font-size: 14.5pt; } .doc-h b { font-size: 15pt; }
+.fill { display: inline-block; min-width: 9mm; padding: 0 3px; border-bottom: 1px dotted #000; text-align: center; }
+.doc-tbl { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
+.doc-tbl th, .doc-tbl td { border: 1px solid #000; padding: 1px 5px; height: 8.6mm; font-size: 14pt; vertical-align: middle; }
+.doc-tbl th { height: auto; font-weight: 400; padding: 2px 3px; text-align: center; white-space: nowrap; font-size: 13.5pt; }
+.doc-tbl td.c { text-align: center; white-space: nowrap; }
+.doc-tbl td.pl { font-size: 13pt; line-height: 1.1; }
+.doc-tbl td small { font-size: 11.5pt; color: #444; line-height: 1; }
+.doc-tbl tfoot td { font-weight: 700; }
+.doc-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin-top: 4mm; align-items: start; }
+.money { border-collapse: collapse; width: 100%; font-size: 14pt; }
+.money td { border: 1px solid #000; padding: 3px 8px; line-height: 1.3; } .money td.r { text-align: right; white-space: nowrap; }
+.money tr.tot td { font-weight: 700; }
+.words { margin: 2px 0 0; font-size: 14pt; }
+.signs { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; text-align: center; font-size: 14.5pt; }
+.signs p { margin: 0 0 1px; white-space: nowrap; } .signs .ln { margin-top: 8mm; }
+.cap { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: .84rem; }
+@media (max-width: 900px) { .phone-wrap { grid-template-columns: 1fr; } .phone { margin: 0 auto; } .rule { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<div class="top"><h1>เดโม่: บันทึกปฏิบัติงานนอกเวลาราชการ (พนักงานขับรถ)</h1>
-  <div class="seg" id="tabs"><button data-v="drv" class="on">1. มือถือคนขับ</button><button data-v="adm">2. หลังบ้าน (รับรอง / เลือกช่วงวัน)</button><button data-v="doc">3. เอกสารที่พิมพ์</button></div></div>
+<div class="top"><h1>เดโม่ (รอบ 2): บันทึกปฏิบัติงานนอกเวลา · พนักงานขับรถ</h1>
+  <div class="seg" id="tabs"><button data-v="set" class="on">1. ตั้งค่ากติกา</button><button data-v="drv">2. มือถือคนขับ</button><button data-v="adm">3. หลังบ้าน (ตรวจ/รับรอง)</button><button data-v="doc">4. ใบเบิกรายคน</button></div></div>
 <main>
-  <section class="intro">
-    <h2>แนวคิด — ไม่ต้องกรอกซ้ำ ระบบดึงจากเวลาที่คนขับกด "ออกเดินทาง / กลับถึง" อยู่แล้ว</h2>
-    <ol>
-      <li><b>ดึงอัตโนมัติ:</b> งานที่กลับถึงหลัง <b>18.00 น.</b> (หรือวันหยุด) → สร้างรายการนอกเวลาให้เอง พร้อมรายการที่ไป · เวลาไป-กลับ · ชื่อครูผู้โดยสาร (ผู้ขอใช้รถ)</li>
-      <li><b>คนขับเพิ่มเองได้:</b> งานนอกเวลาที่ไม่มีในระบบ (เช่น รับ-ส่งเอกสารด่วน ล้างรถ) กด "เพิ่มงานนอกเวลา"</li>
-      <li><b>หัวหน้างานยานพาหนะรับรอง</b> ในหลังบ้าน (แก้เวลาได้ / ไม่รับรองได้)</li>
-      <li><b>เลือกช่วงวันที่</b> (เช่น 1–30 พ.ย.) → พิมพ์ "บันทึกการลงเวลาปฏิบัติงานนอกเวลาราชการ" ตามแบบฟอร์มเดิม ส่งฝ่ายการเงินเบิก</li>
-    </ol>
-    <div class="rule"><span>นับหลัง 18.00 น.</span><span>ไม่เกิน 3 ชั่วโมง/ครั้ง</span><span>เวลาจริงจากปุ่มของคนขับ</span><span>ข้อมูลในเดโม่เป็นตัวอย่าง</span></div>
+  <section class="view on" id="v-set">
+    <div class="card"><h2>⚙ กติกานับเวลานอกเวลา (แอดมินแก้ได้ — ลองเปลี่ยนค่า ตัวเลขทุกแท็บเปลี่ยนตาม)</h2>
+      <p class="hint">แบ่งวันเป็น 3 แบบ: <span class="pill work">วันทำการ</span> นับหลังเวลาที่กำหนด · <span class="pill hol">วันหยุด</span> นับทุกชั่วโมงที่ทำงาน · <span class="pill duty">วันเวร</span> คนเข้าเวรได้ค่าตอบแทนวันหยุดตามเวลาเวร (คนอื่นที่มีงานวันนั้นนับเป็นวันหยุด)</p>
+      <div class="rules" id="rules"></div></div>
+    <div class="card"><h2>📅 เวรวันอาทิตย์ (1 คน หมุนเวียน)</h2>
+      <p class="hint">ระบบจัดหมุนเวียนให้อัตโนมัติตามลำดับคนขับ · สลับเวรรายสัปดาห์ได้ · คนเข้าเวรได้รายการ "เวรวันอาทิตย์" ให้เอง ไม่ต้องกรอก</p>
+      <div class="roster" id="roster" style="margin-top:10px"></div></div>
+    <div class="card"><h2>🎌 วันหยุดราชการ / นักขัตฤกษ์ (นับเป็นวันหยุด)</h2>
+      <div class="hols" id="hols" style="margin-top:8px"></div></div>
+    <div class="law"><b>อัตราค่าเริ่มต้น</b> ตั้งตามระเบียบกระทรวงการคลังว่าด้วยการเบิกจ่ายเงินตอบแทนการปฏิบัติงานนอกเวลาราชการ พ.ศ. 2550 (วันทำการ 50 บ./ชม. · วันหยุด 60 บ./ชม. ไม่เกิน 7 ชม./วัน) ร่วมกับเงื่อนไขของโรงเรียน "ไม่เกิน 3 ชม./ครั้ง" — <b>ควรให้ฝ่ายการเงินยืนยันอัตราก่อนใช้จริง</b> แก้ได้ตลอดในหน้านี้</div>
   </section>
 
-  <!-- 1. มือถือคนขับ -->
-  <section class="view on" id="v-drv"><div class="phone-wrap">
-    <div class="phone"><div class="ph-bar"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> งานนอกเวลาของฉัน · พ.ย. 69</div>
-      <div class="ph-body" id="drvList"></div></div>
-    <div class="note"><h3>หน้าจอคนขับ (เมนู "งานนอกเวลา")</h3>
-      <p>• ทุกครั้งที่คนขับกด <b>"กลับถึงแล้ว"</b> หลัง 18.00 น. ระบบเพิ่มรายการนอกเวลาให้ทันที (ป้าย <span class="pill auto">อัตโนมัติ</span>)</p>
-      <p>• ระบบคิดชั่วโมงนอกเวลา = ตั้งแต่ 18.00 น. ถึงเวลากลับ <b>ไม่เกิน 3 ชม./ครั้ง</b></p>
-      <p>• งานที่ไม่ได้ขอผ่านระบบ กด <b>+ เพิ่มงานนอกเวลา</b> (ป้าย <span class="pill man">เพิ่มเอง</span>) — ต้องให้หัวหน้ารับรอง</p>
-      <p>• สถานะ <span class="pill wait">รอรับรอง</span> → <span class="pill ok">รับรองแล้ว</span> เห็นชั่วโมงสะสมของเดือนตลอด</p>
-      <p class="hint">ลองกด "เพิ่มงานนอกเวลา" แล้วบันทึก — รายการจะไปโผล่ในแท็บ 2 และ 3 ด้วย</p></div>
+  <section class="view" id="v-drv"><div class="phone-wrap">
+    <div class="phone"><div class="ph-bar">กด "กลับถึงโรงเรียน" · 12 พ.ย. 69 เวลา 21:10</div>
+      <div class="ph-body">
+        <div class="gps">📍 ตำแหน่งตอนกด: อยู่ที่โรงเรียน (ห่าง 40 ม.) ✓</div>
+        <div class="modal"><h4>⚠ กลับช้ากว่ากำหนด 2:10 ชม.</h4>
+          <p>กำหนดกลับ 19:00 น. (ตามที่ผู้ขอแจ้ง) · ระบบนับนอกเวลาให้ถึง <b>19:30 น.</b> อัตโนมัติ ส่วนที่เกินต้องระบุเหตุผล ให้หัวหน้างานรับรอง</p>
+          <div class="chips"><span>รถติด / อุบัติเหตุ</span><span>ภารกิจเลิกช้า</span><span>รอผู้โดยสาร</span><span>อื่น ๆ</span></div>
+          <input value="คณะครูประชุมเลิกช้ากว่ากำหนด" style="width:100%">
+          <p class="hint">ครูผู้ขอใช้รถจะได้แจ้งเตือนให้กดยืนยันเวลาถึงโรงเรียนด้วย</p></div>
+        <div class="sum3" id="drvSum"></div>
+        <div id="drvList" style="display:grid;gap:8px"></div>
+      </div></div>
+    <div class="card"><h2>ปิดช่องโหว่ "รอเวลาแล้วค่อยกด"</h2>
+      <p class="hint">เวลาที่นับเงินมาจากปุ่ม "กลับถึงโรงเรียน" ที่คนขับกดเพื่อปิดงาน — กันการรอกดด้วย 5 ชั้น:</p>
+      <div class="guard" style="margin-top:10px">
+        <div><b>① เพดาน = กำหนดกลับ + 30 นาที</b>ใช้เวลากลับที่ครูแจ้งตอนขอใช้รถ · กดช้ากว่านั้น ส่วนเกินไม่นับอัตโนมัติ ต้องมีเหตุผลและหัวหน้ารับรอง</div>
+        <div><b>② พิกัด GPS ตอนกด</b>บันทึกตำแหน่งตอนกด "ออกเดินทาง / กลับถึง" · กดห่างโรงเรียนเกิน 500 ม. ขึ้นธงให้ตรวจ</div>
+        <div><b>③ ใช้เวลาที่กดจริง</b>คนขับแก้เวลาให้ช้ากว่าเวลาที่กดไม่ได้ (แก้ให้เร็วขึ้นได้เท่านั้น)</div>
+        <div><b>④ ครูผู้โดยสารยืนยัน</b>ผู้ขอใช้รถได้แจ้งเตือน "รถถึงโรงเรียนกี่โมง" กดยืนยัน 1 ครั้ง · ต่างจากเวลาที่คนขับกดเกิน 20 นาที ขึ้นธง</div>
+        <div><b>⑤ เตือนเมื่อเลยเวลา</b>เลยกำหนดกลับ 30 นาทียังไม่กด → เตือนคนขับ · เลย 1 ชม. → เตือนแอดมิน</div>
+      </div></div>
   </div></section>
 
-  <!-- 2. หลังบ้าน -->
   <section class="view" id="v-adm"><div class="card">
     <div class="tools">
       <label>ตั้งแต่วันที่<input type="date" id="fFrom" value="2026-11-01"></label>
       <label>ถึงวันที่<input type="date" id="fTo" value="2026-11-30"></label>
       <label>พนักงานขับรถ<select id="fDrv"><option value="">ทุกคน</option></select></label>
-      <label>สถานะ<select id="fSt"><option value="">ทั้งหมด</option><option value="wait">รอรับรอง</option><option value="ok">รับรองแล้ว</option></select></label>
       <span style="flex:1"></span>
-      <button class="btn" id="okAll"><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> รับรองที่เลือก</button>
-      <button class="btn p" id="toDoc"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> พิมพ์แบบฟอร์มเบิก</button>
+      <button class="btn p" id="toDoc">🖨 พิมพ์ใบเบิกรายคน</button>
     </div>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th><input type="checkbox" id="ckAll"></th><th>วันที่</th><th>รายการที่ไป</th><th>เวลาไป</th><th>เวลากลับ</th><th>พนักงานขับรถ</th><th>ครูผู้โดยสาร</th><th class="r">ชม.นอกเวลา</th><th>ที่มา</th><th>สถานะ</th></tr></thead><tbody id="admRows"></tbody><tfoot id="admFoot"></tfoot></table></div>
-    <div class="drv-sum" id="drvSum"></div>
-    <p class="hint" style="margin-top:12px">• พิมพ์เฉพาะรายการที่ <b>รับรองแล้ว</b> ในช่วงวันที่เลือก · เลือกคนขับ 1 คน = ได้ใบแยกรายคน (สะดวกเบิกรายบุคคล) · ทุกคน = ใบรวม<br>• กดแถวเพื่อแก้เวลา / ไม่รับรอง (ในระบบจริง)</p>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>วันที่</th><th>รายการที่ไป</th><th>พนักงานขับรถ</th><th>ไป</th><th>กลับ (กด)</th><th>กำหนดกลับ</th><th>ตรวจสอบ</th><th class="r">ชม.ที่นับ</th><th class="r">เงิน (บ.)</th><th>สถานะ</th></tr></thead><tbody id="admRows"></tbody><tfoot id="admFoot"></tfoot></table></div>
+    <p class="hint" style="margin-top:10px">แถวสีส้ม = มีธงให้ตรวจ (กดช้ากว่ากำหนด / GPS ไม่อยู่ที่โรงเรียน / ครูยืนยันเวลาไม่ตรง) — ก่อนรับรองจะนับแค่ถึงกำหนดกลับ + 30 นาที · ลองกดปุ่มในแถวสีส้มดู</p>
   </div></section>
 
-  <!-- 3. เอกสาร -->
   <section class="view" id="v-doc">
+    <div class="card" style="padding:12px 16px"><div class="tools" style="margin:0"><label>พนักงานขับรถ<select id="dDrv"></select></label><label>ตั้งแต่<input type="date" id="dFrom" value="2026-11-01"></label><label>ถึง<input type="date" id="dTo" value="2026-11-30"></label><span class="hint">พิมพ์เฉพาะรายการที่รับรองแล้ว · คนละ 1 ใบ</span></div></div>
     <div class="paper-scroll"><div class="paper" id="paper"></div></div>
-    <p class="cap">A4 แนวนอน · ฟอนต์ TH Sarabun New · ตามแบบฟอร์มเดิมของโรงเรียน (มีแถวว่างให้เขียนเพิ่ม) · ถ้ารายการเกินหน้า ขึ้นหน้าใหม่พร้อมหัวตารางให้อัตโนมัติ</p>
+    <p class="cap">A4 แนวนอน · ตามแบบฟอร์มเดิม + คอลัมน์ "ชม." + สรุปชั่วโมง/เงินท้ายใบ · ลงชื่อผู้ปฏิบัติงานและหัวหน้างานยานพาหนะ</p>
   </section>
 </main>
 <script>
 const DRV = ['นายสวง เพไร', 'นายบุญทัน กองไรสง', 'นายพัลลภ สุนทร', 'นายไชยวัฒน์ กุณฑล'];
+const DOW = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const R = { start: '18:00', capWork: 3, rateWork: 50, capHol: 7, rateHol: 60, grace: 30, dutyFrom: '08:30', dutyTo: '16:30',
+  type: { 0: 'duty', 1: 'work', 2: 'work', 3: 'work', 4: 'work', 5: 'work', 6: 'hol' } };
+let HOLS = [{ d: '2026-11-24', n: 'ตัวอย่างวันหยุดพิเศษ' }];
+const SUNS = ['2026-11-01', '2026-11-08', '2026-11-15', '2026-11-22', '2026-11-29'];
+let ROSTER = { '2026-11-01': 2, '2026-11-08': 0, '2026-11-15': 1, '2026-11-22': 3, '2026-11-29': 2 };
+// plan = กำหนดกลับที่ผู้ขอแจ้ง · gps = ระยะจากโรงเรียนตอนกด (ม.) · conf = เวลาที่ครูยืนยัน
 let OT = [
-  { d: '2026-11-03', place: 'สนามบินสุวรรณภูมิ (รับคณะครูดูงาน)', out: '15:30', back: '20:10', drv: 0, pax: 'นางสาวพิศมัย แจ่มจำรัส', src: 'auto', st: 'ok' },
-  { d: '2026-11-06', place: 'มหาวิทยาลัยมหิดล ศาลายา (แข่งขันโครงงาน)', out: '13:00', back: '19:05', drv: 1, pax: 'นายชลธีร์ จันทร์ลอย', src: 'auto', st: 'ok' },
-  { d: '2026-11-08', place: 'อุทยานแห่งชาติเขาใหญ่ (ค่ายวิทยาศาสตร์)', out: '07:00', back: '21:40', drv: 0, pax: 'นางปิยะนุช ใจดี', src: 'auto', st: 'ok' },
-  { d: '2026-11-12', place: 'รับ-ส่งเอกสารด่วน สพม.ปทุมธานี', out: '18:00', back: '19:30', drv: 2, pax: 'นายณรงค์ฤทธิ์ แมนสืบชาติ', src: 'man', st: 'wait' },
-  { d: '2026-11-14', place: 'โรงพยาบาลธรรมศาสตร์ (ส่งนักเรียนป่วย)', out: '17:20', back: '19:45', drv: 3, pax: 'นางนิตยา สุขทอง', src: 'auto', st: 'wait' },
-  { d: '2026-11-18', place: 'ศูนย์ประชุมแห่งชาติสิริกิติ์ (นิทรรศการ)', out: '06:30', back: '18:50', drv: 1, pax: 'นายอรรถพล แก้วประเสริฐ', src: 'auto', st: 'wait' }
+  { d: '2026-11-03', place: 'สนามบินสุวรรณภูมิ (รับคณะครูดูงาน)', out: '15:30', back: '20:10', plan: '20:00', gps: 30, conf: '20:05', drv: 0, pax: 'นางสาวพิศมัย แจ่มจำรัส', st: 'ok' },
+  { d: '2026-11-07', place: 'อุทยานแห่งชาติเขาใหญ่ (ค่ายวิทยาศาสตร์)', out: '07:00', back: '15:20', plan: '15:30', gps: 20, conf: '15:20', drv: 0, pax: 'นางปิยะนุช ใจดี', st: 'ok' },
+  { d: '2026-11-08', duty: true, place: 'เวรวันอาทิตย์', out: '08:30', back: '16:30', drv: 0, st: 'ok' },
+  { d: '2026-11-08', place: 'ส่งนักเรียนแข่งขัน ม.ธรรมศาสตร์ รังสิต', out: '14:00', back: '17:45', plan: '17:30', gps: 50, conf: '17:40', drv: 0, pax: 'นายชลธีร์ จันทร์ลอย', st: 'ok' },
+  { d: '2026-11-12', place: 'มหาวิทยาลัยมหิดล ศาลายา (ประชุมเครือข่าย)', out: '16:00', back: '21:10', plan: '19:00', gps: 40, conf: '21:05', drv: 0, pax: 'นายณรงค์ฤทธิ์ แมนสืบชาติ', st: 'wait', why: 'คณะครูประชุมเลิกช้ากว่ากำหนด' },
+  { d: '2026-11-18', place: 'รับ-ส่งเอกสารด่วน สพม.ปทุมธานี', out: '18:00', back: '19:30', drv: 0, pax: 'นางนิตยา สุขทอง', st: 'ok', man: true },
+  { d: '2026-11-20', place: 'โรงพยาบาลธรรมศาสตร์ (ส่งนักเรียนป่วย)', out: '15:00', back: '20:40', plan: '18:00', gps: 14200, conf: '19:10', drv: 0, pax: 'นางสาวพิศมัย แจ่มจำรัส', st: 'wait', why: '' },
+  { d: '2026-11-06', place: 'มหาวิทยาลัยมหิดล ศาลายา (แข่งขันโครงงาน)', out: '13:00', back: '19:05', plan: '18:30', gps: 20, conf: '19:00', drv: 1, pax: 'นายชลธีร์ จันทร์ลอย', st: 'ok' },
+  { d: '2026-11-15', duty: true, place: 'เวรวันอาทิตย์', out: '08:30', back: '16:30', drv: 1, st: 'ok' },
+  { d: '2026-11-14', place: 'ศูนย์ประชุมแห่งชาติสิริกิติ์ (นิทรรศการ)', out: '06:30', back: '13:50', plan: '14:00', gps: 10, conf: '13:50', drv: 3, pax: 'นายอรรถพล แก้วประเสริฐ', st: 'ok' }
 ];
 const TH_M = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const TH_S = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-const dd = s => { const d = new Date(s + 'T12:00'); return { d: d.getDate(), m: d.getMonth(), y: d.getFullYear() + 543 }; };
+const dd = s => { const d = new Date(s + 'T12:00'); return { d: d.getDate(), m: d.getMonth(), y: d.getFullYear() + 543, w: d.getDay() }; };
 const dShort = s => { const x = dd(s); return `${x.d} ${TH_S[x.m]} ${String(x.y).slice(2)}`; };
 const dSlash = s => { const x = dd(s); return `${x.d}/${x.m + 1}/${x.y}`; };
-const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-// ชั่วโมงนอกเวลา: ตั้งแต่ 18.00 (หรือเวลาออกถ้าออกหลัง 18.00) ถึงเวลากลับ ไม่เกิน 3 ชม.
-const otH = o => Math.min(3, Math.max(0, (mins(o.back) - Math.max(mins(o.out), 18 * 60)) / 60));
+const M = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
+const T = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`;
 const hm = h => { const t = Math.round(h * 60); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const pill = o => `<span class="pill ${o.st}">${o.st === 'ok' ? 'รับรองแล้ว' : 'รอรับรอง'}</span>`;
-const srcP = o => `<span class="pill ${o.src}">${o.src === 'auto' ? 'อัตโนมัติ' : 'เพิ่มเอง'}</span>`;
-
-function drawDrv() {
-  const me = 0, mine = OT.filter(o => o.drv === me);
-  const tot = mine.reduce((s, o) => s + otH(o), 0), ok = mine.filter(o => o.st === 'ok').reduce((s, o) => s + otH(o), 0);
-  document.getElementById('drvList').innerHTML = `
-    <div class="hint">${DRV[me]} · พนักงานขับรถ</div>
-    <div class="ot-sum"><div><b>${mine.length}</b><small>ครั้ง</small></div><div><b>${hm(tot)}</b><small>ชม.นอกเวลา</small></div><div><b>${hm(ok)}</b><small>รับรองแล้ว</small></div></div>
-    ${mine.map(o => `<div class="ot-card"><div class="h"><b>${dShort(o.d)}</b>${pill(o)}</div>
-      <div>${esc(o.place)}</div>
-      <div class="t">ไป <em>${o.out}</em> กลับ <em>${o.back}</em><span class="hrs">นอกเวลา ${hm(otH(o))} ชม.</span></div>
-      <small>ครูผู้โดยสาร: ${esc(o.pax)} · ${srcP(o)}</small></div>`).join('')}
-    <form class="form" id="addF">
-      <b style="font:600 .92rem Prompt;color:var(--navy)">+ เพิ่มงานนอกเวลา (ที่ไม่มีในระบบ)</b>
-      <label>วันที่<input type="date" name="d" value="2026-11-20" required></label>
-      <label>รายการที่ไป<input name="place" placeholder="เช่น ล้างรถ / รับ-ส่งเอกสารด่วน" required></label>
-      <div class="g2"><label>เวลาไป<input type="time" name="out" value="18:00" required></label><label>เวลากลับ<input type="time" name="back" value="20:00" required></label></div>
-      <label>ครูผู้โดยสาร / ผู้สั่งงาน<input name="pax" placeholder="ชื่อ-นามสกุล" required></label>
-      <button class="btn p" type="submit">บันทึก — ส่งให้หัวหน้ารับรอง</button>
-    </form>`;
-  document.getElementById('addF').addEventListener('submit', e => {
-    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    OT.push({ ...f, drv: me, src: 'man', st: 'wait' }); OT.sort((a, b) => a.d.localeCompare(b.d)); drawAll();
+const money = n => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function dayType(d, drv) {
+  if (HOLS.some(h => h.d === d)) return 'hol';
+  const t = R.type[dd(d).w];
+  if (t === 'duty') return ROSTER[d] === drv ? 'duty' : 'hol';
+  return t;
+}
+const TYPE_L = { work: 'วันทำการ', hol: 'วันหยุด', duty: 'วันเวร' };
+function flags(o) {
+  const f = []; if (o.duty || o.man) return f;
+  if (o.plan && M(o.back) > M(o.plan) + R.grace) f.push(`กดช้ากว่ากำหนดกลับ ${hm((M(o.back) - M(o.plan)) / 60)} ชม.`);
+  if (o.gps > 500) f.push(`GPS ตอนกดห่างโรงเรียน ${(o.gps / 1000).toFixed(1)} กม.`);
+  if (o.conf && Math.abs(M(o.conf) - M(o.back)) > 20) f.push(`ครูยืนยันถึง ${o.conf} (ต่าง ${Math.abs(M(o.conf) - M(o.back))} นาที)`);
+  return f;
+}
+// เวลากลับที่นับ: ยังไม่รับรองส่วนเกิน → ไม่เกินกำหนด+grace
+const backUsed = o => o.duty || o.man || !o.plan || o.lateOk === true ? M(o.back) : Math.min(M(o.back), M(o.plan) + R.grace);
+function compute(list) {
+  const used = {};
+  return list.map(o => {
+    const ty = dayType(o.d, o.drv), b = backUsed(o), key = o.drv + o.d;
+    let h = 0, rate = R.rateWork;
+    if (ty === 'work') h = Math.min(R.capWork, Math.max(0, (b - Math.max(M(o.out), M(R.start))) / 60));
+    else {
+      rate = R.rateHol;
+      if (ty === 'duty' && !o.duty) h = Math.max(0, (b - Math.max(M(o.out), M(R.dutyTo))) / 60);
+      else if (o.duty) h = Math.max(0, (M(R.dutyTo) - M(R.dutyFrom)) / 60);
+      else h = Math.max(0, (b - M(o.out)) / 60);
+      const left = Math.max(0, R.capHol - (used[key] || 0)); h = Math.min(h, left); used[key] = (used[key] || 0) + h;
+    }
+    return { o, ty, b, h, rate, amt: h * rate, fl: flags(o) };
   });
 }
-const sel = new Set();
-function filtered() {
-  const f = document.getElementById('fFrom').value, t = document.getElementById('fTo').value, dv = document.getElementById('fDrv').value, st = document.getElementById('fSt').value;
-  return OT.map((o, i) => ({ o, i })).filter(({ o }) => o.d >= f && o.d <= t && (dv === '' || o.drv === +dv) && (!st || o.st === st));
+const sorted = () => OT.slice().sort((a, b) => a.d.localeCompare(b.d) || (b.duty ? 1 : 0) - (a.duty ? 1 : 0) || a.out.localeCompare(b.out));
+function drawSet() {
+  const dayOpts = k => `<select data-day="${k}">${['work', 'hol', 'duty'].map(t => `<option value="${t}" ${R.type[k] === t ? 'selected' : ''}>${TYPE_L[t]}</option>`).join('')}</select>`;
+  document.getElementById('rules').innerHTML = `
+    <div class="rule"><b>ประเภทวัน</b><div class="days">${[1, 2, 3, 4, 5, 6, 0].map(k => `<label>${DOW[k]} ${dayOpts(k)}</label>`).join('')}</div></div>
+    <div class="rule"><b><span class="pill work">วันทำการ</span></b><div class="row">เริ่มนับหลัง <input type="time" data-r="start" value="${R.start}"> น. · ไม่เกิน <input type="number" step="0.5" data-r="capWork" value="${R.capWork}"> ชม./ครั้ง · อัตรา <input type="number" data-r="rateWork" value="${R.rateWork}"> บาท/ชม.</div></div>
+    <div class="rule"><b><span class="pill hol">วันหยุด</span></b><div class="row">นับตั้งแต่ออกจนกลับ · ไม่เกิน <input type="number" step="0.5" data-r="capHol" value="${R.capHol}"> ชม./วัน · อัตรา <input type="number" data-r="rateHol" value="${R.rateHol}"> บาท/ชม.</div></div>
+    <div class="rule"><b><span class="pill duty">วันเวร</span></b><div class="row">เวลาเวร <input type="time" data-r="dutyFrom" value="${R.dutyFrom}"> – <input type="time" data-r="dutyTo" value="${R.dutyTo}"> น. (อัตราวันหยุด) · มีงานเกินเวลาเวร นับเพิ่มได้ภายในเพดานวันหยุด</div></div>
+    <div class="rule"><b>กันกดช้า</b><div class="row">ก่อนรับรอง นับได้ไม่เกินกำหนดกลับ + <input type="number" data-r="grace" value="${R.grace}"> นาที</div></div>`;
+  document.getElementById('roster').innerHTML = SUNS.map(s => `<div><b>อาทิตย์ ${dShort(s)}</b><select data-ros="${s}">${DRV.map((n, k) => `<option value="${k}" ${ROSTER[s] === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`).join('');
+  document.getElementById('hols').innerHTML = HOLS.map((h, i) => `<span>${dShort(h.d)} · ${esc(h.n)} <button data-hdel="${i}" title="ลบ">×</button></span>`).join('') + `<input type="date" id="hD" value="2026-11-30"><input id="hN" placeholder="ชื่อวันหยุด" style="width:170px"><button class="btn sm" id="hAdd">+ เพิ่มวันหยุด</button>`;
+}
+document.getElementById('v-set').addEventListener('change', e => {
+  const r = e.target.dataset.r, d = e.target.dataset.day, s = e.target.dataset.ros;
+  if (r) R[r] = e.target.type === 'number' ? +e.target.value : e.target.value;
+  if (d) R.type[d] = e.target.value;
+  if (s) ROSTER[s] = +e.target.value;
+  if (r || d || s) drawAll(false);
+});
+document.getElementById('v-set').addEventListener('click', e => {
+  const del = e.target.closest('[data-hdel]'); if (del) { HOLS.splice(+del.dataset.hdel, 1); drawAll(); }
+  if (e.target.closest('#hAdd')) { const d = document.getElementById('hD').value; if (d) { HOLS.push({ d, n: document.getElementById('hN').value || 'วันหยุด' }); drawAll(); } }
+});
+function drawDrv() {
+  const rows = compute(sorted()).filter(x => x.o.drv === 0);
+  const h = rows.reduce((s, x) => s + x.h, 0), a = rows.reduce((s, x) => s + x.amt, 0);
+  document.getElementById('drvSum').innerHTML = `<div><b>${rows.length}</b><small>รายการ พ.ย.</small></div><div><b>${hm(h)}</b><small>ชม.ที่นับ</small></div><div><b>${Math.round(a).toLocaleString()}</b><small>บาท (ประมาณ)</small></div>`;
+  document.getElementById('drvList').innerHTML = rows.map(x => `<div class="ot-card"><div class="h"><b>${dShort(x.o.d)}</b><span class="pill ${x.ty}">${TYPE_L[x.ty]}</span></div>
+    <div>${esc(x.o.place)}${x.o.man ? ' <span class="pill man">เพิ่มเอง</span>' : ''}</div>
+    <div class="hint">ไป ${x.o.out} · กลับ ${x.o.back}${x.b !== M(x.o.back) ? ` <b style="color:#c2410c">(นับถึง ${T(x.b)})</b>` : ''} · <b>${hm(x.h)} ชม.</b> · ${x.o.st === 'ok' ? '<span class="pill ok">รับรองแล้ว</span>' : '<span class="pill wait">รอรับรอง</span>'}</div></div>`).join('');
 }
 function drawAdm() {
-  const rows = filtered();
-  document.getElementById('admRows').innerHTML = rows.map(({ o, i }) => `<tr><td><input type="checkbox" data-i="${i}" ${sel.has(i) ? 'checked' : ''}></td><td class="nw">${dShort(o.d)}</td><td>${esc(o.place)}</td><td>${o.out}</td><td>${o.back}</td><td class="nw">${DRV[o.drv]}</td><td class="nw">${esc(o.pax)}</td><td class="r"><b>${hm(otH(o))}</b></td><td>${srcP(o)}</td><td>${pill(o)}</td></tr>`).join('') || `<tr><td colspan="10" class="hint" style="text-align:center;padding:24px">ไม่มีรายการในช่วงนี้</td></tr>`;
-  const tot = rows.reduce((s, { o }) => s + otH(o), 0);
-  document.getElementById('admFoot').innerHTML = rows.length ? `<tr><td colspan="7">รวม ${rows.length} ครั้ง</td><td class="r">${hm(tot)}</td><td colspan="2"></td></tr>` : '';
-  document.getElementById('drvSum').innerHTML = DRV.map((n, k) => { const rs = rows.filter(x => x.o.drv === k); return rs.length ? `<div>${n}<br><b>${rs.length} ครั้ง · ${hm(rs.reduce((s, x) => s + otH(x.o), 0))} ชม.</b></div>` : ''; }).join('');
+  const f = document.getElementById('fFrom').value, t = document.getElementById('fTo').value, dv = document.getElementById('fDrv').value;
+  const rows = compute(sorted()).map(x => ({ ...x, i: OT.indexOf(x.o) })).filter(x => x.o.d >= f && x.o.d <= t && (dv === '' || x.o.drv === +dv));
+  document.getElementById('admRows').innerHTML = rows.map(x => { const o = x.o, open = o.st !== 'ok'; return `<tr class="${x.fl.length && open ? 'flagged' : ''}">
+    <td class="nw">${dShort(o.d)}<small><span class="pill ${x.ty}">${TYPE_L[x.ty]}</span></small></td>
+    <td>${esc(o.place)}${o.man ? ' <span class="pill man">เพิ่มเอง</span>' : ''}<small>${esc(o.pax || '')}</small></td>
+    <td class="nw">${DRV[o.drv]}</td><td>${o.out}</td><td><b>${o.back}</b>${x.b !== M(o.back) ? `<small style="color:#c2410c">นับถึง ${T(x.b)}</small>` : ''}</td><td>${o.plan || '-'}</td>
+    <td>${o.duty ? '<small>เวรตามตาราง</small>' : o.man ? '<small>คนขับเพิ่มเอง</small>' : `<small>📍 ${o.gps > 500 ? `<b style="color:#c2410c">${(o.gps / 1000).toFixed(1)} กม.</b>` : 'ที่โรงเรียน'} · ครูยืนยัน ${o.conf || '-'}</small>`}
+      ${x.fl.length && open ? `<div class="why">⚑ ${x.fl.join(' · ')}<br>${o.why ? `เหตุผลคนขับ: “${esc(o.why)}”` : 'คนขับยังไม่ระบุเหตุผล'}</div><div class="acts"><button class="btn sm okb" data-ok="${x.i}">รับรองตามที่กด</button><button class="btn sm nob" data-cut="${x.i}">นับแค่กำหนด+${R.grace} นาที</button></div>` : ''}</td>
+    <td class="r"><b>${hm(x.h)}</b></td><td class="r">${money(x.amt)}</td>
+    <td>${o.st === 'ok' ? '<span class="pill ok">รับรองแล้ว</span>' : x.fl.length ? '<span class="pill flag">มีธง</span>' : `<span class="pill wait">รอรับรอง</span><div class="acts"><button class="btn sm okb" data-ok="${x.i}">รับรอง</button></div>`}</td></tr>`; }).join('');
+  const H = rows.reduce((s, x) => s + x.h, 0), A = rows.reduce((s, x) => s + x.amt, 0);
+  document.getElementById('admFoot').innerHTML = `<tr><td colspan="7">รวม ${rows.length} รายการ</td><td class="r">${hm(H)}</td><td class="r">${money(A)}</td><td></td></tr>`;
+}
+document.getElementById('admRows').addEventListener('click', e => {
+  const ok = e.target.closest('[data-ok]'), cut = e.target.closest('[data-cut]');
+  if (ok) { const o = OT[+ok.dataset.ok]; o.st = 'ok'; o.lateOk = true; drawAll(false); }
+  if (cut) { const o = OT[+cut.dataset.cut]; o.st = 'ok'; o.lateOk = false; drawAll(false); }
+});
+function bahtText(n) {
+  const D = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'], P = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
+  const rd = s => { let o = ''; const L = s.length; for (let i = 0; i < L; i++) { const d = +s[i], p = L - i - 1; if (!d) continue; o += p === 1 && d === 1 ? 'สิบ' : p === 1 && d === 2 ? 'ยี่สิบ' : p === 0 && d === 1 && L > 1 ? 'เอ็ด' : D[d] + P[p]; } return o; };
+  const [b, st] = (Math.round(n * 100) / 100).toFixed(2).split('.');
+  return (rd(b.replace(/^0+/, '')) || 'ศูนย์') + 'บาท' + (st === '00' ? 'ถ้วน' : rd(st.replace(/^0/, '')) + 'สตางค์');
 }
 function drawDoc() {
-  const f = document.getElementById('fFrom').value, t = document.getElementById('fTo').value, dv = document.getElementById('fDrv').value;
-  const rows = OT.filter(o => o.d >= f && o.d <= t && (dv === '' || o.drv === +dv) && o.st === 'ok');
-  const a = dd(f), b = dd(t), N = Math.max(11, rows.length);
+  const k = +document.getElementById('dDrv').value, f = document.getElementById('dFrom').value, t = document.getElementById('dTo').value;
+  const rows = compute(sorted()).filter(x => x.o.drv === k && x.o.d >= f && x.o.d <= t && x.o.st === 'ok' && x.h > 0);
+  const a = dd(f), b = dd(t), N = Math.max(9, rows.length);
+  const hW = rows.filter(x => x.ty === 'work').reduce((s, x) => s + x.h, 0), hH = rows.filter(x => x.ty !== 'work').reduce((s, x) => s + x.h, 0);
+  const aW = hW * R.rateWork, aH = hH * R.rateHol, tot = aW + aH;
   document.getElementById('paper').innerHTML = `
     <div class="doc-h"><img src="../app/images/logo.png" alt=""><div>
       <p><b>บันทึกการลงเวลาปฏิบัติงานนอกเวลาราชการ โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ปทุมธานี</b></p>
-      <p><b>สำหรับพนักงานขับรถ (ปฏิบัติงานหลังเวลา 18.00 น. และไม่เกิน 3 ชั่วโมง/ครั้ง)</b> วันที่ <span class="fill">${a.d}</span> เดือน <span class="fill">${TH_M[a.m]}</span> พ.ศ. <span class="fill">${a.y}</span> ถึง วันที่ <span class="fill">${b.d}</span> เดือน <span class="fill">${TH_M[b.m]}</span> พ.ศ. <span class="fill">${b.y}</span>${dv !== '' ? ` &nbsp;·&nbsp; <b>${DRV[+dv]}</b>` : ''}</p></div></div>
-    <table class="doc-tbl"><colgroup><col style="width:4%"><col style="width:10%"><col style="width:25%"><col style="width:9%"><col style="width:20.5%"><col style="width:9%"><col style="width:22.5%"></colgroup>
-      <thead><tr><th>ที่</th><th>วัน/เดือน/ปี</th><th>รายการที่ไป</th><th>เวลาไป</th><th>ชื่อ-นามสกุล พนักงานขับรถ</th><th>เวลากลับ</th><th>ชื่อ-นามสกุล ครูผู้โดยสาร</th></tr></thead>
-      <tbody>${Array.from({ length: N }, (_, k) => { const o = rows[k]; return o ? `<tr><td class="c">${k + 1}</td><td class="c">${dSlash(o.d)}</td><td class="pl">${esc(o.place)}</td><td class="c">${o.out.replace(':', '.')} น.</td><td><span class="one">${DRV[o.drv]}</span></td><td class="c">${o.back.replace(':', '.')} น.</td><td><span class="one">${esc(o.pax)}</span></td></tr>` : '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'; }).join('')}</tbody></table>
-    <div class="doc-sign"><p class="ln"><span>ลงชื่อ</span><span>หัวหน้างานยานพาหนะ</span></p><p>(นายณรงค์ฤทธิ์ แมนสืบชาติ)</p></div>`;
+      <p><b>สำหรับพนักงานขับรถ (ปฏิบัติงานหลังเวลา ${R.start.replace(':', '.')} น. และไม่เกิน ${R.capWork} ชั่วโมง/ครั้ง)</b> วันที่ <span class="fill">${a.d}</span> เดือน <span class="fill">${TH_M[a.m]}</span> พ.ศ. <span class="fill">${a.y}</span> ถึง วันที่ <span class="fill">${b.d}</span> เดือน <span class="fill">${TH_M[b.m]}</span> พ.ศ. <span class="fill">${b.y}</span></p>
+      <p>ชื่อ-นามสกุล พนักงานขับรถ <span class="fill" style="min-width:60mm">${DRV[k]}</span></p></div></div>
+    <table class="doc-tbl"><colgroup><col style="width:4%"><col style="width:13%"><col style="width:27%"><col style="width:8.5%"><col style="width:8.5%"><col style="width:6%"><col style="width:21.5%"><col style="width:11.5%"></colgroup>
+      <thead><tr><th>ที่</th><th>วัน/เดือน/ปี</th><th>รายการที่ไป</th><th>เวลาไป</th><th>เวลากลับ</th><th>ชม.</th><th>ชื่อ-นามสกุล ครูผู้โดยสาร</th><th>ลายมือชื่อครู</th></tr></thead>
+      <tbody>${Array.from({ length: N }, (_, i) => { const x = rows[i]; return x ? `<tr><td class="c">${i + 1}</td><td class="c">${dSlash(x.o.d)}${x.ty !== 'work' ? `<br><small>(${TYPE_L[x.ty]})</small>` : ''}</td><td class="pl">${esc(x.o.place)}</td><td class="c">${x.o.out.replace(':', '.')} น.</td><td class="c">${T(x.b).replace(':', '.')} น.</td><td class="c">${hm(x.h)}</td><td>${esc(x.o.pax || (x.o.duty ? '-' : ''))}</td><td></td></tr>` : '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'; }).join('')}</tbody>
+      <tfoot><tr><td colspan="5" style="text-align:right">รวมชั่วโมงที่ปฏิบัติงาน</td><td class="c">${hm(hW + hH)}</td><td colspan="2"></td></tr></tfoot></table>
+    <div class="doc-bottom">
+      <div><table class="money">
+        <tr><td>วันทำการ ${hm(hW)} ชม. × ${R.rateWork} บาท</td><td class="r">${money(aW)} บาท</td></tr>
+        <tr><td>วันหยุด / วันเวร ${hm(hH)} ชม. × ${R.rateHol} บาท</td><td class="r">${money(aH)} บาท</td></tr>
+        <tr class="tot"><td>รวมเป็นเงินทั้งสิ้น</td><td class="r">${money(tot)} บาท</td></tr></table>
+        <p class="words">(${bahtText(tot)})</p></div>
+      <div class="signs"><div><p class="ln">ลงชื่อ ................................</p><p>(${DRV[k]})</p><p>ผู้ปฏิบัติงาน</p></div>
+        <div><p class="ln">ลงชื่อ ................................</p><p>(นายณรงค์ฤทธิ์ แมนสืบชาติ)</p><p>หัวหน้างานยานพาหนะ</p></div></div></div>`;
 }
-function drawAll() { drawDrv(); drawAdm(); drawDoc(); }
+function drawAll(set = true) { if (set) drawSet(); drawDrv(); drawAdm(); drawDoc(); }
 document.getElementById('fDrv').innerHTML += DRV.map((n, k) => `<option value="${k}">${n}</option>`).join('');
-['fFrom', 'fTo', 'fDrv', 'fSt'].forEach(id => document.getElementById(id).addEventListener('change', () => { drawAdm(); drawDoc(); }));
-document.getElementById('admRows').addEventListener('change', e => { const c = e.target.closest('[data-i]'); if (c) c.checked ? sel.add(+c.dataset.i) : sel.delete(+c.dataset.i); });
-document.getElementById('ckAll').addEventListener('change', e => { filtered().forEach(({ i }) => e.target.checked ? sel.add(i) : sel.delete(i)); drawAdm(); });
-document.getElementById('okAll').addEventListener('click', () => { sel.forEach(i => { OT[i].st = 'ok'; }); sel.clear(); document.getElementById('ckAll').checked = false; drawAll(); });
-const show = v => { document.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v)); document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); };
+document.getElementById('dDrv').innerHTML = DRV.map((n, k) => `<option value="${k}">${n}</option>`).join('');
+['fFrom', 'fTo', 'fDrv'].forEach(id => document.getElementById(id).addEventListener('change', drawAdm));
+['dFrom', 'dTo', 'dDrv'].forEach(id => document.getElementById(id).addEventListener('change', drawDoc));
+const show = v => { document.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v)); document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); scrollTo(0, 0); };
 document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
-document.getElementById('toDoc').addEventListener('click', () => show('doc'));
+document.getElementById('toDoc').addEventListener('click', () => { const v = document.getElementById('fDrv').value; if (v !== '') document.getElementById('dDrv').value = v; drawDoc(); show('doc'); });
 drawAll();
 const q = new URLSearchParams(location.search).get('v'); if (q) show(q);
 </script>
