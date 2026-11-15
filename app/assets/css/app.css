@@ -1737,3 +1737,12 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .lt340 .person .pos { font-size: .68rem; }
 .lt420 .daypick { max-width: 100%; gap: 2px; } .lt420 .daypick .dp-date { padding: 0 2px; gap: 4px; min-width: 0; } .lt420 .daypick .dp-date input { min-width: 0; width: 7.4em; }
 .lt340 .daypick .dp-btn { width: 30px; height: 30px; } .lt340 .daypick .dp-today { padding: 6px 10px; }
+/* สร้าง PDF บน iPhone (วาดเป็นภาพ): เลขข้อ/จุดหน้ารายการวาดเองให้ตรงบรรทัด */
+.pdf-mode ol, .pdf-mode ul { list-style: none; }
+.pdf-mode ol { counter-reset: pdfn; }
+.pdf-mode ol > li { counter-increment: pdfn; position: relative; }
+.pdf-mode ol > li::before { content: counter(pdfn) "."; position: absolute; right: 100%; margin-right: .35em; }
+.pdf-mode ul > li { position: relative; }
+.pdf-mode ul > li::before { content: "•"; position: absolute; right: 100%; margin-right: .4em; }
+.pdf-mode > * { padding-bottom: 3px; }
+.pdf-mode .memo-doc .cb.on::after { top: -12px; left: 1px; }

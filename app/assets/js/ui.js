@@ -353,14 +353,69 @@ const UI = (() => {
     const done = () => { root.classList.remove('printing'); document.title = oldTitle; area.remove(); st.remove(); window.removeEventListener('afterprint', done); };
     root.classList.add('printing'); document.title = title.replace(/[\\/:*?"<>|]/g, '-');
     window.addEventListener('afterprint', done);
-    // iPhone/iPad: Safari สั่งพิมพ์ได้เฉพาะตอนผู้ใช้กดปุ่มเอง (หลังรอโหลดเอกสาร คำสั่งพิมพ์จะถูกเมิน) → ให้กดยืนยันอีกครั้ง
+    // iPhone/iPad: Safari ไม่เปิดหน้าพิมพ์จากคำสั่งของเว็บ (iOS ใหม่) → สร้างไฟล์ PDF จริงในเครื่อง แล้วส่งให้เมนูแชร์ของ iPhone
+    //   (ในเมนูแชร์มี "พิมพ์" · "บันทึกไปยังไฟล์" · ส่ง LINE/อีเมล)
     if (isIOS()) {
-      const ok = await modal({ title: 'เอกสารพร้อมแล้ว', body: `<p>กด <b>พิมพ์ / บันทึก PDF</b> แล้วเลือกเครื่องพิมพ์ — หรือกดปุ่ม <b>แชร์</b> ในหน้าพิมพ์ เพื่อบันทึกเป็นไฟล์ PDF</p>`,
-        actions: [{ label: 'ยกเลิก', value: false }, { label: 'พิมพ์ / บันทึก PDF', icon: 'printer', kind: 'btn-primary', onClick: () => { window.print(); return true; } }] });
-      if (!ok) done();
+      window.removeEventListener('afterprint', done);
+      root.classList.remove('printing'); document.title = oldTitle;
+      let file = null, err = '';
+      try { toast('กำลังสร้างไฟล์ PDF…', 'info'); file = await makePdf(area, { title, landscape, margin }); }
+      catch (e) { err = e.message || String(e); }
+      const fileName = title.replace(/[\\/:*?"<>|]/g, '-') + '.pdf';
+      const share = () => {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title }).catch(() => {}); return true; }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); return true;
+      };
+      const safariPrint = () => { root.classList.add('printing'); document.title = title.replace(/[\\/:*?"<>|]/g, '-'); window.print(); setTimeout(() => { document.title = oldTitle; }, 4000); return true; };
+      await modal({ title: file ? 'ไฟล์ PDF พร้อมแล้ว' : 'สร้างไฟล์ PDF ไม่สำเร็จ',
+        body: file ? `<p>กด <b>แชร์ / พิมพ์ PDF</b> แล้วเลือก</p><ul style="margin:8px 0 0 18px;line-height:1.8"><li><b>พิมพ์</b> — ส่งไปเครื่องพิมพ์</li><li><b>บันทึกไปยังไฟล์</b> — เก็บเป็น PDF ในเครื่อง</li><li>หรือส่งทาง LINE / อีเมล</li></ul>`
+          : `<p>${esc(err)}</p><p style="margin-top:8px">ลองกด <b>หน้าพิมพ์ของ Safari</b> แทน หรือพิมพ์จากคอมพิวเตอร์</p>`,
+        actions: file ? [{ label: 'หน้าพิมพ์ของ Safari', onClick: safariPrint }, { label: 'แชร์ / พิมพ์ PDF', icon: 'printer', kind: 'btn-primary', onClick: share }]
+          : [{ label: 'ปิด', value: false }, { label: 'หน้าพิมพ์ของ Safari', icon: 'printer', kind: 'btn-primary', onClick: safariPrint }] });
+      // ไม่ลบ #printArea ทันที (หน้าพิมพ์ของ Safari อาจยังเปิดอยู่) — ซ่อนอยู่แล้วบนจอ และจะถูกแทนเมื่อพิมพ์ครั้งต่อไป
       return;
     }
     setTimeout(() => window.print(), 60);
   }
-  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc, signaturePad };
+  // ───── สร้าง PDF ในเครื่อง (ใช้บน iPhone/iPad) — วาดเอกสารเป็นภาพทีละส่วนแล้วจัดลงหน้า A4 ─────
+  const loadScript = src => new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('โหลดตัวสร้าง PDF ไม่สำเร็จ (ตรวจอินเทอร์เน็ต)')); document.head.appendChild(s); });
+  async function makePdf(area, { title = 'เอกสาร', landscape = false, margin = '' } = {}) {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const PW = landscape ? 297 : 210, PH = landscape ? 210 : 297;
+    const m = (margin || '14mm 12mm 16mm 12mm').split(/\s+/).map(v => parseFloat(v) || 0);
+    const [mt, mr, mb, ml] = m.length === 4 ? m : m.length === 2 ? [m[0], m[1], m[0], m[1]] : [m[0], m[0], m[0], m[0]];
+    const CW = PW - ml - mr, CH = PH - mt - mb;
+    // วางเอกสารนอกจอที่ความกว้างเท่าเนื้อที่บนกระดาษ (มองไม่เห็น แต่ถูกวาดได้)
+    area.style.cssText = `display:block;position:absolute;left:-12000px;top:0;width:${CW}mm;background:#fff;padding:0;margin:0`;
+    area.classList.add('pdf-mode');
+    const pxPerMm = area.getBoundingClientRect().width / CW;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: landscape ? 'l' : 'p', unit: 'mm', format: 'a4', compress: true });
+    let y = 0, first = true;
+    const newPage = () => { if (!first) pdf.addPage(); first = false; y = 0; };
+    const breakBefore = el => el.matches('.memo-doc + .memo-doc, .pd-divider, .pd-pics') || (el.previousElementSibling && el.previousElementSibling.matches('.pd-cover, .pd-divider'));
+    const blocks = [...area.children].filter(el => el.getBoundingClientRect().height > 0);
+    try {
+      for (const el of blocks) {
+        const cv = await window.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        const hMm = el.getBoundingClientRect().height / pxPerMm;
+        if (first || breakBefore(el) || (y > 0 && y + hMm > CH + .5)) newPage();
+        if (hMm <= CH + .5) { pdf.addImage(cv.toDataURL('image/jpeg', .92), 'JPEG', ml, mt + y, CW, hMm); y += hMm + 2; continue; }
+        // ยาวเกินหน้าเล็กน้อย (เช่น บันทึกข้อความ 1 ฉบับ) → ย่อให้พอดีหน้าเดียว ไม่แยกบรรทัดท้ายไปหน้าใหม่
+        if (hMm <= CH * 1.18) { if (y > 0) newPage(); const k = CH / hMm; pdf.addImage(cv.toDataURL('image/jpeg', .92), 'JPEG', ml + CW * (1 - k) / 2, mt, CW * k, CH); y = CH + 2; continue; }
+        // ส่วนที่ยาวกว่าหนึ่งหน้า (เช่น ตารางยาว) → ตัดเป็นช่วงต่อหน้า
+        const sliceH = Math.floor(cv.height * (CH / hMm));
+        for (let sy = 0; sy < cv.height; sy += sliceH) {
+          if (sy > 0) newPage();
+          const h = Math.min(sliceH, cv.height - sy), c2 = document.createElement('canvas'); c2.width = cv.width; c2.height = h;
+          c2.getContext('2d').drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
+          const hh = h / cv.height * hMm; pdf.addImage(c2.toDataURL('image/jpeg', .92), 'JPEG', ml, mt, CW, hh); y = hh + 2;
+        }
+      }
+    } finally { area.style.cssText = ''; area.classList.remove('pdf-mode'); }
+    const blob = pdf.output('blob');
+    return new File([blob], title.replace(/[\\/:*?"<>|]/g, '-') + '.pdf', { type: 'application/pdf' });
+  }
+  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc, makePdf, signaturePad };
 })();
