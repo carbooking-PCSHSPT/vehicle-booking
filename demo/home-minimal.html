@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>หน้าแรกมินิมอล 5 แบบ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-2: #3b52c9; --navy-9: #141a44; --gold: #c9962b; --gold-2: #f2c14e; --cream: #faf6ee; --ink: #1b2147; --muted: #6e6a7c; --line: #e8e1d2; --img: url('../app/images/hero-fleet.jpg'); }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e6e1d5; color: var(--ink); font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; overflow-x: hidden; }
+.top { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font: 600 1rem Prompt; color: var(--navy); flex: 1 1 220px; }
+.seg { display: inline-flex; padding: 4px; border-radius: 14px; background: #efe8d8; }
+.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font: 500 .88rem Prompt; color: var(--ink); cursor: pointer; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .5); }
+main { padding: 24px 12px 70px; display: grid; gap: 44px; justify-items: center; }
+.opt { width: 100%; max-width: 1280px; display: grid; justify-items: center; }
+.opt-h { width: 100%; display: flex; align-items: baseline; gap: 10px; margin: 0 4px 12px; flex-wrap: wrap; }
+.opt-h .tag { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--navy); color: #fff; font: 700 1rem Prompt; }
+.opt-h h2 { margin: 0; font: 600 1.15rem Prompt; color: var(--navy); }
+.opt-h p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: .88rem; }
+.note { width: 100%; margin: 12px 4px 0; font-size: .84rem; color: var(--muted); } .note b { color: var(--ink); }
+.stage { width: 100%; overflow: hidden; border-radius: 22px; background: #fff; box-shadow: 0 30px 60px -36px rgba(40, 30, 10, .6); }
+.frame { transform-origin: 0 0; }
+.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ───── โครงร่วม ───── */
+.site { container: site / inline-size; background: var(--cream); color: var(--ink); overflow: hidden; }
+.nv { position: absolute; top: 0; left: 0; right: 0; z-index: 6; display: flex; align-items: center; gap: 28px; padding: 18px 48px; }
+.br { display: flex; align-items: center; gap: 12px; margin-right: auto; } .br img { height: 48px; } .br b { display: block; font: 600 1.05rem Prompt; line-height: 1.2; } .br small { display: block; font: 500 .6rem Prompt; letter-spacing: .22em; color: var(--gold); }
+.lk { display: flex; gap: 28px; font: 500 .95rem Prompt; } .lk a { position: relative; color: inherit; text-decoration: none; opacity: .85; } .lk a.on { opacity: 1; } .lk a.on::after { content: ""; position: absolute; left: 50%; bottom: -8px; width: 18px; height: 3px; border-radius: 3px; background: var(--gold-2); transform: translateX(-50%); }
+.ib { position: relative; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+.ib .dot { position: absolute; top: 9px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: #e2552b; border: 2px solid #fff; }
+.av { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--navy); color: #fff; font: 600 1rem Prompt; }
+.mn { display: none; }
+.nv.dk { color: #fff; } .nv.dk .br small { color: var(--gold-2); } .nv.dk .ib { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .22); color: #fff; } .nv.dk .ib .dot { border-color: #24307a; } .nv.dk .av { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: var(--ink); }
+.nv.lt { color: var(--navy); }
+.eb { display: flex; align-items: center; gap: 14px; font: 500 1rem Prompt; color: var(--gold); } .eb::before { content: ""; width: 56px; height: 1px; background: currentColor; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 26px; border-radius: 99px; font: 600 1.02rem Prompt; text-decoration: none; white-space: nowrap; border: 1.5px solid transparent; }
+.b-gold { background: linear-gradient(135deg, #f6d27a, var(--gold)); color: #241a04; box-shadow: 0 16px 30px -14px rgba(201, 150, 43, .9); }
+.b-navy { background: var(--navy); color: #fff; box-shadow: 0 16px 30px -14px rgba(36, 48, 122, .8); }
+.b-ol { color: #fff; border-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .04); }
+.b-on { color: var(--navy); border-color: rgba(36, 48, 122, .25); background: rgba(255, 255, 255, .6); }
+.ctas { display: flex; flex-wrap: wrap; gap: 14px; }
+.ctas .cnt { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: #e2552b; color: #fff; font-size: .74rem; }
+/* วันนี้ (ส่วนสรุปสั้น ๆ ใต้ภาพหลัก) */
+.td { max-width: 1184px; margin: 0 auto; padding: 44px 48px 52px; }
+.td-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.td-h h3 { margin: 0; font: 600 1.3rem Prompt; color: var(--navy); } .td-h h3 small { margin-left: 10px; font: 400 .9rem 'IBM Plex Sans Thai'; color: var(--muted); }
+.td-h a { display: inline-flex; align-items: center; gap: 6px; font: 500 .92rem Prompt; color: var(--navy); text-decoration: none; }
+.td-g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.td-c { display: flex; align-items: center; gap: 16px; padding: 20px 22px; border-radius: 22px; background: #fff; border: 1px solid var(--line); }
+.td-c .ci { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; background: #eef0fa; color: var(--navy); }
+.td-c.g .ci { background: #fdf3dc; color: #9a6f12; } .td-c.o .ci { background: #fff1e6; color: #c2410c; }
+.td-c b { display: block; font: 600 1.7rem Prompt; color: var(--navy); line-height: 1.1; } .td-c b em { font: 400 .95rem Prompt; font-style: normal; color: var(--muted); } .td-c small { color: var(--muted); font-size: .86rem; }
+@container site (max-width: 1000px) {
+  .nv { padding: 14px 28px; } .lk { display: none; } .mn { display: grid; }
+  .btn { height: 50px; padding: 0 18px; gap: 8px; font-size: .95rem; } .ctas { gap: 10px; }
+  .td { padding: 36px 28px 44px; }
+  .td-c { padding: 16px; gap: 12px; } .td-c .ci { width: 42px; height: 42px; } .td-c b { font-size: 1.45rem; }
+}
+@container site (max-width: 560px) {
+  .nv { padding: 12px 16px; gap: 8px; } .br img { height: 40px; } .br small { display: none; } .br b { font-size: .98rem; } .ib, .av { width: 40px; height: 40px; }
+  .nv .bell { display: none; }
+  .eb { font-size: .86rem; } .eb::before { width: 36px; }
+  .btn { height: 52px; padding: 0 18px; font-size: .95rem; justify-content: center; }
+  .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .ctas .btn:first-child { grid-column: 1 / -1; }
+  .ctas .btn:not(:first-child) { height: 48px; padding: 0 10px; font-size: .88rem; gap: 6px; } .ctas .btn:not(:first-child) .i { width: 17px; height: 17px; }
+  .td { padding: 26px 16px 32px; } .td-h h3 { font-size: 1.1rem; } .td-h h3 small { display: block; margin: 2px 0 0; font-size: .8rem; } .td-h a { font-size: .85rem; }
+  .td-g { gap: 8px; } .td-c { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border-radius: 18px; } .td-c .ci { width: 34px; height: 34px; border-radius: 11px; } .td-c .ci .i { width: 18px; height: 18px; }
+  .td-c b { font-size: 1.3rem; } .td-c small { font-size: .74rem; }
+}
+
+/* ───── A: ภาพเต็มจอ + ไล่เฉดกรมท่า (ตามภาพตัวอย่าง) ───── */
+.vA .hero { position: relative; min-height: 680px; display: flex; align-items: center; color: #fff; background: var(--navy-9); overflow: hidden; }
+.vA .ph { position: absolute; inset: 0; background: var(--img) 70% 62% / cover no-repeat; }
+.vA .ov { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(20, 26, 68, .97) 0%, rgba(20, 26, 68, .9) 32%, rgba(20, 26, 68, .45) 58%, rgba(20, 26, 68, .08) 82%), linear-gradient(0deg, rgba(20, 26, 68, .55), transparent 28%), linear-gradient(180deg, rgba(20, 26, 68, .55), transparent 22%); }
+.vA .ln { position: absolute; inset: 0; background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .04) 0 1px, transparent 1px 24px); -webkit-mask-image: linear-gradient(90deg, #000 0 40%, transparent 65%); mask-image: linear-gradient(90deg, #000 0 40%, transparent 65%); }
+.vA .vl { position: absolute; left: 48px; top: 130px; bottom: 70px; width: 1px; background: linear-gradient(transparent, rgba(242, 193, 78, .55), transparent); }
+.vA .in { position: relative; z-index: 2; padding: 130px 48px 90px 100px; max-width: 780px; }
+.vA .eb { color: var(--gold-2); }
+.vA h1 { margin: 24px 0 0; font: 700 5rem/1.05 Prompt; letter-spacing: -.01em; }
+.vA h1 .t2 { display: block; margin-top: 12px; font-weight: 300; font-size: 3.5rem; background: linear-gradient(90deg, #f8e3a6, #e0b04c 60%, #c9962b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.vA .ds { margin: 26px 0 36px; max-width: 30em; font-size: 1.1rem; line-height: 1.75; color: rgba(255, 255, 255, .82); }
+.fi { position: absolute; z-index: 1; width: 78px; height: 78px; border-radius: 50%; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .3); color: rgba(255, 255, 255, .85); background: rgba(20, 26, 68, .18); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fl 7s ease-in-out infinite; }
+.fi .i { width: 30px; height: 30px; stroke-width: 1.4; }
+@keyframes fl { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@container site (max-width: 1000px) {
+  .vA .hero { min-height: 600px; } .vA .in { padding: 120px 32px 70px 64px; max-width: 640px; } .vA .vl { left: 30px; }
+  .vA h1 { font-size: 3.9rem; } .vA h1 .t2 { font-size: 2.7rem; }
+  .vA .ov { background: linear-gradient(90deg, rgba(20, 26, 68, .97) 0%, rgba(20, 26, 68, .88) 45%, rgba(20, 26, 68, .35) 75%, rgba(20, 26, 68, .1)), linear-gradient(0deg, rgba(20, 26, 68, .5), transparent 30%); }
+  .vA .fi.f3, .vA .fi.f4 { display: none; }
+}
+@container site (max-width: 560px) {
+  .vA .hero { display: block; min-height: 0; }
+  .vA .ph { bottom: auto; height: 330px; background-position: 38% 70%; }
+  .vA .ov { background: linear-gradient(180deg, rgba(20, 26, 68, .55) 0, rgba(20, 26, 68, .05) 90px, rgba(20, 26, 68, .35) 190px, rgba(20, 26, 68, .85) 260px, var(--navy-9) 326px); }
+  .vA .ln, .vA .vl, .vA .fi { display: none; }
+  .vA .in { padding: 270px 18px 30px; }
+  .vA h1 { margin-top: 14px; font-size: 2.6rem; } .vA h1 .t2 { font-size: 2rem; margin-top: 6px; }
+  .vA .ds { margin: 14px 0 22px; font-size: .95rem; }
+}
+
+/* ───── B: ภาพสว่าง + ข้อความกรมท่า (โทนเดิมของเว็บ) ───── */
+.vB .hero { position: relative; min-height: 680px; display: flex; align-items: center; background: var(--cream); overflow: hidden; }
+.vB .ph { position: absolute; inset: 0 0 0 28%; background: var(--img) 62% 60% / cover no-repeat; }
+.vB .ov { position: absolute; inset: 0; background: linear-gradient(90deg, var(--cream) 0%, var(--cream) 29%, rgba(250, 246, 238, .88) 38%, rgba(250, 246, 238, .35) 52%, rgba(250, 246, 238, 0) 64%), linear-gradient(180deg, rgba(250, 246, 238, .7), transparent 20%); }
+.vB .in { position: relative; z-index: 2; padding: 130px 48px 90px; max-width: 700px; }
+.vB h1 { margin: 22px 0 0; font: 700 4.6rem/1.08 Prompt; color: var(--navy); }
+.vB h1 .t2 { display: block; margin-top: 8px; font-size: 3.4rem; font-weight: 600; color: var(--gold); }
+.vB .ds { margin: 22px 0 34px; max-width: 26em; font-size: 1.08rem; line-height: 1.75; color: #3d4466; }
+.vB .live { position: absolute; z-index: 2; right: 40px; bottom: 36px; display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 99px; background: rgba(255, 255, 255, .88); backdrop-filter: blur(8px); font: 500 .95rem Prompt; color: var(--navy); box-shadow: 0 16px 30px -18px rgba(20, 30, 80, .6); }
+.vB .live i { width: 10px; height: 10px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 5px rgba(16, 185, 129, .2); }
+@container site (max-width: 1000px) {
+  .vB .hero { min-height: 600px; } .vB .ph { left: 22%; } .vB .in { padding: 120px 28px 70px; max-width: 600px; }
+  .vB .ov { background: linear-gradient(90deg, var(--cream) 0%, var(--cream) 34%, rgba(250, 246, 238, .8) 50%, rgba(250, 246, 238, 0) 75%); }
+  .vB h1 { font-size: 3.6rem; } .vB h1 .t2 { font-size: 2.6rem; } .vB .live { right: 24px; bottom: 24px; }
+}
+@container site (max-width: 560px) {
+  .vB .hero { display: block; min-height: 0; }
+  .vB .ph { position: relative; inset: auto; height: 290px; background-position: 40% 70%; border-radius: 0 0 30px 30px; }
+  .vB .ov { bottom: auto; height: 120px; background: linear-gradient(180deg, rgba(250, 246, 238, .85), transparent); }
+  .vB .in { padding: 22px 18px 26px; }
+  .vB h1 { margin-top: 12px; font-size: 2.5rem; } .vB h1 .t2 { font-size: 1.9rem; margin-top: 2px; }
+  .vB .ds { margin: 12px 0 20px; font-size: .95rem; }
+  .vB .live { top: 228px; bottom: auto; right: 14px; padding: 8px 14px; font-size: .82rem; }
+}
+
+/* ───── C: ซุ้มโค้ง (ภาพในกรอบโค้ง) ───── */
+.vC .hero { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 60px; align-items: center; padding: 120px 48px 70px; background: radial-gradient(700px 420px at 85% 20%, #fff0cf, transparent 70%), var(--cream); }
+.vC h1 { margin: 22px 0 0; font: 700 4.4rem/1.08 Prompt; color: var(--navy); } .vC h1 .t2 { display: block; margin-top: 8px; font-size: 3.2rem; font-weight: 600; color: var(--gold); }
+.vC .ds { margin: 22px 0 34px; max-width: 26em; font-size: 1.08rem; line-height: 1.75; color: #3d4466; }
+.vC .arch-w { position: relative; padding: 16px; }
+.vC .arch-w::before { content: ""; position: absolute; inset: 0; border: 1.5px solid rgba(201, 150, 43, .55); border-radius: 300px 300px 36px 36px; }
+.vC .arch { height: 520px; border-radius: 290px 290px 28px 28px; background: var(--img) 42% 62% / cover no-repeat; box-shadow: 0 40px 70px -40px rgba(36, 48, 122, .7); }
+.vC .chip { position: absolute; display: flex; align-items: center; gap: 12px; padding: 12px 18px 12px 12px; border-radius: 20px; background: #fff; box-shadow: 0 20px 40px -22px rgba(20, 30, 80, .6); font: 500 .9rem Prompt; color: var(--ink); animation: fl 7s ease-in-out infinite; }
+.vC .chip .ci { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--navy); color: #fff; } .vC .chip.g .ci { background: linear-gradient(135deg, #f6d27a, var(--gold)); color: #241a04; }
+.vC .chip b { display: block; font: 600 1.15rem Prompt; color: var(--navy); line-height: 1.15; } .vC .chip small { color: var(--muted); font-size: .78rem; }
+.vC .c1 { left: -34px; bottom: 70px; } .vC .c2 { right: -18px; top: 120px; animation-delay: -3.5s; }
+@container site (max-width: 1000px) {
+  .vC .hero { gap: 30px; padding: 110px 28px 50px; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
+  .vC h1 { font-size: 3.4rem; } .vC h1 .t2 { font-size: 2.5rem; } .vC .arch { height: 420px; } .vC .ctas .btn { height: 52px; padding: 0 20px; }
+  .vC .c1 { left: -20px; bottom: 40px; } .vC .c2 { display: none; }
+}
+@container site (max-width: 560px) {
+  .vC .hero { grid-template-columns: 1fr; gap: 6px; padding: 76px 16px 26px; }
+  .vC .arch-w { order: -1; padding: 10px; } .vC .arch-w::before { border-radius: 999px 999px 26px 26px; }
+  .vC .arch { height: 250px; border-radius: 999px 999px 20px 20px; background-position: 45% 70%; }
+  .vC .chip { padding: 8px 12px 8px 8px; gap: 8px; border-radius: 16px; } .vC .chip .ci { width: 32px; height: 32px; border-radius: 10px; } .vC .chip .ci .i { width: 17px; height: 17px; } .vC .chip b { font-size: .95rem; } .vC .chip small { font-size: .7rem; }
+  .vC .c1 { left: 0; bottom: 4px; } .vC .c2 { display: flex; right: 0; top: auto; bottom: 4px; }
+  .vC h1 { margin-top: 12px; font-size: 2.5rem; } .vC h1 .t2 { font-size: 1.9rem; margin-top: 2px; }
+  .vC .ds { margin: 12px 0 20px; font-size: .95rem; }
+}
+
+/* ───── D: ข้อความกลางหน้า + ภาพพาโนรามา ───── */
+.vD .hero { position: relative; padding: 140px 48px 0; text-align: center; background: radial-gradient(800px 360px at 50% 0%, #fff0cf, transparent 70%), var(--cream); }
+.vD .eb { justify-content: center; } .vD .eb::after { content: ""; width: 56px; height: 1px; background: currentColor; }
+.vD h1 { margin: 20px 0 0; font: 700 4.4rem/1.1 Prompt; color: var(--navy); } .vD h1 .t2 { color: var(--gold); }
+.vD .ds { margin: 18px auto 32px; max-width: 34em; font-size: 1.08rem; line-height: 1.7; color: #3d4466; }
+.vD .ctas { justify-content: center; }
+.vD .pano { position: relative; max-width: 1184px; height: 430px; margin: 52px auto 0; border-radius: 36px; background: var(--img) 50% 64% / cover no-repeat; box-shadow: 0 40px 70px -44px rgba(36, 48, 122, .8); }
+.vD .pano::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(0deg, rgba(20, 26, 68, .45), transparent 40%); }
+.vD .bar { position: absolute; z-index: 2; left: 50%; bottom: -38px; transform: translateX(-50%); display: grid; grid-template-columns: repeat(3, auto); background: #fff; border-radius: 22px; box-shadow: 0 24px 50px -26px rgba(20, 30, 80, .55); }
+.vD .bar div { display: flex; align-items: center; gap: 12px; padding: 18px 30px; text-align: left; white-space: nowrap; } .vD .bar div + div { border-left: 1px solid var(--line); }
+.vD .bar .i { color: var(--gold); width: 24px; height: 24px; } .vD .bar b { display: block; font: 600 1.05rem Prompt; color: var(--navy); } .vD .bar small { color: var(--muted); font-size: .8rem; }
+.vD .td { padding-top: 84px; }
+@container site (max-width: 1000px) {
+  .vD .hero { padding: 120px 28px 0; } .vD h1 { font-size: 3.5rem; } .vD h1 .t2 { display: block; } .vD .pano { height: 340px; margin-top: 40px; border-radius: 28px; }
+  .vD .bar div { padding: 14px 18px; gap: 8px; } .vD .bar b { font-size: .95rem; }
+}
+@container site (max-width: 560px) {
+  .vD .hero { padding: 84px 16px 0; } .vD .eb::before, .vD .eb::after { width: 26px; }
+  .vD h1 { margin-top: 12px; font-size: 2.4rem; } .vD h1 .t2 { display: block; font-size: 1.9rem; }
+  .vD .ds { margin: 12px auto 20px; font-size: .95rem; } .vD .ctas { text-align: left; }
+  .vD .pano { height: 210px; margin-top: 24px; border-radius: 22px; background-position: 42% 70%; }
+  .vD .bar { position: relative; left: auto; bottom: auto; transform: none; margin: -28px 10px 0; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 18px; }
+  .vD .bar div { flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 10px; white-space: normal; } .vD .bar .i { width: 18px; height: 18px; } .vD .bar b { font-size: .85rem; } .vD .bar small { font-size: .7rem; }
+  .vD .td { padding-top: 26px; }
+}
+
+/* ───── E: กรมท่าดูโอโทน + ขบวนรถวิ่งตามเส้นทอง ───── */
+.vE .hero { position: relative; min-height: 680px; display: flex; align-items: center; color: #fff; background: var(--navy-9); overflow: hidden; }
+.vE .ph { position: absolute; inset: 0 0 0 36%; background: var(--img) 60% 60% / cover no-repeat; filter: grayscale(1) contrast(1.1) brightness(1.05); }
+.vE .tint { position: absolute; inset: 0 0 0 36%; background: #2a3a9a; mix-blend-mode: multiply; }
+.vE .glow { position: absolute; inset: 0 0 0 36%; background: radial-gradient(500px 300px at 70% 30%, rgba(242, 193, 78, .35), transparent 70%); mix-blend-mode: screen; }
+.vE .ov { position: absolute; inset: 0; background: linear-gradient(90deg, var(--navy-9) 0%, var(--navy-9) 36%, rgba(20, 26, 68, .6) 50%, rgba(20, 26, 68, 0) 70%), linear-gradient(0deg, var(--navy-9), transparent 30%); }
+.vE .in { position: relative; z-index: 2; padding: 120px 48px 150px; max-width: 760px; }
+.vE .eb { color: var(--gold-2); }
+.vE h1 { margin: 22px 0 0; font: 700 4.8rem/1.06 Prompt; } .vE h1 .t2 { display: block; margin-top: 10px; font-size: 3.3rem; font-weight: 500; color: var(--gold-2); }
+.vE .ds { margin: 22px 0 34px; max-width: 28em; font-size: 1.08rem; line-height: 1.75; color: rgba(255, 255, 255, .8); }
+.vE .road { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 130px; }
+.vE .road svg { width: 100%; height: 100%; display: block; }
+@container site (max-width: 1000px) {
+  .vE .hero { min-height: 620px; } .vE .ph, .vE .tint, .vE .glow { left: 30%; } .vE .in { padding: 110px 28px 150px; max-width: 600px; }
+  .vE .ov { background: linear-gradient(90deg, var(--navy-9) 0%, var(--navy-9) 32%, rgba(20, 26, 68, .55) 55%, rgba(20, 26, 68, .1)), linear-gradient(0deg, var(--navy-9), transparent 30%); }
+  .vE h1 { font-size: 3.8rem; } .vE h1 .t2 { font-size: 2.6rem; }
+}
+@container site (max-width: 560px) {
+  .vE .hero { display: block; min-height: 0; }
+  .vE .ph, .vE .tint, .vE .glow { inset: 0 0 auto 0; height: 300px; background-position: 40% 70%; }
+  .vE .ov { background: linear-gradient(180deg, rgba(20, 26, 68, .5) 0, rgba(20, 26, 68, .1) 90px, rgba(20, 26, 68, .6) 200px, var(--navy-9) 296px); }
+  .vE .in { padding: 240px 18px 120px; } .vE h1 { margin-top: 12px; font-size: 2.6rem; } .vE h1 .t2 { font-size: 1.95rem; margin-top: 4px; }
+  .vE .ds { margin: 12px 0 22px; font-size: .95rem; } .vE .road { height: 100px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="top"><h1>หน้าแรกแบบมินิมอล · ภาพรถของโรงเรียน · เลือก 1 แบบ</h1>
+  <div class="seg" id="w"><button data-w="1280" class="on">คอม</button><button data-w="820">แท็บเล็ต</button><button data-w="390">มือถือ</button></div></div>
+<main id="m"></main>
+<script>
+const LOGO = '../app/images/logo.png';
+const P = {
+  van: '<path d="M3 17V7.5A2.5 2.5 0 0 1 5.5 5H15l5.5 6.2V17h-1.6"/><path d="M3 11.5h17.5"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/>',
+  bus: '<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 18v2M16 18v2"/><circle cx="8" cy="14.5" r="1"/><circle cx="16" cy="14.5" r="1"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M15 8l2 2"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  cal: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 15h6M12 12v6"/>',
+  clip: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>', arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>'
+};
+const ic = k => `<svg class="i" viewBox="0 0 24 24">${P[k]}</svg>`;
+const nav = dark => `<header class="nv ${dark ? 'dk' : 'lt'}"><span class="br"><img src="${LOGO}" alt=""><span><b>ระบบยานพาหนะ</b><small>PCSHS PATHUM THANI</small></span></span>
+  <nav class="lk"><a class="on">หน้าแรก</a><a>ขอใช้รถ</a><a>ตารางรถ</a><a>การขอใช้รถของฉัน</a></nav>
+  <span class="ib bell">${ic('bell')}<i class="dot"></i></span><span class="av">ช</span><span class="ib mn">${ic('menu')}</span></header>`;
+const head = `<div class="eb">ฝ่ายบริหารงานทั่วไป</div><h1>ระบบยานพาหนะ <span class="t2">ขอรถส่วนกลาง</span></h1>`;
+const DS = 'บริการรถตู้ รถบัส และรถส่วนกลาง ให้คุณครูและบุคลากร ขอใช้ ติดตาม และรับแจ้งผลได้ในที่เดียว';
+const ctas = (p, s) => `<div class="ctas"><a class="btn ${p}">${ic('file')} ขอใช้รถ</a><a class="btn ${s}">${ic('cal')} ตารางรถว่าง</a><a class="btn ${s}">${ic('clip')} คำขอของฉัน <span class="cnt">2</span></a></div>`;
+const today = `<section class="td"><div class="td-h"><h3>วันนี้<small>วันอาทิตย์ 15 พฤศจิกายน 2569</small></h3><a>กระดานเที่ยวรถ ${ic('arrow')}</a></div>
+  <div class="td-g"><div class="td-c"><span class="ci">${ic('route')}</span><span><b>8</b><small>เที่ยววันนี้</small></span></div><div class="td-c o"><span class="ci">${ic('van')}</span><span><b>2</b><small>กำลังเดินทาง</small></span></div><div class="td-c g"><span class="ci">${ic('key')}</span><span><b>10<em> / 14</em></b><small>รถว่างตอนนี้</small></span></div></div></section>`;
+
+// E: ขบวนรถวิ่งบนเส้นทองด้านล่าง
+const ROAD = 'M-40 92 C 200 40, 380 118, 640 78 S 1040 30, 1320 70';
+const car = (w, h, c, b) => `<g><animateMotion dur="16s" begin="${b}s" repeatCount="indefinite" rotate="auto"><mpath href="#eRoad"/></animateMotion><rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" rx="4" fill="${c}"/><rect x="${w / 2 - 8}" y="${-h / 2 + 2}" width="4.5" height="${h - 4}" rx="1.5" fill="#bfe0ff"/><circle cx="${w / 2 - 1}" cy="${-h / 2 + 2.5}" r="1.4" fill="#fff6c8"/><circle cx="${w / 2 - 1}" cy="${h / 2 - 2.5}" r="1.4" fill="#fff6c8"/><path d="M${w / 2} -3 L${w / 2 + 34} -12 L${w / 2 + 34} 12 L${w / 2} 3Z" fill="#fff6c8" opacity=".25"/></g>`;
+const roadSvg = `<svg viewBox="0 0 1280 130" preserveAspectRatio="xMidYMax slice"><path d="${ROAD}" fill="none" stroke="rgba(242,193,78,.18)" stroke-width="14" stroke-linecap="round"/><path id="eRoad" d="${ROAD}" fill="none" stroke="#f2c14e" stroke-width="2" stroke-dasharray="10 9" opacity=".9"/>
+  ${[[300, 88], [700, 72], [1060, 46]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#141a44" stroke="#f2c14e" stroke-width="2.5"/>`).join('')}
+  ${car(30, 14, '#5b74ff', 0)}${car(44, 15, '#d9a640', -5.3)}${car(26, 12, '#e6e8ff', -10.6)}</svg>`;
+
+const OPTS = [
+  { t: 'ภาพเต็มจอ ไล่เฉดกรมท่า', d: 'ตามแนวภาพตัวอย่าง: ภาพรถของโรงเรียนเต็มจอ ซ้ายไล่เฉดกรมท่าเข้ม หัวข้อตัวใหญ่สีขาว + บรรทัดรองสีทอง ปุ่มทรงแคปซูล ไอคอนเส้นลอยเบา ๆ',
+    n: '<b>ใกล้ภาพตัวอย่างที่สุด</b> · ดูเป็นทางการ หรู ภาพรถเด่น', cls: 'vA',
+    html: `${nav(true)}<section class="hero"><div class="ph"></div><div class="ov"></div><div class="ln"></div><div class="vl"></div>
+      <span class="fi f1" style="right:9%;top:22%">${ic('van')}</span><span class="fi f2" style="right:22%;top:12%;animation-delay:-2s">${ic('pin')}</span><span class="fi f3" style="right:5%;top:52%;animation-delay:-4s">${ic('key')}</span><span class="fi f4" style="right:30%;top:40%;animation-delay:-5.5s">${ic('cal')}</span>
+      <div class="in">${head}<p class="ds">${DS}</p>${ctas('b-gold', 'b-ol')}</div></section>${today}` },
+  { t: 'ภาพสว่าง ข้อความกรมท่า', d: 'คงโทนครีม–กรมท่า–ทองของเว็บเดิม ภาพรถอยู่ด้านขวา จางเข้าหาพื้นครีม ข้อความด้านซ้ายอ่านง่าย มีป้ายสถานะเล็ก ๆ หนึ่งจุด',
+    n: '<b>สะอาด อ่านง่ายที่สุด</b> · เปลี่ยนจากหน้าเดิมน้อยที่สุด', cls: 'vB',
+    html: `${nav(false)}<section class="hero"><div class="ph"></div><div class="ov"></div><span class="live"><i></i>พร้อมให้บริการ 14 คัน</span>
+      <div class="in">${head}<p class="ds">${DS}</p>${ctas('b-navy', 'b-on')}</div></section>${today}` },
+  { t: 'ซุ้มโค้ง', d: 'ภาพรถอยู่ในกรอบโค้งด้านบน มีเส้นทองล้อมกรอบ ป้ายข้อมูลสั้น ๆ 2 ป้ายลอยข้างภาพ พื้นครีมโล่ง ข้อความด้านซ้าย',
+    n: 'ดู<b>อบอุ่น มีเอกลักษณ์</b> ไม่เหมือนเว็บทั่วไป', cls: 'vC',
+    html: `${nav(false)}<section class="hero"><div class="tx">${head}<p class="ds">${DS}</p>${ctas('b-navy', 'b-on')}</div>
+      <div class="arch-w"><div class="arch"></div><span class="chip c1"><span class="ci">${ic('van')}</span><span><b>14 คัน</b><small>พร้อมให้บริการ</small></span></span><span class="chip g c2"><span class="ci">${ic('clock')}</span><span><b>3 วัน</b><small>ขอล่วงหน้าอย่างน้อย</small></span></span></div></section>${today}` },
+  { t: 'ข้อความกลาง + ภาพพาโนรามา', d: 'หัวข้อและปุ่มอยู่กลางหน้า ใต้ลงมาเป็นภาพรถแบบพาโนรามาขอบมน มีแถบข้อมูลสั้น 3 ช่องซ้อนขอบล่างของภาพ',
+    n: '<b>มินิมอลที่สุด</b> · โฟกัสที่ปุ่มขอใช้รถ แล้วให้ภาพเล่าเรื่องต่อ', cls: 'vD',
+    html: `${nav(false)}<section class="hero">${head}<p class="ds">${DS}</p>${ctas('b-navy', 'b-on')}
+      <div class="pano"></div><div class="bar"><div>${ic('van')}<span><b>14 คัน</b><small>พร้อมให้บริการ</small></span></div><div>${ic('clock')}<span><b>ล่วงหน้า 3 วัน</b><small>ก่อนวันเดินทาง</small></span></div><div>${ic('shield')}<span><b>ติดตามได้</b><small>ทุกขั้นตอน</small></span></div></div></section>${today}` },
+  { t: 'กรมท่าดูโอโทน + ขบวนรถ', d: 'ภาพรถปรับเป็นโทนกรมท่า–ทอง (ดูโอโทน) กลืนกับพื้นหลังเข้ม และยังมีขบวนรถวิ่งตามเส้นทองด้านล่าง ต่อยอดจากแบบ C ที่เลือกไว้',
+    n: 'โทนสีคุมทั้งหน้า <b>หรูและกลมกลืนที่สุด</b> · แต่สีจริงของรถจะไม่เห็น', cls: 'vE',
+    html: `${nav(true)}<section class="hero"><div class="ph"></div><div class="tint"></div><div class="glow"></div><div class="ov"></div>
+      <div class="in">${head}<p class="ds">${DS}</p>${ctas('b-gold', 'b-ol')}</div><div class="road">${roadSvg}</div></section>${today}` }
+];
+document.getElementById('m').innerHTML = OPTS.map((o, i) => `<section class="opt"><div class="opt-h"><span class="tag">${'ABCDE'[i]}</span><h2>${o.t}</h2><p>${o.d}</p></div>
+  <div class="stage"><div class="frame"><div class="site ${o.cls}" style="position:relative">${o.html}</div></div></div><p class="note">${o.n}</p></section>`).join('');
+
+// ย่อ/ขยายกรอบให้พอดีจอ (ออกแบบที่ความกว้างจริงของแต่ละอุปกรณ์)
+let W = 1280;
+const fit = () => document.querySelectorAll('.stage').forEach(st => {
+  st.style.maxWidth = W + 'px';
+  const fr = st.firstElementChild, s = Math.min(1, st.clientWidth / W);
+  fr.style.width = W + 'px'; fr.style.transform = `scale(${s})`; st.style.height = Math.ceil(fr.offsetHeight * s) + 'px';
+});
+const setW = w => { W = w; document.querySelectorAll('#w button').forEach(b => b.classList.toggle('on', +b.dataset.w === w)); fit(); };
+document.getElementById('w').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setW(+b.dataset.w); });
+addEventListener('resize', fit); if (window.ResizeObserver) document.querySelectorAll('.frame').forEach(f => new ResizeObserver(fit).observe(f));
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(fit);
+setW(+new URLSearchParams(location.search).get('w') || (innerWidth < 700 ? 390 : 1280));
+</script>
+</body>
+</html>
