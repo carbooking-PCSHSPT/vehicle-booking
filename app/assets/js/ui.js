@@ -183,6 +183,7 @@ const UI = (() => {
   }
   // เบราว์เซอร์ในแอป (LINE / Facebook / Messenger / Instagram) สั่งพิมพ์ไม่ได้
   const inApp = () => /\bLine\/|FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(navigator.userAgent || '');
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   // แสดงรูปย่อ (รองรับ PDF)
   const thumb = (ref, cls = '') => isPdf(ref) || /^drive:/.test(ref) && /pdf/i.test(ref)
     ? `<button type="button" class="thumb pdf ${cls}" data-view="${esc(ref)}">${icon('file')}<span>PDF</span></button>`
@@ -352,6 +353,13 @@ const UI = (() => {
     const done = () => { root.classList.remove('printing'); document.title = oldTitle; area.remove(); st.remove(); window.removeEventListener('afterprint', done); };
     root.classList.add('printing'); document.title = title.replace(/[\\/:*?"<>|]/g, '-');
     window.addEventListener('afterprint', done);
+    // iPhone/iPad: Safari สั่งพิมพ์ได้เฉพาะตอนผู้ใช้กดปุ่มเอง (หลังรอโหลดเอกสาร คำสั่งพิมพ์จะถูกเมิน) → ให้กดยืนยันอีกครั้ง
+    if (isIOS()) {
+      const ok = await modal({ title: 'เอกสารพร้อมแล้ว', body: `<p>กด <b>พิมพ์ / บันทึก PDF</b> แล้วเลือกเครื่องพิมพ์ — หรือกดปุ่ม <b>แชร์</b> ในหน้าพิมพ์ เพื่อบันทึกเป็นไฟล์ PDF</p>`,
+        actions: [{ label: 'ยกเลิก', value: false }, { label: 'พิมพ์ / บันทึก PDF', icon: 'printer', kind: 'btn-primary', onClick: () => { window.print(); return true; } }] });
+      if (!ok) done();
+      return;
+    }
     setTimeout(() => window.print(), 60);
   }
   return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc, signaturePad };

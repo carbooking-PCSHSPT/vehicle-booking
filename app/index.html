@@ -10,25 +10,40 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/app.css?v=2026-11-15b">
-<script src="assets/js/viewmode.js?v=2026-11-15b"></script>
+<link rel="stylesheet" href="assets/css/app.css?v=2026-11-15e">
+<script src="assets/js/viewmode.js?v=2026-11-15e"></script>
 </head>
 <body>
 <div id="app"><div class="boot" role="status"><img src="images/logo.png" alt=""><p>กำลังโหลดระบบยานพาหนะ…</p></div></div>
+<script>
+/* เครื่อง/เบราว์เซอร์รุ่นเก่า (iOS ต่ำกว่า 14.5 · Chrome ต่ำกว่า 88) เปิดระบบไม่ได้ → แจ้งให้อัปเดต แทนหน้าว่าง (โค้ดส่วนนี้ต้องเป็น ES5) */
+(function () {
+  var ok = true;
+  try { new Function('var a={b:1};return a?.b??0'); } catch (e) { ok = false; }
+  if (ok && window.CSS && CSS.supports) ok = CSS.supports('aspect-ratio', '1 / 1') && CSS.supports('inset', '0');
+  var msg = function (t) {
+    var a = document.getElementById('app');
+    if (a) a.innerHTML = '<div class="boot" role="alert"><img src="images/logo.png" alt=""><p style="max-width:320px;line-height:1.7">' + t + '</p></div>';
+  };
+  if (!ok) { window.__oldBrowser = true; msg('<b>เบราว์เซอร์นี้เก่าเกินไป</b><br>กรุณาอัปเดตแอป Chrome / Safari หรือระบบของมือถือ แล้วเปิดใหม่อีกครั้ง<br><small>(ต้องการ iOS 14.5 ขึ้นไป หรือ Chrome 88 ขึ้นไป)</small>'); return; }
+  // โหลดนานผิดปกติ (เน็ตช้า/สคริปต์โหลดไม่ครบ) → บอกวิธีแก้
+  setTimeout(function () { if (document.querySelector('#app > .boot')) msg('ระบบโหลดช้ากว่าปกติ…<br><small>ถ้ายังไม่ขึ้น ลองตรวจอินเทอร์เน็ต แล้ว<a href="" style="color:#24307a;font-weight:600"> รีเฟรชหน้านี้</a> · ถ้าเปิดจากแอป LINE ให้กด ⋮ แล้วเลือก “เปิดใน Chrome / Safari”</small>'); }, 20000);
+})();
+</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="assets/js/config.js?v=2026-11-15b"></script>
-<script src="assets/js/icons.js?v=2026-11-15b"></script>
-<script src="assets/js/store.js?v=2026-11-15b"></script>
-<script src="assets/js/ui.js?v=2026-11-15b"></script>
-<script src="assets/js/maps.js?v=2026-11-15b"></script>
-<script src="assets/js/app.js?v=2026-11-15b"></script>
-<script src="assets/js/pages-public.js?v=2026-11-15b"></script>
-<script src="assets/js/pages-driver.js?v=2026-11-15b"></script>
-<script src="assets/js/pages-admin.js?v=2026-11-15b"></script>
+<script src="assets/js/config.js?v=2026-11-15e"></script>
+<script src="assets/js/icons.js?v=2026-11-15e"></script>
+<script src="assets/js/store.js?v=2026-11-15e"></script>
+<script src="assets/js/ui.js?v=2026-11-15e"></script>
+<script src="assets/js/maps.js?v=2026-11-15e"></script>
+<script src="assets/js/app.js?v=2026-11-15e"></script>
+<script src="assets/js/pages-public.js?v=2026-11-15e"></script>
+<script src="assets/js/pages-driver.js?v=2026-11-15e"></script>
+<script src="assets/js/pages-admin.js?v=2026-11-15e"></script>
 </body>
 </html>

@@ -300,6 +300,25 @@ const C = (() => {
   }));
   const pdfDocs = new Map();
   const DV = { key: '', el: null, api: null };
+  // iPhone/iPad (Safari): เปิดไฟล์ในแท็บใหม่ไม่ได้ (หน้าว่าง / WebKitBlobResource) → ดูในหน้าเดิม + ปุ่มบันทึก/แชร์
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  async function saveFile(ref) {
+    try {
+      const url = await S().fileUrl(ref), blob = await (await fetch(url)).blob();
+      const ext = (blob.type.split('/')[1] || 'bin').replace('jpeg', 'jpg'), name = `ไฟล์แนบ.${ext}`;
+      const file = new File([blob], name, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { UI.toast('บันทึกไฟล์ไม่สำเร็จ: ' + e.message, 'error'); }
+  }
+  // ดูไฟล์แนบในหน้าต่างซ้อน (มือถือ/แท็บเล็ต และ iPhone ทุกขนาด) — PDF ทุกหน้า ซูม/หมุนได้
+  function viewFiles(refs, i = 0) {
+    UI.modal({ title: 'ดูไฟล์แนบ', size: 'lg fv-modal', body: docSlot(), onOpen: el => { const api = mountDocViewer(el, refs, 'fv:' + Date.now()); if (api && i) api.show(i); } });
+  }
+  // จอสัมผัส (มือถือ/แท็บเล็ต): ปุ่มในตัวแสดงเป็น "บันทึก / แชร์" แทน "เปิดแท็บใหม่"
+  const useSave = () => isIOS() || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  // มือถือ/แท็บเล็ตทุกแบบ (จอสัมผัส) — Android Chrome เปิด PDF ในแท็บใหม่ไม่ได้ (จะดาวน์โหลดแทน)
+  const viewInPage = () => isIOS() || document.documentElement.classList.contains('lt900') || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
   const docSlot = () => '<div data-docview></div>';
   function mountDocViewer(root, refs, key) {
     const slot = root.querySelector('[data-docview]');
@@ -316,7 +335,7 @@ const C = (() => {
           <button type="button" class="icon-btn sm" data-dv="fit" title="พอดีความกว้าง" aria-label="พอดีความกว้าง">${icon('fitWidth')}</button>
           <button type="button" class="icon-btn sm" data-dv="rot" title="หมุน 90°" aria-label="หมุน">${icon('rotate')}</button>
           <button type="button" class="icon-btn sm" data-dv="max" title="ขยายเต็มจอ (Esc ออก)" aria-label="ขยายเต็มจอ">${icon('maximize')}</button>
-          <button type="button" class="icon-btn sm" data-dv="tab" title="เปิดในแท็บใหม่" aria-label="เปิดในแท็บใหม่">${icon('arrowUR')}</button>
+          ${useSave() ? `<button type="button" class="icon-btn sm" data-dv="tab" title="บันทึก / แชร์ไฟล์" aria-label="บันทึก / แชร์ไฟล์">${icon('download')}</button>` : `<button type="button" class="icon-btn sm" data-dv="tab" title="เปิดในแท็บใหม่" aria-label="เปิดในแท็บใหม่">${icon('arrowUR')}</button>`}
           <button type="button" class="icon-btn sm dv-close" data-dv="close" title="ปิด" aria-label="ปิด">${icon('x')}</button>
         </div></div>
       <div class="dv-body"><div class="dv-pages"><div class="dv-msg">กำลังโหลดเอกสาร…</div></div></div>
@@ -336,6 +355,8 @@ const C = (() => {
         if (my !== token) return;
         const frag = document.createDocumentFragment();
         if (UI.isPdf(ref)) {
+          // เครื่องรุ่นเก่า/เน็ตช้า: ถ้า 15 วินาทียังไม่ขึ้น ให้มีปุ่มบันทึก/เปิดด้วยแอปอื่น (ไม่ค้างที่ "กำลังโหลด")
+          setTimeout(() => { if (my === token && pages.querySelector('.dv-msg') && !pages.querySelector('canvas')) pages.querySelector('.dv-msg').innerHTML = `ยังแสดงเอกสารไม่ได้ (เครื่องหรือเน็ตอาจช้า)<br><button type="button" class="btn btn-ghost btn-sm" data-dv="tab" style="margin-top:10px">${useSave() ? `${icon('download')} บันทึก / แชร์ไฟล์` : `${icon('arrowUR')} เปิดในแท็บใหม่`}</button>`; }, 15000);
           const lib = await loadPdfJs();
           if (!pdfDocs.has(url)) pdfDocs.set(url, lib.getDocument({ url }).promise);
           const pdf = await pdfDocs.get(url);
@@ -364,7 +385,7 @@ const C = (() => {
           foot.textContent = 'รูปภาพ';
         }
       } catch (e) {
-        if (my === token) { pages.innerHTML = `<div class="dv-msg">${icon('alert')} ${UI.esc(e.message || 'เปิดเอกสารไม่สำเร็จ')}<br><button type="button" class="btn btn-ghost btn-sm" data-dv="tab" style="margin-top:10px">${icon('arrowUR')} เปิดในแท็บใหม่</button></div>`; foot.textContent = ''; }
+        if (my === token) { pages.innerHTML = `<div class="dv-msg">${icon('alert')} ${UI.esc(e.message || 'เปิดเอกสารไม่สำเร็จ')}<br><button type="button" class="btn btn-ghost btn-sm" data-dv="tab" style="margin-top:10px">${useSave() ? `${icon('download')} บันทึก / แชร์ไฟล์` : `${icon('arrowUR')} เปิดในแท็บใหม่`}</button></div>`; foot.textContent = ''; }
       }
     };
     const setMax = on => { el.classList.toggle('dv-max', on); document.body.classList.toggle('dv-max-open', on); el.querySelector('[data-dv=max]').innerHTML = icon(on ? 'minimize' : 'maximize'); setTimeout(draw, 30); };
@@ -377,7 +398,7 @@ const C = (() => {
       if (a === 'fit') { st.zoom = 1; draw(); }
       if (a === 'rot') { st.rot = (st.rot + 90) % 360; draw(); }
       if (a === 'max') setMax(!el.classList.contains('dv-max'));
-      if (a === 'tab') UI.openFile(refs[st.i]);
+      if (a === 'tab') (useSave() ? saveFile : UI.openFile)(refs[st.i]);
       if (a === 'close') { if (el.classList.contains('dv-max')) setMax(false); document.documentElement.classList.remove('dv-sheet'); }
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && el.classList.contains('dv-max')) setMax(false); });
@@ -522,7 +543,7 @@ const C = (() => {
     return html;
   }
 
-  return { atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
+  return { viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {
@@ -772,7 +793,15 @@ const App = (() => {
       const vm = e.target.closest('[data-vmode]');
       if (vm) { const m = vm.dataset.vmode; if (m !== ViewMode.get()) { ViewMode.set(m); UI.toast(m === 'auto' ? 'ปรับมุมมองอัตโนมัติตามขนาดจอ' : `เปลี่ยนเป็นมุมมอง${ViewMode.MODES[m].label}แล้ว`); } return; }
       const op = e.target.closest('[data-view]');
-      if (op) { e.preventDefault(); UI.openFile(op.dataset.view); return; }
+      if (op) {
+        e.preventDefault();
+        if (!C.viewInPage()) { UI.openFile(op.dataset.view); return; }
+        // รวมไฟล์แนบชุดเดียวกัน (กดซ้าย-ขวาในตัวแสดงได้)
+        const box = op.parentElement, all = box ? [...box.querySelectorAll(':scope > [data-view]')].map(x => x.dataset.view) : [];
+        const refs = all.length ? all : [op.dataset.view];
+        C.viewFiles(refs, Math.max(0, refs.indexOf(op.dataset.view)));
+        return;
+      }
       // การ์ดที่กดได้ทั้งใบ (ไม่ใช้ <a> ซ้อน <a>)
       const card = e.target.closest('[data-href]');
       if (card && !e.target.closest('a,button,input,select,textarea,label') && (!card.matches('tr') || card.classList.contains('bd-row'))) location.hash = card.dataset.href;

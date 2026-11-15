@@ -37,7 +37,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* ───────── บูต ───────── */
-.boot { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 18px; color: var(--muted); }
+.boot { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 18px; color: var(--muted); padding: 0 20px; text-align: center; }
 .boot img { height: 90px; animation: hover 3s ease-in-out infinite; }
 @keyframes hover { 50% { transform: translateY(-8px); } }
 
@@ -1713,3 +1713,27 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .lt640 .person .ct a[href^="mailto"], .lt640 .person .ct a { overflow: hidden; text-overflow: ellipsis; display: block; white-space: nowrap; }
 .lt640 .drv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .lt640 .drv-grid .person .ph { width: 60px; height: 60px; }
+/* ดูไฟล์แนบในหน้าต่างซ้อน (มือถือ / iPhone) */
+.modal.fv-modal .modal-body { padding: 0; }
+.fv-modal .dv { height: min(76vh, 900px); border: 0; border-radius: 0; box-shadow: none; }
+.fv-modal .dv-title { display: none; }
+.fv-modal .dv-tools { margin-left: 0; width: 100%; justify-content: space-between; }
+.fv-modal .dv-tools .dv-close, .fv-modal .dv-tools [data-dv="max"] { display: none !important; }
+/* มือถือจอแคบ: แถบเมนูบนต้องเห็นปุ่ม ☰ ครบ · หัวข้อ/ชื่อไม่ตัดกลางคำ */
+.nw { white-space: nowrap; }
+.lt420 .nav-inner { width: calc(100% - 24px); gap: 8px; }
+.lt420 .brand { padding-right: 0; gap: 8px; }
+.lt420 .atom { width: 40px; height: 40px; } .lt420 .atom img { height: 32px; }
+.lt420 .brand strong { font-size: .9rem; }
+.lt420 .nav-actions { gap: 6px; }
+.lt420 .nav .icon-btn { width: 40px; height: 40px; border-radius: 12px; }
+.lt420 .user-chip { padding: 3px; } .lt420 .user-chip .chev { display: none; }
+.lt420 .page-head h1 { font-size: 1.5rem; }
+.lt420 .person b { font-size: .86rem; }
+.lt340 .brand strong { display: none; }
+.lt340 .hb h1 { font-size: 2.15rem; }
+.lt340 .page-head h1 { font-size: 1.32rem; }
+.lt340 .person b { font-size: .78rem; }
+.lt340 .person .pos { font-size: .68rem; }
+.lt420 .daypick { max-width: 100%; gap: 2px; } .lt420 .daypick .dp-date { padding: 0 2px; gap: 4px; min-width: 0; } .lt420 .daypick .dp-date input { min-width: 0; width: 7.4em; }
+.lt340 .daypick .dp-btn { width: 30px; height: 30px; } .lt340 .daypick .dp-today { padding: 6px 10px; }

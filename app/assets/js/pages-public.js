@@ -833,6 +833,8 @@
   });
 
   // ═════════ ติดต่อเรา ═════════
+  // ชื่อ-นามสกุลไม่ถูกตัดกลางคำ (ภาษาไทยไม่มีเว้นวรรค เบราว์เซอร์ตัดนามสกุลตรงไหนก็ได้)
+  const nwName = n => String(n || '').trim().split(/\s+/).map(w => `<span class="nw">${esc(w)}</span>`).join(' ');
   Pages.contact = () => {
     const s = S.db.settings, cm = (s.committee || []).slice();
     const levels = [...new Set(cm.map(c => +c.level || 3))].sort();
@@ -842,11 +844,11 @@
         <div class="org">${levels.map(lv => `<div class="org-level">${cm.filter(c => (+c.level || 3) === lv).map(c => `
           <div class="person l${lv} ${c.name ? '' : 'ph-empty'} reveal">
             <div class="ph">${c.photo ? UI.img(c.photo, c.name) : icon('user')}</div>
-            <b>${esc(c.name) || '(รอข้อมูล)'}</b><div class="pos">${esc(c.position)}</div>
+            <b>${c.name ? nwName(c.name) : '(รอข้อมูล)'}</b><div class="pos">${esc(c.position)}</div>
             <div class="ct">${c.phone ? `<a href="tel:${esc(c.phone)}">${icon('phone')} ${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${icon('mail')} ${esc(c.email)}</a>` : ''}</div>
           </div>`).join('')}</div>`).join('')}</div>
         <h3 class="ct-h">${icon('wheel')} พนักงานขับรถ</h3>
-        ${inn() ? `<div class="veh-grid drv-grid">${S.db.drivers.filter(d => d.active !== false).map(d => `<div class="person" style="width:auto"><div class="ph">${d.photo ? UI.img(d.photo, d.name) : icon('user')}</div><b>${esc(d.name)}</b><div class="pos">พนักงานขับรถ · ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '-'}</div><div class="ct">${d.phone ? `<a href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>`).join('')}</div>` : `<div class="note-box navy">${icon('lock')}<div>เข้าสู่ระบบเพื่อดูรายชื่อและเบอร์โทรพนักงานขับรถ</div></div>`}
+        ${inn() ? `<div class="veh-grid drv-grid">${S.db.drivers.filter(d => d.active !== false).map(d => `<div class="person" style="width:auto"><div class="ph">${d.photo ? UI.img(d.photo, d.name) : icon('user')}</div><b>${nwName(d.name)}</b><div class="pos">พนักงานขับรถ · ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '-'}</div><div class="ct">${d.phone ? `<a href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>`).join('')}</div>` : `<div class="note-box navy">${icon('lock')}<div>เข้าสู่ระบบเพื่อดูรายชื่อและเบอร์โทรพนักงานขับรถ</div></div>`}
         <h3 class="ct-h">${icon('phone')} ช่องทางติดต่อ</h3>
         <div class="ct-list">
           ${s.contactPhone ? `<a class="ct-row" href="tel:${esc(s.contactPhone)}"><span class="ci">${icon('phone')}</span><span><small>โทรศัพท์${s.contactName ? ` · ${esc(s.contactName)}` : ''}</small><b>${esc(s.contactPhone)}</b></span></a>` : ''}

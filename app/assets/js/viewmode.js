@@ -15,7 +15,8 @@ const ViewMode = (() => {
     tablet: { label: 'แท็บเล็ต', icon: 'tablet', w: 1024 },
     desktop: { label: 'คอมพิวเตอร์', short: 'คอม', icon: 'monitor', w: 1280 }
   };
-  const MAX = [1380, 1180, 1120, 1060, 1000, 900, 640], MIN = [900, 1100];
+  // 420 = มือถือทั่วไป (Android 360–412 · iPhone 375–430) · 340 = มือถือจอเล็ก/รุ่นเก่า (320)
+  const MAX = [1380, 1180, 1120, 1060, 1000, 900, 640, 420, 340], MIN = [900, 1100];
   const DEFAULT_VP = 'width=device-width, initial-scale=1';
   const root = document.documentElement;
   const touch = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
