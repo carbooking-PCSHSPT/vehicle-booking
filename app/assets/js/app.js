@@ -424,7 +424,7 @@ const C = (() => {
     };
   }
   const canMemo = r => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);
-  const MEMO_PAGE = { margin: '15mm 18mm 12mm 25mm', pageNo: false, fitWidth: '167mm' };   // A4 กว้าง 210 − ขอบซ้าย 25 − ขวา 18
+  const MEMO_PAGE = { margin: '12mm 20mm 10mm 30mm', pageNo: false, fitWidth: '160mm' };   // ขอบตามหนังสือราชการ: ซ้าย 3 ซม. ขวา 2 ซม.
   // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
   const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);
   async function printMemo(r) { await S().loadSignatures(sigEmails([r])); UI.printDoc(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
@@ -485,8 +485,9 @@ const C = (() => {
   function memoHTML(r, { krut = true } = {}) {
     const s = S(), st = s.db.settings, M = memoSettings();
     const dTh = d => new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+    // วัน/เดือน/ปี แบบสั้น (พ.ศ.) ใต้ลายมือชื่อ เช่น 15/11/2569
+    const dNum = d => { const x = new Date(d); return `${x.getDate()}/${x.getMonth() + 1}/${x.getFullYear() + 543}`; };
     const tm = d => `${UI.fmt.time(d)} น.`;
-    const dots = n => '.'.repeat(n);
     const u = s.user(r.requester.email) || (s.me && s.me.email === r.requester.email ? s.me : {}) || {};
     const pos = u.position || '';
     const t = s.tripType(r), sameDay = s.sameDay(r.startAt, r.endAt);
@@ -496,51 +497,48 @@ const C = (() => {
     const paxParts = [r.teachers ? `ครู/บุคลากร ${r.teachers} คน` : '', r.students ? `นักเรียน ${r.students} คน` : '', r.others ? `บุคคลอื่น ${r.others} คน` : ''].filter(Boolean).join(' ');
     const dests = (r.destinations || []).map(d => d.name + (d.province ? ` จังหวัด${d.province.replace(/^จ(\.|ังหวัด)\s*/, '')}` : '')).join(', ') || s.destName(r);
     const asg = r.assignments || [];
-    const apv = (r.history || []).filter(h => h.action === 'approve').pop();
-    // es = { img, at } ลายเซ็นอิเล็กทรอนิกส์ (ถ้ามี) — วางรูปลายเซ็นทับเส้นจุด
-    const sig = (role, name, p, es) => `<div class="mm-sig${es && es.img ? ' has-img' : ''}"><p>(ลงชื่อ) <span class="mm-dots">${es && es.img ? `<img src="${es.img}" alt="">` : ''}${dots(42)}</span> ${role}</p><p>(${name ? esc(name) : dots(40)})</p><p>ตำแหน่ง ${p ? esc(p) : dots(36)}</p>${es && es.at ? `<p class="mm-es">ลงนามอิเล็กทรอนิกส์ผ่านระบบ ${UI.fmt.dt(es.at)}</p>` : ''}</div>`;
     const E = r.esign || {};
-    const reqSig = r.createdBy === r.requester.email && s.sigOf(r.requester.email) ? { img: s.sigOf(r.requester.email), at: r.createdAt } : null;
-    const headSig = E.head ? { img: s.sigOf(E.head.email), at: E.head.at } : null;
-    const depSig = E.deputy ? { img: s.sigOf(E.deputy.email), at: E.deputy.at } : null;
-    const dateLine = es => es ? `<p class="mm-date">วันที่ ${dTh(es.at)}</p>` : `<p class="mm-date">วันที่ ${dots(8)} / ${dots(8)} / ${dots(8)}</p>`;
-    const html = `<div class="memo-doc">
+    const deny = !!(E.deputy && E.deputy.decision === 'deny') || r.status === 'rejected';
+    // อนุมัติในระบบแล้ว → ลงวันที่ตามวันที่กดอนุมัติ
+    const apv = (r.history || []).filter(h => h.action === 'approve').pop();
+    const okd = !deny && ((E.deputy && E.deputy.decision !== 'deny') || ['approved', 'ontrip', 'returned', 'closed'].includes(r.status));
+    const apvAt = apv ? apv.at : (okd ? (r.decision && r.decision.at) || '' : '');
+    // ลายมือชื่อ: ไม่มีเส้นจุด — มีลายเซ็นอิเล็กทรอนิกส์ก็วางรูป ไม่มีก็เว้นที่ว่างไว้เซ็นด้วยปากกา
+    const sig = (role, name, p, img, at) => `<div class="mm-sig"><p class="mm-sl">ลงชื่อ <span class="mm-sp">${img ? `<img src="${img}" alt="">` : ''}</span> ${role}</p><p>(${name ? esc(name) : '<span class="mm-blank"></span>'})</p><p>${p ? esc(p) : ''}</p>${at ? `<p>${dNum(at)}</p>` : ''}</div>`;
+    const reqImg = r.createdBy === r.requester.email ? s.sigOf(r.requester.email) : '';
+    const headImg = E.head ? s.sigOf(E.head.email) : '', depImg = E.deputy ? s.sigOf(E.deputy.email) : '';
+    const headAt = (E.head && E.head.at) || apvAt, depAt = (E.deputy && E.deputy.at) || apvAt;
+    return `<div class="memo-doc">
       ${krut ? `<div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>`
         : `<div class="mm-lh"><img src="images/logo.png" alt=""><div><b>${esc(st.schoolName || '')}</b><span>${esc(st.division || '')} · ${esc(st.unit || 'งานยานพาหนะ')}</span></div></div><h1 class="mm-lh-t">บันทึกข้อความ</h1>`}
       <div class="mm-line"><b>ส่วนราชการ</b><span data-fit>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
-      <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${r.id}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(r.createdAt)}</span></div></div>
+      <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${r.id}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(apvAt || r.createdAt)}</span></div></div>
       <div class="mm-line"><b>เรื่อง</b><span>ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน</span></div>
-      <hr>
       <p class="mm-to"><b>เรียน</b> ${esc(M.to)}</p>
       <p class="mm-p">ด้วยข้าพเจ้า ${esc(r.requester.name)}${pos ? ` ตำแหน่ง ${esc(pos)}` : ''}${r.requester.dept ? ` ${esc(r.requester.dept)}` : ''} มีความประสงค์ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน เพื่อ${esc(r.purpose || '')}${r.project ? ` (${esc(r.project)})` : ''} โดยมีรายละเอียดดังนี้</p>
       <ol class="mm-list">
         <li><b>สถานที่ไปราชการ</b> ${esc(dests)}</li>
         <li><b>กำหนดเดินทาง</b> ${when} (${esc(s.tripLabel(r))}${t === 'overnight' && r.lodging ? ` · ที่พัก ${esc(r.lodging)}` : ''})</li>
         <li><b>ผู้เดินทาง</b> รวม ${pax} คน${paxParts ? ` (${paxParts})` : ''}${r.passengerNames ? ` ได้แก่ ${esc(r.passengerNames)}` : ''}</li>
-        <li><b>จุดขึ้นรถ</b> ${esc(r.pickup || '-')} · <b>โทรศัพท์ติดต่อระหว่างเดินทาง</b> ${esc(r.contactPhone || r.requester.phone || '-')}</li>
+        <li><b>จุดขึ้นรถ</b> ${esc(r.pickup || '-')} <b>โทรศัพท์ติดต่อระหว่างเดินทาง</b> ${esc(r.contactPhone || r.requester.phone || '-')}</li>
         ${r.note ? `<li><b>หมายเหตุ</b> ${esc(r.note)}</li>` : ''}
       </ol>
       <p class="mm-p">จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต</p>
-      <div class="mm-right">${sig('ผู้ขอใช้รถ', r.requester.name, pos, reqSig)}</div>
+      <div class="mm-right">${sig('ผู้ขอใช้รถ', r.requester.name, pos, reqImg, r.createdAt)}</div>
       <div class="mm-boxes">
         <div class="mm-box"><h3>ความเห็นหัวหน้างานยานพาหนะ</h3>
           <p>เรียน ${esc(M.to)}</p>
-          <p class="mm-ind">งานยานพาหนะได้ตรวจสอบแล้ว และจัดรถให้ดังนี้</p>
-          ${asg.length ? `<ul>${asg.map(a => `<li>${esc(vName(a.vehicleId))}${vPlate(a.vehicleId) ? ` ทะเบียน ${esc(vPlate(a.vehicleId))}` : ''} · พนักงานขับรถ ${esc(dName(a.driverId))}${dPhone(a.driverId) ? ` โทร ${esc(dPhone(a.driverId))}` : ''}</li>`).join('')}</ul>` : `<p>${dots(70)}</p>`}
+          <p class="mm-ind">งานยานพาหนะได้ตรวจสอบแล้ว${asg.length ? ' และจัดรถให้ดังนี้' : ''}</p>
+          ${asg.length ? `<ul>${asg.map(a => `<li>${esc(vName(a.vehicleId))}${vPlate(a.vehicleId) ? ` ทะเบียน ${esc(vPlate(a.vehicleId))}` : ''} พนักงานขับรถ ${esc(dName(a.driverId))}${dPhone(a.driverId) ? ` โทร ${esc(dPhone(a.driverId))}` : ''}</li>`).join('')}</ul>` : '<p class="mm-gap"></p>'}
           ${r.decision && r.decision.note ? `<p class="mm-note">หมายเหตุ: ${esc(r.decision.note)}</p>` : ''}
-          <p class="mm-ind">เห็นควรอนุญาต</p>
-          ${sig('', E.head ? E.head.name : M.headName, M.headPos, headSig)}${dateLine(headSig)}</div>
+          <p class="mm-ind">${deny ? 'เห็นควรไม่อนุญาต' : okd ? 'เห็นควรอนุญาต' : ''}</p>
+          ${sig('', E.head ? E.head.name : M.headName, M.headPos, headImg, headAt)}</div>
         <div class="mm-box"><h3>ความเห็น / คำสั่ง</h3>
-          ${(() => { const deny = E.deputy && E.deputy.decision === 'deny';
-            // อนุมัติในระบบแล้ว (อนุมัติ / กำลังเดินทาง / กลับแล้ว / ปิดงาน) → ติ๊ก "อนุญาต" ให้เลย
-            const ok = !deny && ((E.deputy && E.deputy.decision !== 'deny') || ['approved', 'ontrip', 'returned', 'closed'].includes(r.status));
-            return `<p class="mm-chk"><span class="cb ${ok ? 'on' : ''}"></span> อนุญาต &nbsp;&nbsp;&nbsp; <span class="cb ${deny ? 'on' : ''}"></span> ไม่อนุญาต</p>`; })()}
-          ${E.deputy && E.deputy.note ? `<p class="mm-fill">${esc(E.deputy.note)}</p>` : `<p>${dots(70)}</p><p>${dots(70)}</p>`}
-          ${sig('', E.deputy ? E.deputy.name : M.depName, M.depPos, depSig)}${dateLine(depSig)}</div>
+          <p class="mm-ks">${deny ? '- ไม่อนุญาต' : okd ? '- ทราบ<br>- อนุญาตตามเสนอ' : ''}</p>
+          ${E.deputy && E.deputy.note ? `<p class="mm-note">${esc(E.deputy.note)}</p>` : ''}
+          ${sig('', E.deputy ? E.deputy.name : M.depName, M.depPos, depImg, depAt)}</div>
       </div>
-      <p class="mm-foot">อ้างอิงระบบยานพาหนะ เลขที่คำขอ ${r.id} · ส่งคำขอ ${UI.fmt.dt(r.createdAt)}${apv ? ` · จัดรถ/อนุมัติในระบบโดย ${esc(apv.byName || apv.by)} เมื่อ ${UI.fmt.dt(apv.at)}` : ''} · พิมพ์เมื่อ ${UI.fmt.dt(new Date().toISOString())}</p>
     </div>`;
-    return html;
   }
 
   return { viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };

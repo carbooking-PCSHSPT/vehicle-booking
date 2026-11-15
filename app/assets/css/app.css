@@ -1746,3 +1746,27 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .pdf-mode ul > li::before { content: "•"; position: absolute; right: 100%; margin-right: .4em; }
 .pdf-mode > * { padding-bottom: 3px; }
 .pdf-mode .memo-doc .cb.on::after { top: -12px; left: 1px; }
+
+/* บันทึกข้อความ (ปรับตามแบบหนังสือราชการ: ไม่มีเส้นจุด · ฟอนต์/ระยะตามตัวอย่าง) */
+.memo-doc { font-size: 13.5pt; line-height: 1.42; }
+.memo-doc .mm-top { height: 17mm; margin-bottom: 2mm; }
+.memo-doc .mm-krut { height: 14mm; }
+.memo-doc h1 { font-size: 26pt; }
+.memo-doc .mm-line { gap: 12px; }
+.memo-doc .mm-line b { font-size: 15.5pt; }
+.memo-doc .mm-line span { border-bottom: 0; padding: 0; }
+.memo-doc .mm-row { grid-template-columns: 1.1fr 1fr; }
+.memo-doc .mm-to { margin: 10px 0 2px; }
+.memo-doc .mm-p { text-indent: 2.5cm; margin: 0 0 2px; }
+.memo-doc .mm-list { margin: 0 0 2px 2.5cm; padding-left: 1.2em; }
+.memo-doc .mm-right { margin: 6px 0 10px; }
+.memo-doc .mm-right .mm-sig { min-width: 75mm; }
+.memo-doc .mm-sig p:first-child, .memo-doc .mm-sig.has-img > p:first-child { margin-top: 10px; }
+.memo-doc .mm-sl { display: flex; align-items: flex-end; justify-content: center; gap: 6px; }
+.memo-doc .mm-sp { position: relative; display: inline-block; width: 42mm; height: 11mm; }
+.memo-doc .mm-sp img { position: absolute; left: 50%; bottom: -1mm; transform: translateX(-50%); height: 12mm; max-width: 130%; object-fit: contain; }
+.memo-doc .mm-blank { display: inline-block; width: 42mm; }
+.memo-doc .mm-box { padding: 5px 12px 8px; font-size: 12.5pt; line-height: 1.36; }
+.memo-doc .mm-box .mm-sp { width: 38mm; }
+.memo-doc .mm-gap { min-height: 2em; }
+.memo-doc .mm-ks { min-height: 3.2em; margin: 2px 0 0 1.2cm !important; }
