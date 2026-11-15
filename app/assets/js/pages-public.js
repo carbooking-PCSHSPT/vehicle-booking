@@ -909,13 +909,15 @@
   // ═════════ ติดต่อเรา ═════════
   // ชื่อ-นามสกุลไม่ถูกตัดกลางคำ (ภาษาไทยไม่มีเว้นวรรค เบราว์เซอร์ตัดนามสกุลตรงไหนก็ได้)
   const nwName = n => String(n || '').trim().split(/\s+/).map(w => `<span class="nw">${esc(w)}</span>`).join(' ');
+  // หัวหน้างานยานพาหนะขึ้นก่อนคนอื่นในระดับเดียวกัน
+  const headFirst = c => /หัวหน้างานยานพาหนะ/.test(c.position || '') ? 1 : 0;
   Pages.contact = () => {
     const s = S.db.settings, cm = (s.committee || []).slice();
     const levels = [...new Set(cm.map(c => +c.level || 3))].sort();
     return {
       html: `<div class="page"><div class="container">
         <div class="page-head"><div><div class="eyebrow">ติดต่อเรา</div><h1>คณะทำงานงานยานพาหนะ</h1><p>${esc(s.division)} · ${esc(s.schoolName)}</p></div>${S.isAdmin(S.me) ? `<a class="btn btn-ghost btn-sm" href="#/admin/settings">${icon('edit')} แก้ไขข้อมูลติดต่อ</a>` : ''}</div>
-        <div class="org">${levels.map(lv => `<div class="org-level">${cm.filter(c => (+c.level || 3) === lv).map(c => `
+        <div class="org">${levels.map(lv => `<div class="org-level">${cm.filter(c => (+c.level || 3) === lv).sort((a, b) => headFirst(b) - headFirst(a)).map(c => `
           <div class="person l${lv} ${c.name ? '' : 'ph-empty'} reveal">
             <div class="ph">${c.photo ? UI.img(c.photo, c.name) : icon('user')}</div>
             <b>${c.name ? nwName(c.name) : '(รอข้อมูล)'}</b><div class="pos">${esc(c.position)}</div>

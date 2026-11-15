@@ -1773,7 +1773,11 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 
 /* ป้ายทะเบียนในลานจอด (คอม/แท็บเล็ตแนวนอน) */
 .pk-plate { display: inline-block; max-width: 100%; margin-top: 1px; padding: 1px 6px; border-radius: 4px; background: #fff; color: #1b2147; border: 1px solid #c9cde0; font-size: .64rem; font-weight: 600; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 0 rgba(0, 0, 0, .25); }
-.lt900 .pk-plate { display: none; }
+/* มือถือ/แท็บเล็ต: ป้ายเล็ก แสดงเฉพาะเลขทะเบียน (ไม่มีจังหวัด) */
+.lt1060 .pk-plate { padding: 0 4px; border-radius: 3px; font-size: .56rem; line-height: 1.45; letter-spacing: -.01em; }
+.lt1060 .pk-plate .pp { display: none; }
+.pk-plate.none { opacity: .55; font-weight: 400; }
+.lt640 .pk-plate.none { display: none; }
 /* ช่องอ่านอย่างเดียว (ระยะทางไป + กลับ) */
 .pk-ro { background: #f5efe2 !important; font-weight: 600; color: var(--navy) !important; }
 /* ตรวจข้อมูลก่อนส่งคำขอ */
@@ -1827,3 +1831,64 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .dc-files .thumb { width: 120px; height: 160px; }
 
 .print-doc .rp-logo { display: block; margin: 0 auto; }
+
+/* ───── ฟอนต์เอกสาร: TH Sarabun New (ฟอนต์ราชการ แทน TH SarabunPSK) — ฝังในระบบ ใช้ได้ทุกเครื่อง ───── */
+@font-face { font-family: 'THSarabunNew'; src: url('../../fonts/THSarabunNew.woff') format('woff'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'THSarabunNew'; src: url('../../fonts/THSarabunNew-Bold.woff') format('woff'); font-weight: 700; font-style: normal; font-display: swap; }
+.print-doc, .print-doc *, .memo-doc, .memo-doc * { font-family: 'THSarabunNew', 'TH SarabunPSK', 'Sarabun', sans-serif !important; }
+.print-doc b, .print-doc strong, .print-doc th, .print-doc h1, .print-doc h2, .print-doc h3 { font-weight: 700 !important; }
+.print-doc { font-size: 15pt; line-height: 1.25; }
+.print-doc .pd-tbl { font-size: 14pt; }
+.print-doc .pd-tbl small, .print-doc .rp-list small { font-size: 12pt; line-height: 1.15; }
+.print-doc .pd-head b { font-size: 18pt; } .print-doc .pd-head span { font-size: 13pt; }
+.print-doc .pd-title { font-size: 22pt; } .print-doc h2 { font-size: 16pt; margin: 10px 0 4px; }
+.print-doc .pd-foot { font-size: 11pt; }
+.print-doc .pd-cover h1 { font-size: 28pt; } .print-doc .pd-divider h1 { font-size: 32pt; }
+/* รายงาน (หน้าปก) — กระชับ ลายเซ็นอยู่หน้าเดียวกัน */
+.print-doc .rp-cover { padding-top: 0; }
+.print-doc .rp-logo { width: 17mm; }
+.print-doc .rp-school { font-size: 20pt; margin-top: 4px; line-height: 1.1; }
+.print-doc .rp-unit { font-size: 14pt; margin: 0; }
+.print-doc .rp-title { font-size: 26pt; margin: 10px 0 0; line-height: 1.1; }
+.print-doc .rp-sub { font-size: 15pt; } .print-doc .rp-range { font-size: 14pt; margin: 0; }
+.print-doc .rp-body { margin-top: 12px; gap: 10px; }
+.print-doc .rp-grid { gap: 12px; }
+.print-doc .rp-t th, .print-doc .rp-t td { padding: 1px 7px; font-size: 13.5pt; line-height: 1.15; }
+.print-doc .rp-t small { display: inline; font-size: 12pt; color: #555; }
+.print-doc .rp-sign { margin-top: 16px; width: max-content; min-width: 70mm; font-size: 15pt; } .print-doc .rp-sign p { white-space: nowrap; } .print-doc .rp-dots { width: 40mm; }
+.print-doc .rp-sign p { margin: 0 0 2px; }
+.print-doc .rp-sign p:first-child { margin-bottom: 8px; }
+.print-doc .rp-head { margin-bottom: 8px; padding-bottom: 6px; gap: 10px; }
+.print-doc .rp-head img { width: 12mm; }
+.print-doc .rp-head b { font-size: 18pt; line-height: 1.1; } .print-doc .rp-head span { font-size: 13pt; line-height: 1.2; }
+.print-doc .rp-list th, .print-doc .rp-list td { padding: 2px 6px; font-size: 14pt; line-height: 1.2; }
+.print-doc .rp-grp td { font-size: 14pt; padding: 2px 6px; }
+.print-doc .rp-st { font-size: 12pt; padding: 0 6px; }
+.print-doc .rp-page h2 { margin-top: 10px; }
+/* บันทึกข้อความ: ขนาดตามหนังสือราชการ (ฟอนต์ TH Sarabun 16 pt · หัวข้อ 20 pt · คำว่าบันทึกข้อความ 29 pt) */
+.memo-doc { font-size: 15pt; line-height: 1.32; }
+.memo-doc h1, .memo-doc .mm-lh-t { font-size: 27pt; line-height: 1; }
+.memo-doc .mm-line b { font-size: 18pt; line-height: 1.2; }
+.memo-doc .mm-line span { line-height: 1.2; }
+.memo-doc .mm-box { font-size: 13.5pt; line-height: 1.3; }
+.memo-doc .mm-box h3 { font-size: 14.5pt; } .memo-doc .mm-top { height: 15mm; } .memo-doc .mm-krut { height: 14mm; } .memo-doc .mm-sig p:first-child, .memo-doc .mm-sig.has-img > p:first-child { margin-top: 4px; } .memo-doc .mm-sp { height: 9mm; } .memo-doc .mm-ks { min-height: 2.6em; } .memo-doc .mm-gap { min-height: 1.3em; }
+.memo-doc .mm-note { font-size: 14pt; }
+/* สถิติบนมือถือ/แท็บเล็ต: การ์ดไม่ล้นจอ */
+.lt1060 .split { grid-template-columns: minmax(0, 1fr); }
+.split > *, .grid > *, .kpis > * { min-width: 0; }
+.chart-box { min-width: 0; max-width: 100%; }
+.chart-box canvas { max-width: 100% !important; }
+/* นำทาง Google Maps (คนขับ) */
+.gm-dest { display: flex; align-items: center; gap: 8px; margin: 4px 0; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+.gm-dest > .i:first-child { color: #e2552b; flex: none; } .gm-dest > .i:last-child { color: var(--muted); width: 16px; height: 16px; margin-left: auto; flex: none; }
+.gm-dest span { display: grid; min-width: 0; } .gm-dest b { font-weight: 600; } .gm-dest small { color: var(--muted); font-size: .78rem; }
+.gm-nav { margin-top: 8px; width: 100%; justify-content: center; }
+.dh-nav { margin-top: 8px; }
+/* เลือกสถานที่: กรอกเอง */
+.pk-ll { display: flex; gap: 8px; } .pk-ll input { flex: 1; min-width: 0; } .pk-ll .btn { white-space: nowrap; flex: none; }
+.pk-how { margin-top: 12px; padding: 10px 14px; border-radius: 14px; background: #fdfaf3; border: 1px solid var(--line); font-size: .88rem; }
+.pk-how summary { cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-weight: 600; color: var(--navy); }
+.pk-how ol { margin: 8px 0 0; padding-left: 1.3em; line-height: 1.7; color: var(--ink-2); }
+.lt640 .pk-ll { flex-direction: column; }
+
+.lt420 .pk-plate { font-size: .47rem; padding: 0 2px; letter-spacing: -.02em; max-width: calc(100% + 2px); }

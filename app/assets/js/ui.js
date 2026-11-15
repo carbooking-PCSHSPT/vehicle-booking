@@ -331,7 +331,14 @@ const UI = (() => {
     });
     area.style.cssText = '';
   }
-  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true, fitWidth = '', footLeft = '' } = {}) {
+  // บันทึกข้อความยาวเกินหน้า → ย่อทั้งฉบับให้พอดี A4 หน้าเดียว (ไม่ให้ลายเซ็นตกไปหน้าถัดไป)
+  async function fitPages(area, width, maxMm) {
+    if (!maxMm || !width) return;
+    area.style.cssText = `display:block;position:fixed;left:-10000px;top:0;width:${width};visibility:hidden`;
+    $$('.memo-doc, .rp-cover', area).forEach(d => { d.style.zoom = ''; const h = d.getBoundingClientRect().height / 3.7795; if (h > maxMm) d.style.zoom = (maxMm / h).toFixed(3); });
+    area.style.cssText = '';
+  }
+  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true, fitWidth = '', footLeft = '', fitPage = 0 } = {}) {
     if (inApp()) {
       await modal({ title: 'เปิดในเบราว์เซอร์ก่อนพิมพ์', body: `<p>แอปนี้ (เช่น LINE) สั่งพิมพ์หรือบันทึก PDF ไม่ได้</p><p style="margin-top:8px">กดเมนู <b>⋮</b> หรือ <b>แชร์</b> มุมจอ แล้วเลือก <b>“เปิดใน Chrome / Safari”</b> จากนั้นกดพิมพ์อีกครั้ง</p>`, actions: [{ label: 'เข้าใจแล้ว', kind: 'btn-primary' }] });
       return;
@@ -352,6 +359,7 @@ const UI = (() => {
     }
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
     await fitLines(area, fitWidth);
+    await fitPages(area, fitWidth, fitPage);
     const oldTitle = document.title, root = document.documentElement;
     const done = () => { root.classList.remove('printing'); document.title = oldTitle; area.remove(); st.remove(); window.removeEventListener('afterprint', done); };
     root.classList.add('printing'); document.title = title.replace(/[\\/:*?"<>|]/g, '-');

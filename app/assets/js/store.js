@@ -1150,6 +1150,8 @@ const Store = (() => {
           r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         }
         else if (status === 'returned') {
+          // ต้องกด "ออกเดินทาง" ก่อนเสมอ (ยกเว้นแอดมินบันทึกแทนพร้อมเหตุผล)
+          if (a.status !== 'ontrip' && !ov) throw new Error(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้');
           if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
           a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }

@@ -8,6 +8,20 @@
   const S = Store;
   const DAY = 864e5;
   const daysTo = d => Math.ceil((new Date(d) - new Date().setHours(0, 0, 0, 0)) / DAY);
+  // ── เช็คระยะตามเลขไมล์: เลขไมล์ล่าสุด (จากงานที่คนขับบันทึก) เทียบรอบถัดไปในแผนบำรุงรักษา ──
+  const SVC_SOON_KM = 1000, SVC_SOON_DAYS = 30;
+  function svcStatus(vId, p) {
+    const odo = Pages._lastOdo ? Pages._lastOdo(vId) : null;
+    return ((p && p.maintenancePlan) || []).map(m => {
+      const every = +m.everyKm || 0, hasLast = m.lastKm !== '' && m.lastKm != null && !isNaN(+m.lastKm);
+      const nextKm = every && hasLast ? +m.lastKm + every : null, left = nextKm != null && odo != null ? nextKm - odo : null;
+      let days = null; if (+m.everyMonths && m.lastDate) { const due = new Date(m.lastDate); due.setMonth(due.getMonth() + +m.everyMonths); days = daysTo(due); }
+      const over = (left != null && left <= 0) || (days != null && days < 0);
+      const soon = !over && ((left != null && left <= SVC_SOON_KM) || (days != null && days <= SVC_SOON_DAYS));
+      const parts = [left != null ? (left <= 0 ? `เลยระยะมาแล้ว ${fmt.num(-left)} กม.` : `อีก ${fmt.num(left)} กม.`) : '', days != null ? (days < 0 ? `เลยกำหนด ${-days} วัน` : `อีก ${days} วัน`) : ''].filter(Boolean);
+      return { m, odo, nextKm, left, days, over, soon, text: parts.join(' · ') || (every && !hasLast ? 'ยังไม่ระบุเลขไมล์ครั้งล่าสุด' : '') };
+    });
+  }
 
   // ───────── โครงหลังบ้าน ─────────
   Pages._adminShell = (path, html) => {
@@ -50,6 +64,7 @@
       const v = S.vehicle(p.id); if (!v) return;
       [['actExpiry', 'พ.ร.บ.'], ['taxExpiry', 'ภาษีรถ']].forEach(([k, l]) => { if (p[k]) { const d = daysTo(p[k]); if (d <= 30) alerts.push({ red: d <= 7, ic: 'shield', t: `${v.name} · ${l} ${d < 0 ? `หมดอายุแล้ว ${-d} วัน` : `จะหมดอายุในอีก ${d} วัน`} (${fmt.date(p[k])})`, h: `#/admin/vehicles/${v.id}?tab=private` }); } });
       if (p.insurance && p.insurance.expiry) { const d = daysTo(p.insurance.expiry); if (d <= 30) alerts.push({ red: d <= 7, ic: 'shield', t: `${v.name} · ประกันภัย ${d < 0 ? 'หมดอายุแล้ว' : `จะหมดอายุในอีก ${d} วัน`} (${fmt.date(p.insurance.expiry)})`, h: `#/admin/vehicles/${v.id}?tab=private` }); }
+      svcStatus(v.id, p).filter(x => x.over || x.soon).forEach(x => alerts.push({ red: x.over, ic: 'wrench', t: `${v.name} · ${x.over ? 'ถึงกำหนด' : 'ใกล้ถึง'}${x.m.item || 'เช็คระยะ'} — ${x.text}${x.odo != null ? ` (ไมล์ล่าสุด ${fmt.num(x.odo)})` : ''}`, h: `#/admin/vehicles/${v.id}?tab=private` }));
     });
     S.db.drivers.forEach(d => { if (d.licenseExpiry && daysTo(d.licenseExpiry) <= 30) alerts.push({ red: daysTo(d.licenseExpiry) <= 7, ic: 'user', t: `ใบขับขี่ ${d.name} ${daysTo(d.licenseExpiry) < 0 ? 'หมดอายุแล้ว' : `จะหมดอายุในอีก ${daysTo(d.licenseExpiry)} วัน`}`, h: '#/admin/drivers' }); });
     // กลับถึงแล้ว (ปิดงานอัตโนมัติ) แต่ยังไม่มีค่าน้ำมัน/ค่าใช้จ่าย ภายใน 3 วัน → เตือนให้บันทึก
@@ -595,13 +610,13 @@
   // ═════════ ข้อมูลรถ ═════════
   Pages.adminVehicles = () => {
     const vs = S.db.vehicles.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-    const exp = p => { if (!p) return ''; const xs = [['พ.ร.บ.', p.actExpiry], ['ภาษี', p.taxExpiry], ['ประกัน', p.insurance && p.insurance.expiry]].filter(x => x[1]).map(([l, d]) => { const n = daysTo(d); return n <= 30 ? `<span class="tag ${n <= 7 ? 'red' : ''}">${l} ${n < 0 ? 'หมดแล้ว' : n + ' วัน'}</span>` : ''; }).join(''); return xs; };
+    const exp = (p, vId) => { if (!p) return ''; const xs = [['พ.ร.บ.', p.actExpiry], ['ภาษี', p.taxExpiry], ['ประกัน', p.insurance && p.insurance.expiry]].filter(x => x[1]).map(([l, d]) => { const n = daysTo(d); return n <= 30 ? `<span class="tag ${n <= 7 ? 'red' : ''}">${l} ${n < 0 ? 'หมดแล้ว' : n + ' วัน'}</span>` : ''; }).join(''); return xs + svcStatus(vId, p).filter(x => x.over || x.soon).map(x => `<span class="tag ${x.over ? 'red' : ''}">${icon('wrench')} ${esc(x.m.item || 'เช็คระยะ')} ${x.left != null ? (x.left <= 0 ? 'เลยระยะ' : `อีก ${fmt.num(x.left)} กม.`) : x.days < 0 ? 'เลยกำหนด' : `อีก ${x.days} วัน`}</span>`).join(''); };
     return {
       layout: 'admin',
       html: `${head('ข้อมูลหลัก', 'ข้อมูลรถ', 'แก้ไขข้อมูลที่เผยแพร่ให้ครูดู และข้อมูลเชิงลึก (พ.ร.บ. ประกัน ประวัติซ่อม) ที่ไม่เผยแพร่', `<a class="btn btn-primary btn-sm" href="#/admin/vehicles/new">${icon('plus')} เพิ่มรถ</a>`)}
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>รหัส</th><th>รถ</th><th>ที่นั่ง</th><th>คนขับที่รับผิดชอบ</th><th>สถานะตอนนี้</th><th>เอกสารใกล้หมดอายุ</th><th>ซ่อม (ครั้ง)</th></tr></thead>
-          <tbody>${vs.map(v => { const p = S.db.vprivate[v.id]; return `<tr class="click" data-href="#/admin/vehicles/${v.id}"><td><b>${v.no || '-'}</b></td><td><b>${icon(kindIcon(v.kind))} ${esc(v.name)}</b><small>${esc(v.plate)} · ${esc(v.brand || '')} ${esc(v.model || '')}</small></td><td>${v.seats}</td><td>${esc(C.dName(v.driverId))}<small>${esc(C.dPhone(v.driverId))}</small></td><td>${pill(S.vehicleState(v))}</td><td>${exp(p) || '<small>—</small>'}</td><td>${p ? (p.repairs || []).length : 0}</td></tr>`; }).join('')}</tbody>
+          <thead><tr><th>รหัส</th><th>รถ</th><th>ที่นั่ง</th><th>คนขับที่รับผิดชอบ</th><th>สถานะตอนนี้</th><th>ไมล์ล่าสุด</th><th>เอกสาร / เช็คระยะ</th><th>ซ่อม (ครั้ง)</th></tr></thead>
+          <tbody>${vs.map(v => { const p = S.db.vprivate[v.id], odo = Pages._lastOdo ? Pages._lastOdo(v.id) : null; return `<tr class="click" data-href="#/admin/vehicles/${v.id}"><td><b>${v.no || '-'}</b></td><td><b>${icon(kindIcon(v.kind))} ${esc(v.name)}</b><small>${esc(v.plate)} · ${esc(v.brand || '')} ${esc(v.model || '')}</small></td><td>${v.seats}</td><td>${esc(C.dName(v.driverId))}<small>${esc(C.dPhone(v.driverId))}</small></td><td>${pill(S.vehicleState(v))}</td><td class="nw">${odo != null ? fmt.num(odo) : '<small>—</small>'}</td><td>${exp(p, v.id) || '<small>—</small>'}</td><td>${p ? (p.repairs || []).length : 0}</td></tr>`; }).join('')}</tbody>
         </table></div></div>`,
       mount(root) { root.addEventListener('click', e => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; }); }
     };
@@ -664,8 +679,9 @@
         <div class="form-section"><h3>${icon('wrench')} ประวัติการซ่อม <span class="pill tone-done" style="margin-left:auto">${p.repairs.length} ครั้ง · ${fmt.money(p.repairs.reduce((s, x) => s + (+x.cost || 0), 0))} บาท</span></h3>
           <div class="stack" id="repList">${p.repairs.slice().sort((a, b) => b.date.localeCompare(a.date)).map(rp => `<div class="exp-row"><span class="ei">${icon('wrench')}</span><div><b>${esc(rp.item)}</b><small>${fmt.date(rp.date)} · ${esc(rp.garage || '')}${rp.mileage ? ` · ไมล์ ${fmt.num(rp.mileage)}` : ''}${rp.note ? ' · ' + esc(rp.note) : ''}</small>${(rp.photos || []).length ? `<div class="thumbs" style="margin-top:6px">${rp.photos.map(x => UI.thumb(x, 'sm')).join('')}</div>` : ''}</div><span class="money">${fmt.money(rp.cost)} ฿</span><div class="row" style="gap:4px"><button type="button" class="icon-btn sm" data-erp="${rp.id}">${icon('edit')}</button><button type="button" class="icon-btn sm" data-drp="${rp.id}">${icon('trash')}</button></div></div>`).join('') || UI.empty('ยังไม่มีประวัติการซ่อม', 'wrench')}</div>
           <button type="button" class="btn btn-ghost btn-sm" id="addRep" style="margin-top:12px">${icon('plus')} เพิ่มรายการซ่อม</button></div>
-        <div class="form-section"><h3>${icon('calendar')} แผนบำรุงรักษาตามระยะ</h3>
-          <div class="stack" id="mpList">${p.maintenancePlan.map(m => `<div class="exp-row"><span class="ei">${icon('refresh')}</span><div><b>${esc(m.item)}</b><small>ทุก ${m.everyKm ? fmt.num(m.everyKm) + ' กม.' : ''}${m.everyKm && m.everyMonths ? ' หรือ ' : ''}${m.everyMonths ? m.everyMonths + ' เดือน' : ''} · ครั้งล่าสุด ${m.lastDate ? fmt.date(m.lastDate) : '-'}${m.lastKm ? ` (${fmt.num(m.lastKm)} กม.)` : ''}</small></div><span>${m.lastDate && m.everyMonths ? (() => { const due = new Date(m.lastDate); due.setMonth(due.getMonth() + +m.everyMonths); const d = daysTo(due); return `<span class="pill tone-${d < 0 ? 'bad' : d < 30 ? 'warn' : 'ok'}">${d < 0 ? 'เลยกำหนด' : `อีก ${d} วัน`}</span>`; })() : ''}</span><div class="row" style="gap:4px"><button type="button" class="icon-btn sm" data-emp="${m.id}">${icon('edit')}</button><button type="button" class="icon-btn sm" data-dmp="${m.id}">${icon('trash')}</button></div></div>`).join('') || UI.empty('ยังไม่มีแผนบำรุงรักษา', 'calendar')}</div>
+        <div class="form-section"><h3>${icon('calendar')} เช็คระยะ / แผนบำรุงรักษาตามเลขไมล์ <span class="hint" style="margin-left:auto;font-weight:400">ไมล์ล่าสุด ${(() => { const o = Pages._lastOdo ? Pages._lastOdo(v.id) : null; return o != null ? `<b>${fmt.num(o)}</b> กม. (จากงานล่าสุดที่คนขับบันทึก)` : 'ยังไม่มีข้อมูล'; })()}</span></h3>
+          <div class="stack" id="mpList">${svcStatus(v.id, p).map(x => { const m = x.m; return `<div class="exp-row"><span class="ei">${icon('refresh')}</span><div><b>${esc(m.item)}</b><small>ทุก ${m.everyKm ? fmt.num(m.everyKm) + ' กม.' : ''}${m.everyKm && m.everyMonths ? ' หรือ ' : ''}${m.everyMonths ? m.everyMonths + ' เดือน' : ''} · ครั้งล่าสุด ${m.lastDate ? fmt.date(m.lastDate) : '-'}${m.lastKm ? ` (${fmt.num(m.lastKm)} กม.)` : ''}${x.nextKm != null ? ` · ครั้งถัดไปที่ ${fmt.num(x.nextKm)} กม.` : ''}</small></div><span>${x.text ? `<span class="pill tone-${x.over ? 'bad' : x.soon ? 'warn' : 'ok'}">${esc(x.text)}</span>` : ''}</span><div class="row" style="gap:4px"><button type="button" class="btn btn-ghost btn-xs" data-dnmp="${m.id}" title="บันทึกว่าทำแล้ว (เริ่มนับรอบใหม่ + เพิ่มในประวัติการซ่อม)">${icon('check')} ทำแล้ว</button><button type="button" class="icon-btn sm" data-emp="${m.id}">${icon('edit')}</button><button type="button" class="icon-btn sm" data-dmp="${m.id}">${icon('trash')}</button></div></div>`; }).join('') || `<div class="empty" style="padding:16px">${icon('calendar')}<p>ยังไม่มีแผนเช็คระยะ</p><button type="button" class="btn btn-primary btn-sm" id="stdMp">${icon('plus')} ใช้แผนมาตรฐาน (เช็คระยะทุก 10,000 กม. หรือ 6 เดือน)</button></div>`}</div>
+          <p class="hint" style="margin-top:8px">${icon('info')} ระบบเตือนในหน้าภาพรวมเมื่อเหลือไม่ถึง ${fmt.num(SVC_SOON_KM)} กม. หรือ ${SVC_SOON_DAYS} วัน · เลขไมล์มาจากตอนคนขับกดออกเดินทาง/กลับถึง</p>
           <button type="button" class="btn btn-ghost btn-sm" id="addMp" style="margin-top:12px">${icon('plus')} เพิ่มรายการบำรุงรักษา</button></div>
         <div class="form-section"><h3>${icon('alert')} อุบัติเหตุ / เคลมประกัน</h3>
           <div class="stack">${p.accidents.map(a => `<div class="exp-row"><span class="ei">${icon('alert')}</span><div><b>${esc(a.detail)}</b><small>${fmt.date(a.date)}${a.claimNo ? ' · เลขเคลม ' + esc(a.claimNo) : ''}</small></div><span class="money">${a.cost ? fmt.money(a.cost) + ' ฿' : ''}</span><button type="button" class="icon-btn sm" data-dac="${a.id}">${icon('trash')}</button></div>`).join('') || '<p class="hint">ไม่มีประวัติอุบัติเหตุ</p>'}</div>
@@ -711,6 +727,16 @@
             if (e.target.closest('#addRep')) return run(async () => { const x = await subModal(`${icon('wrench')} เพิ่มรายการซ่อม`, RF, { id: 'rp' + Date.now(), date: fmt.localDate(new Date()), photos: [] }, true); if (x && x.item) { x.cost = +x.cost || 0; x.mileage = +x.mileage || null; p.repairs.push(x); return true; } });
             const er = e.target.closest('[data-erp]'); if (er) return run(async () => { const i = p.repairs.findIndex(x => x.id === er.dataset.erp); const x = await subModal(`${icon('wrench')} แก้ไขรายการซ่อม`, RF, p.repairs[i], true); if (x) { x.cost = +x.cost || 0; p.repairs[i] = x; return true; } });
             const dr = e.target.closest('[data-drp]'); if (dr) return run(async () => { if (await UI.confirm('ลบรายการซ่อมนี้?', { danger: true, ok: 'ลบ' })) { p.repairs = p.repairs.filter(x => x.id !== dr.dataset.drp); return true; } });
+            const odoNow = () => (Pages._lastOdo ? Pages._lastOdo(v.id) : null);
+            if (e.target.closest('#stdMp')) return run(async () => { p.maintenancePlan.push({ id: 'mp' + Date.now(), item: 'เช็คระยะ (เปลี่ยนน้ำมันเครื่อง/ไส้กรอง ตรวจสภาพ)', everyKm: 10000, everyMonths: 6, lastDate: fmt.localDate(new Date()), lastKm: odoNow() ?? '' }); return true; });
+            const dn = e.target.closest('[data-dnmp]'); if (dn) return run(async () => {
+              const i = p.maintenancePlan.findIndex(x => x.id === dn.dataset.dnmp), m = p.maintenancePlan[i];
+              const x = await subModal(`${icon('check')} บันทึกว่า "${esc(m.item)}" ทำแล้ว`, [['date', 'วันที่ทำ', 'date'], ['mileage', 'เลขไมล์ตอนทำ', 'number'], ['garage', 'อู่/ศูนย์บริการ'], ['cost', 'ค่าใช้จ่าย (บาท)', 'number'], ['note', 'หมายเหตุ', 'textarea']], { id: 'rp' + Date.now(), date: fmt.localDate(new Date()), mileage: odoNow() ?? '', photos: [] }, true);
+              if (!x) return false;
+              p.maintenancePlan[i] = { ...m, lastDate: x.date, lastKm: x.mileage === '' ? m.lastKm : +x.mileage };
+              p.repairs.push({ ...x, item: m.item, cost: +x.cost || 0, mileage: +x.mileage || null });
+              return true;
+            });
             if (e.target.closest('#addMp')) return run(async () => { const x = await subModal(`${icon('calendar')} เพิ่มแผนบำรุงรักษา`, MF, { id: 'mp' + Date.now() }); if (x && x.item) { p.maintenancePlan.push(x); return true; } });
             const em = e.target.closest('[data-emp]'); if (em) return run(async () => { const i = p.maintenancePlan.findIndex(x => x.id === em.dataset.emp); const x = await subModal('แก้ไขแผนบำรุงรักษา', MF, p.maintenancePlan[i]); if (x) { p.maintenancePlan[i] = x; return true; } });
             const dm = e.target.closest('[data-dmp]'); if (dm) return run(async () => { p.maintenancePlan = p.maintenancePlan.filter(x => x.id !== dm.dataset.dmp); return true; });
@@ -1132,7 +1158,7 @@
             <h2>รายเดือน</h2>${T(['เดือน', 'เที่ยว', 'กม.', 'ค่าใช้จ่าย'], byMonth.map(x => [x.label, x.trips, fmt.num(x.km), fmt.money(x.cost)]))}
             <h2>แยกตามฝ่าย / กลุ่มสาระ</h2>${T(['ฝ่าย', 'ครั้ง', 'ผู้เดินทาง', 'กม.', 'ค่าใช้จ่าย'], byDept.map(x => [esc(x.k), x.n, fmt.num(x.pax), fmt.num(x.km), fmt.money(x.cost)]))}
             <h2>ปลายทางยอดนิยม</h2>${T(['สถานที่', 'จังหวัด', 'ครั้ง'], byDest.map(x => [esc(x.k), esc(x.prov), x.n]))}`);
-          UI.printDoc(html, { title: `รายงานสถิติการใช้รถ ${per.label}`, footLeft: `รายงานสถิติการใช้รถส่วนกลาง · ${per.label}` });
+          UI.printDoc(html, { title: `รายงานสถิติการใช้รถ ${per.label}`, fitWidth: '186mm', fitPage: 264, footLeft: `รายงานสถิติการใช้รถส่วนกลาง · ${per.label}` });
         });
         $('#xls', root).addEventListener('click', () => UI.exportSheets(`สถิติการใช้รถ-${per.label}`, [
           { name: 'สรุป', head: ['รายการ', 'ค่า'], rows: [['ช่วงเวลา', per.label], ['คำขอทั้งหมด', K.req], ['อนุมัติ', K.ok], ['ไม่อนุมัติ', K.rej], ['ยกเลิก', K.cancel], ['ระยะทางรวม (กม.)', K.km], ['ผู้เดินทาง', K.pax], ['ครู', K.tea], ['นักเรียน', K.stu], ['บุคคลอื่น', K.oth], ['ค่าน้ำมัน', K.fuel], ['ค่าใช้จ่ายอื่น', K.other], ['ค่าซ่อม', K.repair], ['น้ำมัน (ลิตร)', K.liters], ['คะแนนคนขับเฉลี่ย', +avgR(ratings).toFixed(2)]] },

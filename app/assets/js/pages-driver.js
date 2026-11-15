@@ -186,6 +186,7 @@
     const a = r.assignments[idx], v = S.vehicle(a.vehicleId) || {};
     const admin = S.isAdmin(S.me) && !!override, dep = status === 'ontrip';
     if (dep && !override && !departState(r).ok) return UI.toast(`ยังไม่ถึงเวลา — ${departState(r).msg} (ก่อนเวลาออก ${EARLY_MIN} นาที)`, 'error');
+    if (!dep && a.status !== 'ontrip' && !override) return UI.toast(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้', 'error');
     const early = !dep && earlyReturn(r);
     const def = dep ? (a.odoStart ?? lastOdo(a.vehicleId) ?? '') : (a.odoEnd ?? '');
     const res = await UI.modal({
@@ -237,7 +238,8 @@
           <div><small>จุดนัดขึ้นรถ</small>${esc(r.pickup || '-')}</div>
           <div><small>ผู้เดินทาง</small>${S.paxText(r)}</div>
           <div class="full"><small>ผู้ขอใช้รถ</small>${esc(r.requester.name)} · <a class="link" href="tel:${esc(r.contactPhone || r.requester.phone)}">${esc(r.contactPhone || r.requester.phone || '')}</a></div>
-          ${(r.destinations || []).length ? `<div class="full"><small>ปลายทาง</small>${r.destinations.map(d => `${esc(d.name)}${d.address ? ` <span class="muted">(${esc(d.address)})</span>` : ''}`).join('<br>')}${r.totalKm ? `<br><span class="muted">ระยะทางรวมประมาณ ${fmt.num(r.totalKm, 0)} กม.</span>` : ''}</div>` : ''}
+          ${(r.destinations || []).length ? `<div class="full"><small>ปลายทาง <span class="muted">· กดชื่อสถานที่เพื่อเปิด Google Maps</span></small>${r.destinations.map((d, k) => `<a class="gm-dest" href="${C.gmapPlace(d)}" target="_blank" rel="noopener">${icon('pin')}<span><b>${r.destinations.length > 1 ? `${k + 1}. ` : ''}${esc(d.name)}</b>${d.address || d.province ? `<small>${esc(d.address || d.province)}</small>` : ''}</span>${icon('arrowUR')}</a>`).join('')}${r.totalKm ? `<span class="muted">ระยะทางรวมประมาณ ${fmt.num(r.totalKm, 0)} กม. (ไป + กลับ)</span>` : ''}
+            <a class="btn btn-ghost btn-sm gm-nav" href="${C.gmapRoute(r.destinations)}" target="_blank" rel="noopener">${icon('navigation')} นำทางด้วย Google Maps${r.destinations.length > 1 ? ` (ทุกจุด ${r.destinations.length} แห่ง)` : ''}</a></div>` : ''}
           ${a.note ? `<div class="full" style="background:var(--gold-50)"><small>หมายเหตุจากแอดมิน</small>${esc(a.note)}</div>` : ''}
           ${S.tripTag(r) ? `<div class="full"><small>ลักษณะการเดินทาง</small>${S.tripTag(r).text}${S.tripType(r) === 'daily' ? ` · ออก ${fmt.time(r.startAt)} กลับ ${fmt.time(r.endAt)} น. ทุกวัน` : ''}${r.lodging ? ' · ที่พัก ' + esc(r.lodging) : ''}</div>` : ''}
           ${others.length ? `<div class="full"><small>รถคันอื่นในทริปเดียวกัน</small>${others.map(o => `${esc(C.vName(o.vehicleId))} · ${esc(C.dName(o.driverId))}`).join('<br>')}</div>` : ''}
@@ -362,6 +364,7 @@
         <a class="dh-next-main" href="${jobHref(next)}"><small>${onTrip ? '● กำลังเดินทางอยู่' : 'งานถัดไป · ' + (relDay(r.startAt) || dShort(r.startAt))}</small><h3>${esc(S.destName(r))}</h3>
           <div class="dh-chips"><span>${icon('clock')} ${fmt.time(r.startAt).replace(' น.', '')} – ${multi ? dShort(r.endAt) + ' ' : ''}${fmt.time(r.endAt)}</span>${multi ? `<span>${icon('calendar')} ${nDays(r)} วัน</span>` : ''}<span>${icon('van')} ${esc(C.vName(next.a.vehicleId))}</span></div></a>
         ${onTrip ? `<button class="btn btn-ok" data-go="returned" data-r="${r.id}" data-i="${next.i}">${icon('home')} กลับถึงโรงเรียนแล้ว</button>` : startSoon ? departBtn(r, next.i, 'btn btn-gold') : ''}
+        ${(onTrip || startSoon) && C.gmapRoute(r.destinations) ? `<a class="btn btn-ghost dh-nav" href="${C.gmapRoute(r.destinations)}" target="_blank" rel="noopener">${icon('navigation')} นำทาง Google Maps</a>` : ''}
       </div>`; })() : '';
     return `<div class="dh-grid">
       <div class="dh-side">

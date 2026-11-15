@@ -176,12 +176,19 @@ const C = (() => {
 
   // ลานจอดรถแบบมองจากด้านบน + ช่องสรุป (แบบ B)
   const PK = { free: '#10b981', booked: '#e0a526', maint: '#ef4444', off: '#9ca3af' };
+  // ป้ายทะเบียน: แยกเลขทะเบียน กับ จังหวัด (มือถือ/แท็บเล็ตแสดงเฉพาะเลข ให้พอดีช่องจอด)
+  function plateTag(plate) {
+    const p = String(plate || '').trim(); if (!p) return '';
+    const parts = p.split(/\s+/), last = parts[parts.length - 1];
+    const hasProv = parts.length > 1 && !/\d/.test(last) && !/ไม่มี/.test(p);
+    return `<span class="pk-plate${/ไม่มี/.test(p) ? ' none' : ''}"><span>${esc(hasProv ? parts.slice(0, -1).join(' ') : p)}</span>${hasProv ? `<span class="pp"> ${esc(last)}</span>` : ''}</span>`;
+  }
   function parkBoard(vehicles) {
     const f = vehicles.map(v => ({ v, s: S().vehicleState(v) }));
     const n = k => f.filter(x => x.s.key === k).length;
     const cols = Math.min(7, Math.ceil(f.length / 2)) || 1;
     return `<div class="pk">
-      <div class="pk-lot" style="--cols:${cols}">${f.map(({ v, s }, i) => `<a class="pk-bay ${i < cols ? 'top' : 'bot'}" href="#/vehicles/${v.id}" title="${esc(v.name)} · ${esc(s.label)} · ${esc(s.note)}">${s.key === 'ontrip' ? `<span class="pk-gone">${icon('route')}</span>` : `<span class="pk-car" style="--c:${PK[s.key] || PK.free}">${icon(s.key === 'maint' ? 'wrench' : kindIcon(v.kind))}</span>`}<span class="pk-nm">${esc(v.name)}</span>${v.plate ? `<span class="pk-plate">${esc(v.plate)}</span>` : ''}</a>`).join('')}</div>
+      <div class="pk-lot" style="--cols:${cols}">${f.map(({ v, s }, i) => `<a class="pk-bay ${i < cols ? 'top' : 'bot'}" href="#/vehicles/${v.id}" title="${esc(v.name)} · ${esc(s.label)} · ${esc(s.note)}">${s.key === 'ontrip' ? `<span class="pk-gone">${icon('route')}</span>` : `<span class="pk-car" style="--c:${PK[s.key] || PK.free}">${icon(s.key === 'maint' ? 'wrench' : kindIcon(v.kind))}</span>`}<span class="pk-nm">${esc(v.name)}</span>${plateTag(v.plate)}</a>`).join('')}</div>
       <div class="pk-leg">
         <div><span><i style="background:${PK.free}"></i><em class="lf">ว่าง</em><em class="ls">ว่าง</em></span><b class="num">${n('free')}</b></div>
         <div><span><i style="background:#f97316"></i><em class="lf">กำลังเดินทาง</em><em class="ls">เดินทาง</em></span><b class="num">${n('ontrip')}</b></div>
@@ -424,9 +431,17 @@ const C = (() => {
     };
   }
   const canMemo = r => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);
-  const MEMO_PAGE = { margin: '12mm 20mm 10mm 30mm', pageNo: false, fitWidth: '160mm' };   // ขอบตามหนังสือราชการ: ซ้าย 3 ซม. ขวา 2 ซม.
+  const MEMO_PAGE = { margin: '12mm 20mm 10mm 30mm', pageNo: false, fitWidth: '160mm', fitPage: 272 };   // ขอบตามหนังสือราชการ: ซ้าย 3 ซม. ขวา 2 ซม.
   // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
   const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);
+  // ── เปิดนำทางใน Google Maps (มือถือเปิดแอป Google Maps ให้เอง) — มีพิกัดใช้พิกัด ไม่มีใช้ชื่อ+ที่อยู่ค้นหา ──
+  const gq = d => d && d.lat != null && d.lng != null && d.lat !== '' ? `${(+d.lat).toFixed(6)},${(+d.lng).toFixed(6)}` : [d && d.name, d && d.address, d && d.province].filter(Boolean).join(' ');
+  const gmapPlace = d => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq(d))}`;
+  function gmapRoute(dests) {
+    const ds = (dests || []).filter(d => gq(d)); if (!ds.length) return '';
+    const last = ds[ds.length - 1], mid = ds.slice(0, -1);
+    return `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(gq(last))}${mid.length ? `&waypoints=${encodeURIComponent(mid.map(gq).join('|'))}` : ''}`;
+  }
   // ดาวน์โหลดบันทึกข้อความเป็นไฟล์ PDF (ไม่ผ่านหน้าพิมพ์)
   async function downloadMemo(r) { await S().loadSignatures(sigEmails([r])); return UI.savePdf(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
   async function printMemo(r) { await S().loadSignatures(sigEmails([r])); UI.printDoc(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
@@ -442,13 +457,13 @@ const C = (() => {
     if (!list.length) return;
     let sv = {}; try { sv = JSON.parse(localStorage.getItem(PDLG) || '{}'); } catch (e) { /* ค่าเริ่มต้น */ }
     const one = list.length === 1;
-    const def = one ? (sv.fmt === 'letter' ? 'letter' : 'memo') : (sv.fmt || 'report');
+    const def = one ? (sv.fmt === 'letter' ? 'letter' : 'memo') : (['memo', 'letter', 'report'].includes(sv.fmt) ? sv.fmt : 'report');
     const fmtOpt = (v, ic, t, d) => `<label class="pf-opt"><input type="radio" name="fmt" value="${v}" ${def === v ? 'checked' : ''}><span>${icon(ic)}<b>${t}</b><small>${d}</small></span></label>`;
     const opt = await UI.modal({
       title: `พิมพ์รวมเป็นไฟล์เดียว<small class="pf-sub">${list.length} รายการ${sub ? ' · ' + esc(sub) : ''}</small>`, size: 'lg',
       body: `<form id="pf" class="stack" style="gap:14px">
         <div class="label">รูปแบบเอกสาร</div>
-        <div class="pf-opts">${one ? '' : fmtOpt('report', 'chart', 'รายงานสรุป', 'หน้าปกสรุปตามสถานะ/หมวด/รถ + ผู้รายงาน แล้วตามด้วยรายการแยกหมวด')}${fmtOpt('memo', 'file', 'บันทึกข้อความ', 'มีตราครุฑ ตามแบบฟอร์มราชการ รายการละ 1 หน้า')}${fmtOpt('letter', 'printer', 'หัวกระดาษโรงเรียน', 'ไม่มีตราครุฑ ใช้ตราโรงเรียน รายการละ 1 หน้า')}${one ? '' : fmtOpt('table', 'clipboard', 'ตารางสรุป', 'หลายรายการต่อหน้า (แนวนอน)')}</div>
+        <div class="pf-opts">${one ? '' : fmtOpt('report', 'chart', 'รายงานสรุป', 'หน้าปกสรุปตามสถานะ/หมวด/รถ + ผู้รายงาน แล้วตามด้วยรายการแยกหมวด')}${fmtOpt('memo', 'file', 'บันทึกข้อความ', 'มีตราครุฑ ตามแบบฟอร์มราชการ รายการละ 1 หน้า')}${fmtOpt('letter', 'printer', 'หัวกระดาษโรงเรียน', 'ไม่มีตราครุฑ ใช้ตราโรงเรียน รายการละ 1 หน้า')}</div>
         ${one ? '' : `<label class="check pf-nr"><input type="checkbox" name="sec" ${sv.sec !== false ? 'checked' : ''}> แยกเป็นส่วนตามหมวดงาน พร้อมหน้าคั่น</label>
         <label class="check"><input type="checkbox" name="cover" ${sv.cover !== false ? 'checked' : ''}> มีหน้าปกสรุปจำนวนตามสถานะและหมวดงาน</label>`}
         <div class="field"><label>หัวข้อเอกสาร ${one ? '<span class="hint">(ใช้เป็นชื่อไฟล์ PDF)</span>' : ''}</label><input class="input" name="title" value="${esc(sv.title || title)}"></div>
@@ -461,7 +476,7 @@ const C = (() => {
     const rs = list.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
     if (opt.fmt === 'report') {
       const range = `${thDate(rs[0].startAt)} – ${thDate(rs[rs.length - 1].startAt)}`;
-      return UI.printDoc(requestReport(rs, docTitle, sub, range), { title: `${docTitle} ${rs.length} รายการ`, footLeft: `${docTitle}${sub ? ' · ' + sub : ''} · ${rs.length} รายการ` });
+      return UI.printDoc(requestReport(rs, docTitle, sub, range), { title: `${docTitle} ${rs.length} รายการ`, fitWidth: '186mm', fitPage: 264, footLeft: `${docTitle}${sub ? ' · ' + sub : ''} · ${rs.length} รายการ` });
     }
     const memoOk = opt.fmt !== 'table';
     const items = memoOk ? rs.filter(r => !['rejected', 'cancelled'].includes(r.status)) : rs;
@@ -585,7 +600,7 @@ const C = (() => {
     </div>`;
   }
 
-  return { thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
+  return { gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {
