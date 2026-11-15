@@ -170,13 +170,19 @@ const UI = (() => {
       }));
     });
   }
+  // มือถือ (โดยเฉพาะ iPhone/Safari) บล็อกหน้าต่างใหม่ที่เปิดหลังรอโหลด → เปิดแท็บว่างทันทีตอนกด แล้วค่อยใส่ลิงก์
   async function openFile(ref) {
+    let w = null;
+    try { w = window.open('', '_blank'); if (w) w.document.write('<title>กำลังเปิดไฟล์…</title><p style="font:16px sans-serif;padding:24px;color:#555">กำลังเปิดไฟล์…</p>'); } catch (e) { w = null; }
     try {
-      const u = await Store.fileUrl(ref);
-      if (/^data:/.test(u)) { const b = await (await fetch(u)).blob(); window.open(URL.createObjectURL(b), '_blank'); }
-      else window.open(u, '_blank');
-    } catch (e) { toast('เปิดไฟล์ไม่สำเร็จ: ' + e.message, 'error'); }
+      let u = await Store.fileUrl(ref);
+      if (/^data:/.test(u)) { const b = await (await fetch(u)).blob(); u = URL.createObjectURL(b); }
+      if (w && !w.closed) w.location.href = u;
+      else if (!window.open(u, '_blank')) location.href = u;   // เปิดแท็บไม่ได้ (เช่น แอป LINE) → เปิดในหน้าเดิม
+    } catch (e) { if (w && !w.closed) w.close(); toast('เปิดไฟล์ไม่สำเร็จ: ' + e.message, 'error'); }
   }
+  // เบราว์เซอร์ในแอป (LINE / Facebook / Messenger / Instagram) สั่งพิมพ์ไม่ได้
+  const inApp = () => /\bLine\/|FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(navigator.userAgent || '');
   // แสดงรูปย่อ (รองรับ PDF)
   const thumb = (ref, cls = '') => isPdf(ref) || /^drive:/.test(ref) && /pdf/i.test(ref)
     ? `<button type="button" class="thumb pdf ${cls}" data-view="${esc(ref)}">${icon('file')}<span>PDF</span></button>`
@@ -325,6 +331,10 @@ const UI = (() => {
     area.style.cssText = '';
   }
   async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true, fitWidth = '' } = {}) {
+    if (inApp()) {
+      await modal({ title: 'เปิดในเบราว์เซอร์ก่อนพิมพ์', body: `<p>แอปนี้ (เช่น LINE) สั่งพิมพ์หรือบันทึก PDF ไม่ได้</p><p style="margin-top:8px">กดเมนู <b>⋮</b> หรือ <b>แชร์</b> มุมจอ แล้วเลือก <b>“เปิดใน Chrome / Safari”</b> จากนั้นกดพิมพ์อีกครั้ง</p>`, actions: [{ label: 'เข้าใจแล้ว', kind: 'btn-primary' }] });
+      return;
+    }
     $('#printArea')?.remove(); $('#printPage')?.remove();
     const area = document.createElement('div'); area.id = 'printArea'; area.className = 'print-doc'; area.innerHTML = html;
     const st = document.createElement('style'); st.id = 'printPage'; st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'};${margin ? ` margin: ${margin};` : ''}${pageNo ? '' : ' @bottom-right { content: none; }'} }`;

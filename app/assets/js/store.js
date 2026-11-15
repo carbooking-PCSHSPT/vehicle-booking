@@ -89,7 +89,7 @@ const Store = (() => {
       // หมวดงาน (แอดมินแก้ไขได้) — เก็บรหัสหมวดในคำขอ เปลี่ยนชื่อภายหลังสถิติยังถูกต้อง
       categories: DEFAULT_CATS.map((c, i) => ({ ...c, active: true, order: i })),
       contactNote: 'ติดต่อสอบถามเรื่องการขอใช้รถส่วนกลาง ในวันและเวลาราชการ',
-      contactPhone: '', contactLine: '', contactRoom: '',
+      contactName: '', contactPhone: '', contactEmail: '', contactLine: '', contactRoom: '',
       committee: [
         { id: 'c1', level: 1, position: 'รองผู้อำนวยการ ฝ่ายบริหารงานทั่วไป', name: '', phone: '', email: '', photo: '' },
         { id: 'c2', level: 2, position: 'หัวหน้าฝ่ายบริหารงานทั่วไป', name: '', phone: '', email: '', photo: '' },

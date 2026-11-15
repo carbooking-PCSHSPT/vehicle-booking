@@ -510,7 +510,10 @@ const C = (() => {
           <p class="mm-ind">เห็นควรอนุญาต</p>
           ${sig('', E.head ? E.head.name : M.headName, M.headPos, headSig)}${dateLine(headSig)}</div>
         <div class="mm-box"><h3>ความเห็น / คำสั่ง</h3>
-          <p class="mm-chk"><span class="cb ${E.deputy && E.deputy.decision !== 'deny' ? 'on' : ''}"></span> อนุญาต &nbsp;&nbsp;&nbsp; <span class="cb ${E.deputy && E.deputy.decision === 'deny' ? 'on' : ''}"></span> ไม่อนุญาต</p>
+          ${(() => { const deny = E.deputy && E.deputy.decision === 'deny';
+            // อนุมัติในระบบแล้ว (อนุมัติ / กำลังเดินทาง / กลับแล้ว / ปิดงาน) → ติ๊ก "อนุญาต" ให้เลย
+            const ok = !deny && ((E.deputy && E.deputy.decision !== 'deny') || ['approved', 'ontrip', 'returned', 'closed'].includes(r.status));
+            return `<p class="mm-chk"><span class="cb ${ok ? 'on' : ''}"></span> อนุญาต &nbsp;&nbsp;&nbsp; <span class="cb ${deny ? 'on' : ''}"></span> ไม่อนุญาต</p>`; })()}
           ${E.deputy && E.deputy.note ? `<p class="mm-fill">${esc(E.deputy.note)}</p>` : `<p>${dots(70)}</p><p>${dots(70)}</p>`}
           ${sig('', E.deputy ? E.deputy.name : M.depName, M.depPos, depSig)}${dateLine(depSig)}</div>
       </div>

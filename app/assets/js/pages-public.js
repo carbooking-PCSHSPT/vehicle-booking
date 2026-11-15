@@ -845,15 +845,16 @@
             <b>${esc(c.name) || '(รอข้อมูล)'}</b><div class="pos">${esc(c.position)}</div>
             <div class="ct">${c.phone ? `<a href="tel:${esc(c.phone)}">${icon('phone')} ${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${icon('mail')} ${esc(c.email)}</a>` : ''}</div>
           </div>`).join('')}</div>`).join('')}</div>
-        <h3 style="margin:44px 0 16px;color:var(--navy)">${icon('phone')} ช่องทางติดต่อ</h3>
-        <div class="grid cols-3">
-          <div class="card"><div class="card-head"><h3>${icon('phone')} โทรศัพท์</h3></div><p>${s.contactPhone ? `<a class="link" href="tel:${esc(s.contactPhone)}">${esc(s.contactPhone)}</a>` : '<span class="hint">(รอข้อมูล)</span>'}</p></div>
-          <div class="card"><div class="card-head"><h3>${icon('mail')} LINE / ช่องทางอื่น</h3></div><p>${esc(s.contactLine) || '<span class="hint">(รอข้อมูล)</span>'}</p></div>
-          <div class="card"><div class="card-head"><h3>${icon('pin')} ห้องทำงาน</h3></div><p>${esc(s.contactRoom) || '<span class="hint">(รอข้อมูล)</span>'}</p></div>
+        <h3 class="ct-h">${icon('wheel')} พนักงานขับรถ</h3>
+        ${inn() ? `<div class="veh-grid drv-grid">${S.db.drivers.filter(d => d.active !== false).map(d => `<div class="person" style="width:auto"><div class="ph">${d.photo ? UI.img(d.photo, d.name) : icon('user')}</div><b>${esc(d.name)}</b><div class="pos">พนักงานขับรถ · ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '-'}</div><div class="ct">${d.phone ? `<a href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>`).join('')}</div>` : `<div class="note-box navy">${icon('lock')}<div>เข้าสู่ระบบเพื่อดูรายชื่อและเบอร์โทรพนักงานขับรถ</div></div>`}
+        <h3 class="ct-h">${icon('phone')} ช่องทางติดต่อ</h3>
+        <div class="ct-list">
+          ${s.contactPhone ? `<a class="ct-row" href="tel:${esc(s.contactPhone)}"><span class="ci">${icon('phone')}</span><span><small>โทรศัพท์${s.contactName ? ` · ${esc(s.contactName)}` : ''}</small><b>${esc(s.contactPhone)}</b></span></a>` : ''}
+          ${s.contactEmail ? `<a class="ct-row" href="mailto:${esc(s.contactEmail)}"><span class="ci">${icon('mail')}</span><span><small>Gmail</small><b>${esc(s.contactEmail)}</b></span></a>` : s.contactLine ? `<div class="ct-row"><span class="ci">${icon('mail')}</span><span><small>ช่องทางอื่น</small><b>${esc(s.contactLine)}</b></span></div>` : ''}
+          ${s.contactRoom ? `<div class="ct-row"><span class="ci">${icon('pin')}</span><span><small>ห้องทำงาน</small><b>${esc(s.contactRoom)}</b></span></div>` : ''}
+          ${!s.contactPhone && !s.contactEmail && !s.contactLine && !s.contactRoom ? `<div class="ct-row"><span class="hint">(รอข้อมูล)</span></div>` : ''}
         </div>
-        ${s.contactNote ? `<div class="note-box" style="margin-top:18px">${icon('info')}<div>${esc(s.contactNote)}</div></div>` : ''}
-        <h3 style="margin:44px 0 16px;color:var(--navy)">${icon('wheel')} พนักงานขับรถ</h3>
-        ${inn() ? `<div class="veh-grid">${S.db.drivers.filter(d => d.active !== false).map(d => `<div class="person" style="width:auto"><div class="ph">${d.photo ? UI.img(d.photo, d.name) : icon('user')}</div><b>${esc(d.name)}</b><div class="pos">พนักงานขับรถ · ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '-'}</div><div class="ct">${d.phone ? `<a href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>`).join('')}</div>` : `<div class="note-box navy">${icon('lock')}<div>เข้าสู่ระบบเพื่อดูรายชื่อและเบอร์โทรพนักงานขับรถ</div></div>`}
+        ${s.contactNote ? `<div class="note-box" style="margin-top:12px">${icon('info')}<div>${esc(s.contactNote)}</div></div>` : ''}
       </div></div>`
     };
   };

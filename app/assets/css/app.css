@@ -1690,3 +1690,26 @@ html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link.back { color: var(-
 .lt640 .hb-btn.gold { grid-column: 1 / -1; height: 54px; font-size: 1.02rem; }
 .lt640 .hb-warn { font-size: .84rem; align-items: flex-start; }
 .lt640 .hb-bg { background-image: url("../../images/hero-fleet2-sm.jpg"); }
+/* หน้าติดต่อเรา: การ์ดคณะทำงานบนมือถือไม่ตกบรรทัด · ช่องทางติดต่อแบบแถวกะทัดรัด */
+.ct-h { margin: 40px 0 14px; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.ct-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ct-row { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid var(--line); color: var(--ink); }
+a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
+.ct-row .ci { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; background: var(--gold-50); color: var(--gold-700); }
+.ct-row .ci .i { width: 19px; height: 19px; }
+.ct-row > span:last-child { display: grid; min-width: 0; line-height: 1.35; }
+.ct-row small { color: var(--muted); font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-row b { font-family: var(--font-display); font-weight: 600; font-size: .95rem; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt900 .ct-list { grid-template-columns: 1fr; gap: 8px; }
+.lt640 .ct-h { margin: 30px 0 12px; font-size: 1.05rem; }
+.lt640 .person { overflow-wrap: normal; padding: 14px 8px; }
+.lt640 .person b { font-size: .9rem; line-height: 1.35; }
+.lt640 .person .pos { font-size: .72rem; line-height: 1.35; }
+.lt640 .person .ct { font-size: .74rem; gap: 2px; margin-top: 8px; }
+.lt640 .person .ct a { min-width: 0; gap: 4px; }
+.lt640 .person .ct a .i { width: 14px; height: 14px; flex: none; }
+.lt640 .person .ct a[href^="mailto"] { font-size: .66rem; white-space: nowrap; }
+.lt640 .person .ct a[href^="mailto"] .i { display: none; }
+.lt640 .person .ct a[href^="mailto"], .lt640 .person .ct a { overflow: hidden; text-overflow: ellipsis; display: block; white-space: nowrap; }
+.lt640 .drv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lt640 .drv-grid .person .ph { width: 60px; height: 60px; }

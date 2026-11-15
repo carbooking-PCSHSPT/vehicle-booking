@@ -1182,8 +1182,9 @@
             <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-ghost" id="pinSchool">${icon('pin')} ${Maps.enabled ? 'ปักหมุดบนแผนที่' : 'ค้นหา/ตั้งค่า'}</button></div>
           </div><p class="hint">${icon('info')} ค่าเริ่มต้นเป็นพิกัดโดยประมาณ — กรุณาตรวจสอบและปักหมุดให้ตรงกับที่ตั้งโรงเรียนจริง</p></div>
           <div class="form-section"><h3>${icon('phone')} ข้อมูลติดต่อ (หน้า "ติดต่อเรา")</h3><div class="grid3">
-            <div class="field"><label>โทรศัพท์</label><input name="contactPhone" value="${esc(s.contactPhone || '')}"></div>
-            <div class="field"><label>LINE / ช่องทางอื่น</label><input name="contactLine" value="${esc(s.contactLine || '')}"></div>
+            <div class="field"><label>ชื่อผู้รับสาย</label><input name="contactName" placeholder="เช่น นางนิตยา สุขทอง (พี่แหม่ม)" value="${esc(s.contactName || '')}"></div>
+            <div class="field"><label>โทรศัพท์</label><input name="contactPhone" type="tel" value="${esc(s.contactPhone || '')}"></div>
+            <div class="field"><label>Gmail / อีเมล</label><input name="contactEmail" type="email" placeholder="example@gmail.com" value="${esc(s.contactEmail || '')}"></div>
             <div class="field"><label>ห้องทำงาน</label><input name="contactRoom" value="${esc(s.contactRoom || '')}"></div>
             <div class="field full"><label>ข้อความแนะนำ</label><textarea name="contactNote" rows="2">${esc(s.contactNote || '')}</textarea></div>
           </div></div>
@@ -1209,7 +1210,7 @@
           const f = UI.formData($('#sf', root));
           const committee = $$('[data-ci]', root).map(row => { const i = +row.dataset.ci; const o = { ...(cm[i] || { id: 'c' + Date.now() + i }) }; $$('[data-k]', row).forEach(el => { o[el.dataset.k] = el.dataset.k === 'level' ? +el.value : el.value; }); o.photo = (photoGetters[i] ? photoGetters[i]() : [])[0] || ''; return o; });
           const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.quick = c.id !== 'other' && row.querySelector('[data-ck=quick]').checked; c.order = i; return c; });
-          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactPhone: f.contactPhone, contactLine: f.contactLine, contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
+          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactName: (f.contactName || '').trim(), contactPhone: f.contactPhone, contactEmail: (f.contactEmail || '').trim(), contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
             memo: { headEmail: f.m_headEmail || '', depEmail: f.m_depEmail || '', to: f.m_to.trim(), noPrefix: f.m_noPrefix.trim(), headName: f.m_headName.trim(), headPos: f.m_headPos.trim(), depName: f.m_depName.trim(), depPos: f.m_depPos.trim() } };
         };
         const saveCats = async mut => { const x = collect(); mut(x.categories); x.categories.forEach((c, i) => { c.order = i; }); await S.saveSettings(x); App.render(); };
