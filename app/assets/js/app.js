@@ -181,7 +181,7 @@ const C = (() => {
     const n = k => f.filter(x => x.s.key === k).length;
     const cols = Math.min(7, Math.ceil(f.length / 2)) || 1;
     return `<div class="pk">
-      <div class="pk-lot" style="--cols:${cols}">${f.map(({ v, s }, i) => `<a class="pk-bay ${i < cols ? 'top' : 'bot'}" href="#/vehicles/${v.id}" title="${esc(v.name)} · ${esc(s.label)} · ${esc(s.note)}">${s.key === 'ontrip' ? `<span class="pk-gone">${icon('route')}</span>` : `<span class="pk-car" style="--c:${PK[s.key] || PK.free}">${icon(s.key === 'maint' ? 'wrench' : kindIcon(v.kind))}</span>`}<span class="pk-nm">${esc(v.name)}</span></a>`).join('')}</div>
+      <div class="pk-lot" style="--cols:${cols}">${f.map(({ v, s }, i) => `<a class="pk-bay ${i < cols ? 'top' : 'bot'}" href="#/vehicles/${v.id}" title="${esc(v.name)} · ${esc(s.label)} · ${esc(s.note)}">${s.key === 'ontrip' ? `<span class="pk-gone">${icon('route')}</span>` : `<span class="pk-car" style="--c:${PK[s.key] || PK.free}">${icon(s.key === 'maint' ? 'wrench' : kindIcon(v.kind))}</span>`}<span class="pk-nm">${esc(v.name)}</span>${v.plate ? `<span class="pk-plate">${esc(v.plate)}</span>` : ''}</a>`).join('')}</div>
       <div class="pk-leg">
         <div><span><i style="background:${PK.free}"></i><em class="lf">ว่าง</em><em class="ls">ว่าง</em></span><b class="num">${n('free')}</b></div>
         <div><span><i style="background:#f97316"></i><em class="lf">กำลังเดินทาง</em><em class="ls">เดินทาง</em></span><b class="num">${n('ontrip')}</b></div>
@@ -240,7 +240,7 @@ const C = (() => {
   }
 
   // ประวัติคำขอ
-  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'], esign: ['edit', 'ลงนามอิเล็กทรอนิกส์'], signed: ['file', 'บันทึกข้อความฉบับลงนาม'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'] };
+  const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'], esign: ['edit', 'ลงนามอิเล็กทรอนิกส์'], signed: ['file', 'บันทึกข้อความฉบับลงนาม'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'], changereq: ['edit', 'ขอแก้ไขข้อมูล'], changeok: ['checkCircle', 'อนุมัติการแก้ไข'], changeno: ['xCircle', 'ไม่อนุมัติการแก้ไข'] };
   const history = r => `<div class="hist">${(r.history || []).slice().reverse().map(h => { const [ic, t] = HIST[h.action] || ['info', h.action]; return `<div class="hist-item"><span class="hi">${icon(ic)}</span><div><b>${t}${h.action === 'depart' || h.action === 'return' ? ` · ${esc(h.note)}` : ''}</b><small>${esc(h.byName || h.by || '')} · ${fmt.dt(h.at)}</small>${h.note && !['depart', 'return'].includes(h.action) ? `<p>${esc(h.note)}</p>` : ''}</div></div>`; }).join('')}</div>`;
 
   // รถที่ได้รับมอบหมาย (สำหรับผู้ขอ/แอดมินดู)
@@ -427,6 +427,8 @@ const C = (() => {
   const MEMO_PAGE = { margin: '12mm 20mm 10mm 30mm', pageNo: false, fitWidth: '160mm' };   // ขอบตามหนังสือราชการ: ซ้าย 3 ซม. ขวา 2 ซม.
   // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
   const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);
+  // ดาวน์โหลดบันทึกข้อความเป็นไฟล์ PDF (ไม่ผ่านหน้าพิมพ์)
+  async function downloadMemo(r) { await S().loadSignatures(sigEmails([r])); return UI.savePdf(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
   async function printMemo(r) { await S().loadSignatures(sigEmails([r])); UI.printDoc(memoHTML(r), { title: `บันทึกข้อความขอใช้รถ ${r.id}`, ...MEMO_PAGE }); }
   // พิมพ์หลายฉบับต่อกัน (1 คำขอ = 1 หน้า)
   async function printMemos(list) {
@@ -440,13 +442,14 @@ const C = (() => {
     if (!list.length) return;
     let sv = {}; try { sv = JSON.parse(localStorage.getItem(PDLG) || '{}'); } catch (e) { /* ค่าเริ่มต้น */ }
     const one = list.length === 1;
-    const fmtOpt = (v, ic, t, d) => `<label class="pf-opt"><input type="radio" name="fmt" value="${v}" ${(sv.fmt || 'memo') === v ? 'checked' : ''}><span>${icon(ic)}<b>${t}</b><small>${d}</small></span></label>`;
+    const def = one ? (sv.fmt === 'letter' ? 'letter' : 'memo') : (sv.fmt || 'report');
+    const fmtOpt = (v, ic, t, d) => `<label class="pf-opt"><input type="radio" name="fmt" value="${v}" ${def === v ? 'checked' : ''}><span>${icon(ic)}<b>${t}</b><small>${d}</small></span></label>`;
     const opt = await UI.modal({
       title: `พิมพ์รวมเป็นไฟล์เดียว<small class="pf-sub">${list.length} รายการ${sub ? ' · ' + esc(sub) : ''}</small>`, size: 'lg',
       body: `<form id="pf" class="stack" style="gap:14px">
         <div class="label">รูปแบบเอกสาร</div>
-        <div class="pf-opts">${fmtOpt('memo', 'file', 'บันทึกข้อความ', 'มีตราครุฑ ตามแบบฟอร์มราชการ รายการละ 1 หน้า')}${fmtOpt('letter', 'printer', 'หัวกระดาษโรงเรียน', 'ไม่มีตราครุฑ ใช้ตราโรงเรียน รายการละ 1 หน้า')}${one ? '' : fmtOpt('table', 'clipboard', 'ตารางสรุป', 'หลายรายการต่อหน้า เหมาะสำหรับรายงาน')}</div>
-        ${one ? '' : `<label class="check"><input type="checkbox" name="sec" ${sv.sec !== false ? 'checked' : ''}> แยกเป็นส่วนตามหมวดงาน พร้อมหน้าคั่น</label>
+        <div class="pf-opts">${one ? '' : fmtOpt('report', 'chart', 'รายงานสรุป', 'หน้าปกสรุปตามสถานะ/หมวด/รถ + ผู้รายงาน แล้วตามด้วยรายการแยกหมวด')}${fmtOpt('memo', 'file', 'บันทึกข้อความ', 'มีตราครุฑ ตามแบบฟอร์มราชการ รายการละ 1 หน้า')}${fmtOpt('letter', 'printer', 'หัวกระดาษโรงเรียน', 'ไม่มีตราครุฑ ใช้ตราโรงเรียน รายการละ 1 หน้า')}${one ? '' : fmtOpt('table', 'clipboard', 'ตารางสรุป', 'หลายรายการต่อหน้า (แนวนอน)')}</div>
+        ${one ? '' : `<label class="check pf-nr"><input type="checkbox" name="sec" ${sv.sec !== false ? 'checked' : ''}> แยกเป็นส่วนตามหมวดงาน พร้อมหน้าคั่น</label>
         <label class="check"><input type="checkbox" name="cover" ${sv.cover !== false ? 'checked' : ''}> มีหน้าปกสรุปจำนวนตามสถานะและหมวดงาน</label>`}
         <div class="field"><label>หัวข้อเอกสาร ${one ? '<span class="hint">(ใช้เป็นชื่อไฟล์ PDF)</span>' : ''}</label><input class="input" name="title" value="${esc(sv.title || title)}"></div>
       </form>`,
@@ -456,6 +459,10 @@ const C = (() => {
     try { localStorage.setItem(PDLG, JSON.stringify({ fmt: opt.fmt, sec: !!opt.sec, cover: !!opt.cover, title: opt.title })); } catch (e) { /* ไม่บันทึกก็ได้ */ }
     const docTitle = String(opt.title || title).trim() || title;
     const rs = list.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
+    if (opt.fmt === 'report') {
+      const range = `${thDate(rs[0].startAt)} – ${thDate(rs[rs.length - 1].startAt)}`;
+      return UI.printDoc(requestReport(rs, docTitle, sub, range), { title: `${docTitle} ${rs.length} รายการ`, footLeft: `${docTitle}${sub ? ' · ' + sub : ''} · ${rs.length} รายการ` });
+    }
     const memoOk = opt.fmt !== 'table';
     const items = memoOk ? rs.filter(r => !['rejected', 'cancelled'].includes(r.status)) : rs;
     if (!items.length) return UI.toast('ไม่มีรายการที่พิมพ์เป็นบันทึกข้อความได้ (ยกเลิก/ไม่อนุมัติทั้งหมด)', 'error');
@@ -466,6 +473,43 @@ const C = (() => {
     const html = (opt.cover && !one ? coverPage(items, docTitle, range) : '')
       + groups.map(([k, grp]) => (k ? `<section class="pd-divider"><small>ส่วนที่ ${groups.findIndex(g => g[0] === k) + 1}</small><h1>${esc(k)}</h1><p>${grp.length} รายการ · ${esc(range)}</p></section>` : '') + body(grp)).join('');
     UI.printDoc(html, { title: one ? `${docTitle} ${items[0].id}` : `${docTitle} ${items.length} รายการ`, ...(opt.fmt === 'table' ? { landscape: true } : MEMO_PAGE) });
+  }
+  const thDate = d => new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+  // ── รายงานแบบเอกสาร (ตามตัวอย่างรายงานแจ้งซ่อม): หน้าปก ตราโรงเรียน + ตารางสรุป + ผู้รายงาน · หน้าถัดไปมีหัวรายงาน ──
+  function reportCover({ title, sub = '', range = '', body = '' }) {
+    const st = S().db.settings, me = S().me || {}, u = S().user(me.email) || me;
+    return `<section class="rp-cover">
+      <img class="rp-logo" src="images/logo.png" alt="">
+      <h2 class="rp-school">${esc(st.schoolName || '')}</h2>
+      <p class="rp-unit">${esc(st.unit || 'งานยานพาหนะ')} · ${esc(st.division || '')}</p>
+      <h1 class="rp-title">${esc(title)}</h1>
+      ${sub ? `<p class="rp-sub">${esc(sub)}</p>` : ''}${range ? `<p class="rp-range">${esc(range)}</p>` : ''}
+      <div class="rp-body">${body}</div>
+      <div class="rp-sign"><p>ลงชื่อ <span class="rp-dots"></span> ผู้รายงาน</p><p>( ${esc(u.name || '')} )</p>${u.position ? `<p>${esc(u.position)}</p>` : ''}<p>วันที่ ${thDate(new Date())}</p></div>
+    </section>`;
+  }
+  const reportHead = (title, sub = '') => { const st = S().db.settings; return `<div class="rp-head"><img src="images/logo.png" alt=""><div><b>${esc(title)}</b><span>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} · ${esc(st.schoolName || '')}</span>${sub ? `<span>${esc(sub)}</span>` : ''}</div></div>`; };
+  const RP_TONE = { pending: '#7c3aed', revise: '#a16207', approved: '#047857', ontrip: '#c2410c', returned: '#64748b', closed: '#64748b', rejected: '#b91c1c', cancelled: '#b91c1c' };
+  // รายงานสรุปคำขอใช้รถ: หน้า 1 สรุปตามสถานะ/หมวด/รถ · หน้า 2+ รายการแยกตามหมวดงาน
+  function requestReport(items, docTitle, sub, range) {
+    const s = S(), cnt = f => items.filter(f).length;
+    const byStatus = Object.entries(s.STATUS).map(([k, v]) => [v.label, cnt(r => r.status === k)]);
+    const groups = [...items.reduce((m, r) => { const k = s.catName(r) || 'ไม่ระบุหมวด'; (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map())];
+    const ok = items.filter(r => !['rejected', 'cancelled'].includes(r.status));
+    const vrows = s.db.vehicles.map(v => { const rs = ok.filter(r => (r.assignments || []).some(a => a.vehicleId === v.id)); const km = rs.reduce((t, r) => { const a = r.assignments.find(x => x.vehicleId === v.id); return t + (a.odoStart != null && a.odoEnd != null ? a.odoEnd - a.odoStart : (+r.totalKm || 0)); }, 0); return { v, n: rs.length, km, pax: rs.reduce((t, r) => t + s.passengers(r), 0) }; }).filter(x => x.n);
+    const tb = (h, rows, foot) => `<table class="pd-tbl rp-t"><thead><tr>${h.map((x, i) => `<th class="${i ? 'r' : ''}">${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody>${foot ? `<tfoot><tr>${foot.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr></tfoot>` : ''}</table>`;
+    const cover = reportCover({ title: docTitle, sub: `${sub ? sub + ' · ' : ''}${items.length} รายการ`, range: `ช่วงวันที่เดินทาง ${range}`, body: `
+      <div class="rp-grid">${tb(['สถานะ', 'จำนวน'], byStatus.map(([l, n]) => [esc(l), n]), ['รวม', items.length])}${tb(['หมวดงาน', 'จำนวน'], groups.map(([k, g]) => [esc(k), g.length]), ['รวม', items.length])}</div>
+      ${vrows.length ? tb(['รถ', 'เที่ยว', 'ระยะทาง (กม.)', 'ผู้เดินทาง (คน)'], vrows.map(x => [`${esc(x.v.name)}${x.v.plate ? ` <small>${esc(x.v.plate)}</small>` : ''}`, x.n, UI.fmt.num(x.km), x.pax]), ['รวม', vrows.reduce((t, x) => t + x.n, 0), UI.fmt.num(vrows.reduce((t, x) => t + x.km, 0)), vrows.reduce((t, x) => t + x.pax, 0)]) : ''}` });
+    let no = 0;
+    const rows = groups.map(([k, g]) => `<tr class="rp-grp"><td colspan="6">${esc(k)} · ${g.length} รายการ</td></tr>` + g.map(r => { const st = s.STATUS[r.status] || {}; return `<tr><td class="c">${++no}</td>
+      <td class="nw">${UI.fmt.date(r.startAt)}<small>${UI.fmt.time(r.startAt)}–${UI.fmt.when(r.endAt)}</small><small>${r.id}</small></td>
+      <td>${esc(s.destName(r))}<small>${esc(r.purpose || '')}${r.totalKm ? ` · ${UI.fmt.num(r.totalKm, 0)} กม.` : ''}</small></td>
+      <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')} · ${s.passengers(r)} คน</small></td>
+      <td>${(r.assignments || []).map(a => `${esc(vName(a.vehicleId))}<small>${esc(dName(a.driverId))}</small>`).join('') || '-'}</td>
+      <td><span class="rp-st" style="--c:${RP_TONE[r.status] || '#555'}">${esc(st.label || r.status)}</span></td></tr>`; }).join('')).join('');
+    return cover + `<section class="rp-page">${reportHead(docTitle, `${sub ? sub + ' · ' : ''}${items.length} รายการ · ${range}`)}
+      <table class="pd-tbl rp-list"><thead><tr><th class="c">ที่</th><th>วันเดินทาง</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   }
   function coverPage(items, docTitle, range) {
     const st = S().db.settings, cnt = f => items.filter(f).length;
@@ -541,7 +585,7 @@ const C = (() => {
     </div>`;
   }
 
-  return { viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
+  return { thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {
@@ -646,7 +690,6 @@ const App = (() => {
           <ul class="footer-links"><li><a href="#/request">ขอใช้รถ</a></li><li><a href="#/schedule">ตารางรถ</a></li><li><a href="#/vehicles">ข้อมูลรถ</a></li><li><a href="#/my">คำขอของฉัน</a></li><li><a href="#/contact">ติดต่อเรา</a></li></ul>
         </div>
         ${ViewMode.pickerHTML('in-footer')}
-        <div class="footer-bottom"><span><span class="line"></span>© ${new Date().getFullYear() + 543} ${esc(s.division)}</span><span>${esc(s.schoolNameEn)}</span></div>
       </div>
     </footer>`;
   }
@@ -718,6 +761,7 @@ const App = (() => {
     if (view.tick) view.tick();   // นาฬิกาแสดงทันที ไม่ว่างรอ 1 วินาที
     // ครั้งแรกหลังเข้าสู่ระบบ: โหลดรูปรถ/คนขับ/คณะทำงานไว้ล่วงหน้าตอนว่าง
     if (Store.authState === 'in' && !render._warm) { render._warm = true; setTimeout(() => Store.warmImages && Store.warmImages(), 2500); }
+    if (Store.authState === 'in') popNews();
     // กดเลือกวันในปฏิทิน → เลื่อนลงไปที่รายการของวันนั้น
     if (query.pick) { const l = document.getElementById('list'); if (l) setTimeout(() => scrollTo({ top: l.getBoundingClientRect().top + scrollY - 90, behavior: 'smooth' }), 60); }
     onScroll();
@@ -725,6 +769,16 @@ const App = (() => {
   }
   // เทียบ HTML เดิม (prev) กับใหม่ (next) แล้วแก้ DOM จริง (live) เฉพาะโหนดที่ต่างกัน
   function frag(html) { const t = document.createElement('template'); t.innerHTML = html; return t.content; }
+  // แจ้งเตือนเด้ง (ครั้งเดียวต่อเรื่อง): ผลการพิจารณาคำขอของฉัน / ผลคำขอแก้ไข — นอกเหนือจากตัวเลขที่กระดิ่ง
+  const POP_KEY = () => 'vb-popped-' + ((Store.me || {}).email || '');
+  const POP_T = { 'คำขอได้รับการอนุมัติ': 'ok', 'แอดมินอนุมัติการแก้ไขข้อมูลแล้ว': 'ok', 'คำขอไม่ได้รับการอนุมัติ': 'error', 'แอดมินไม่อนุมัติการแก้ไขข้อมูล': 'error', 'แอดมินส่งคำขอกลับให้แก้ไข': 'info' };
+  function popNews() {
+    let seen = []; try { seen = JSON.parse(localStorage.getItem(POP_KEY()) || '[]'); } catch (e) { /* ใช้ค่าว่าง */ }
+    const news = Store.notifications().filter(n => n.unread && POP_T[n.title] && !seen.includes(n.id)).slice(0, 3);
+    if (!news.length) return;
+    news.forEach((n, i) => setTimeout(() => UI.toast(`${n.title} — ${n.body}`, POP_T[n.title]), 600 + i * 900));
+    try { localStorage.setItem(POP_KEY(), JSON.stringify([...seen, ...news.map(n => n.id)].slice(-200))); } catch (e) { /* ข้าม */ }
+  }
   function sameAttrs(a, b) {
     if (a.attributes.length !== b.attributes.length) return false;
     for (const at of a.attributes) if (b.getAttribute(at.name) !== at.value) return false;

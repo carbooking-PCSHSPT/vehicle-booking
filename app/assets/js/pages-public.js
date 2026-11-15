@@ -492,7 +492,7 @@
       }
     };
   }
-  Pages._requestForm = { html: requestFormHTML, bind: bindRequestForm };
+  Pages._requestForm = { html: requestFormHTML, bind: bindRequestForm, confirm: d => confirmDateTime(d) };
   function confirmDateTime(data) {
     const a = new Date(data.startAt), b = new Date(data.endAt), t = data.tripType || 'day';
     const tm = d => { const x = fmt.time(d); return `<span class="t${oddTime(x) ? ' odd' : ''}">${x} น. <em>${period(x)}</em></span>`; };
@@ -503,8 +503,31 @@
       ${row(t === 'daily' ? 'วันแรก · ออกจากโรงเรียน' : 'ออกจากโรงเรียน', a, 'navigation')}
       ${row(t === 'daily' ? 'วันสุดท้าย · กลับถึงโรงเรียน' : 'กลับถึงโรงเรียน', b, 'home')}
       ${oddTime(fmt.time(a)) || oddTime(fmt.time(b)) ? `<div class="note-box warn-y" style="margin-top:4px">${icon('alert')}<div>มีเวลาที่อยู่ช่วง<b>กลางคืน/เช้ามืด</b> — ถ้าตั้งใจเป็นช่วงบ่าย ให้กด "กลับไปแก้" (เช่น บ่ายสี่โมง = 16:00 น.)</div></div>` : ''}
-    </div>`;
-    return UI.modal({ title: 'ตรวจสอบวันและเวลาก่อนส่ง', body, actions: [{ label: 'กลับไปแก้', value: false }, { label: 'ถูกต้อง ส่งคำขอ', kind: 'btn-primary', icon: 'send', value: true }] }).then(v => v === true);
+    </div>${confirmDetails(data)}`;
+    return UI.modal({ title: 'ตรวจสอบข้อมูลก่อนส่ง', size: 'lg', body, actions: [{ label: 'กลับไปแก้', value: false }, { label: 'ถูกต้อง ส่งคำขอ', kind: 'btn-primary', icon: 'send', value: true }] }).then(v => v === true);
+  }
+  // สรุปข้อมูลทั้งหมดในคำขอ (ใต้วันเวลา) — ให้ตรวจก่อนส่ง กันกรอก/แนบไฟล์ผิด
+  function confirmDetails(d) {
+    const cat = d.category === 'other' ? `อื่น ๆ (${d.categoryOther || '-'})` : ((S.catOf(d.category) || {}).name || '-');
+    const pax = (+d.teachers || 0) + (+d.students || 0) + (+d.others || 0);
+    const row = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
+    const dests = (d.destinations || []).map((p, i) => `${(d.destinations.length > 1 ? `${i + 1}. ` : '')}<b>${esc(p.name)}</b>${p.province ? ` <small>${esc(p.province)}</small>` : ''}${p.km ? ` <small>· ${fmt.num(p.km, 1)} กม. จากโรงเรียน</small>` : ''}`).join('<br>');
+    const files = d.attachments || [];
+    return `<dl class="kv dc-kv">
+      ${row('หมวดงาน', esc(cat))}
+      ${row('วัตถุประสงค์', esc(d.purpose || ''))}
+      ${row('ชื่องาน/โครงการ', esc(d.project || ''))}
+      ${row('สถานที่', dests)}
+      ${row('ระยะทางรวม', d.totalKm ? `<b>${fmt.num(d.totalKm, 1)} กม.</b> (ไป + กลับ)` : '')}
+      ${row('ผู้เดินทาง', `<b>${pax} คน</b> · ครู/บุคลากร ${+d.teachers || 0} · นักเรียน ${+d.students || 0}${+d.others ? ` · บุคคลอื่น ${+d.others}` : ''}`)}
+      ${row('รายชื่อ', esc(d.passengerNames || ''))}
+      ${row('จุดขึ้นรถ', esc(d.pickup || ''))}
+      ${row('เบอร์ติดต่อ', esc(d.contactPhone || ''))}
+      ${row('ที่พัก', esc(d.lodging || ''))}
+      ${row('หมายเหตุ', esc(d.note || ''))}
+    </dl>
+    <div class="dc-files"><div class="label">${icon('paperclip')} บันทึกข้อความที่แนบ ${files.length ? `<small>${files.length} ไฟล์ · กดเพื่อเปิดดู</small>` : ''}</div>
+      ${files.length ? `<div class="thumbs">${files.map(f => UI.thumb(f)).join('')}</div>` : `<p class="hint">ไม่ได้แนบ${S.isQuickCat(d.category) ? ' (งานประจำ ไม่ต้องแนบ)' : ''}</p>`}</div>`;
   }
 
   Pages.requestForm = ({ params, query }) => {
@@ -739,6 +762,52 @@
     return `<div class="note-box ${cls}">${icon(d.action === 'approve' ? 'checkCircle' : d.action === 'reject' ? 'xCircle' : 'undo')}<div><b>${t}</b> <small class="muted">โดย ${esc(d.byName || '')} · ${fmt.dt(d.at)}</small>${d.note ? `<div style="margin-top:6px"><b>หมายเหตุจากแอดมิน:</b> ${esc(d.note)}</div>` : ''}</div></div>`;
   }
   Pages._decisionBox = decisionBox;
+  // ── ขอแก้ไขข้อมูล (คำขอที่อนุมัติแล้ว) ──
+  const CH_LABEL = { startAt: 'ออกเดินทาง', endAt: 'กลับถึง', tripType: 'ลักษณะการเดินทาง', teachers: 'ครู/บุคลากร', students: 'นักเรียน', others: 'บุคคลอื่น', passengerNames: 'รายชื่อ', pickup: 'จุดขึ้นรถ', contactPhone: 'เบอร์ติดต่อ', note: 'หมายเหตุ' };
+  const chVal = (k, v) => /At$/.test(k) && v ? fmt.dt(v) : k === 'tripType' ? ((S.TRIP_UI[v] || {}).label || v) : (v === '' || v == null ? '-' : String(v));
+  function changeDiff(cr) {
+    const ks = Object.keys(cr.data || {});
+    return ks.length ? `<table class="ch-diff"><thead><tr><th>รายการ</th><th>เดิม</th><th>ขอเปลี่ยนเป็น</th></tr></thead><tbody>${ks.map(k => `<tr><td>${CH_LABEL[k] || k}</td><td>${esc(chVal(k, (cr.before || {})[k]))}</td><td><b>${esc(chVal(k, cr.data[k]))}</b></td></tr>`).join('')}</tbody></table>` : '';
+  }
+  Pages._changeDiff = changeDiff;
+  async function changeDialog(r) {
+    const dS = fmt.localDate(r.startAt), dE = fmt.localDate(r.endAt), tS = fmt.time(r.startAt), tE = fmt.time(r.endAt);
+    const res = await UI.modal({
+      title: 'ขอแก้ไขข้อมูลคำขอ', size: 'lg',
+      body: `<form id="chf" class="stack" style="gap:14px">
+        <p class="hint">${icon('info')} แก้เฉพาะรายการที่ต้องการเปลี่ยน แล้วระบุเหตุผล — แอดมินจะพิจารณา (และตรวจว่ารถยังว่าง) ระหว่างนี้ข้อมูลเดิมยังใช้อยู่</p>
+        <div class="grid2">
+          <div class="field"><label>วันออกเดินทาง</label><input type="date" name="dS" value="${dS}"></div><div class="field"><label>เวลาออก</label><input type="time" name="tS" value="${tS}"></div>
+          <div class="field"><label>วันกลับถึงโรงเรียน</label><input type="date" name="dE" value="${dE}"></div><div class="field"><label>เวลากลับถึง</label><input type="time" name="tE" value="${tE}"></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>ครู/บุคลากร</label><input type="number" min="0" name="teachers" value="${+r.teachers || 0}"></div>
+          <div class="field"><label>นักเรียน</label><input type="number" min="0" name="students" value="${+r.students || 0}"></div>
+          <div class="field"><label>บุคคลอื่น</label><input type="number" min="0" name="others" value="${+r.others || 0}"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>จุดขึ้นรถ</label><input name="pickup" value="${esc(r.pickup || '')}"></div>
+          <div class="field"><label>เบอร์ติดต่อระหว่างเดินทาง</label><input type="tel" name="contactPhone" value="${esc(r.contactPhone || '')}"></div>
+          <div class="field full"><label>รายชื่อผู้เดินทาง</label><textarea name="passengerNames" rows="2">${esc(r.passengerNames || '')}</textarea></div>
+          <div class="field full"><label>หมายเหตุ</label><textarea name="note" rows="2">${esc(r.note || '')}</textarea></div>
+          <div class="field full"><label>เหตุผลที่ขอแก้ไข <b class="req">*</b></label><textarea name="reason" rows="2" required placeholder="เช่น ผู้จัดงานเลื่อนเวลา / จำนวนนักเรียนเพิ่ม"></textarea></div>
+        </div></form>`,
+      actions: [{ label: 'ยกเลิก', value: null }, { label: 'ส่งคำขอแก้ไข', kind: 'btn-primary', icon: 'send', onClick: async el => {
+        const f = UI.formData(el.querySelector('#chf'));
+        if (!f.dS || !f.tS || !f.dE || !f.tE) throw new Error('กรุณาระบุวันและเวลาให้ครบ');
+        const startAt = new Date(`${f.dS}T${f.tS}`).toISOString(), endAt = new Date(`${f.dE}T${f.tE}`).toISOString();
+        const data = { startAt, endAt, teachers: f.teachers, students: f.students, others: f.others, pickup: f.pickup, contactPhone: f.contactPhone, passengerNames: f.passengerNames, note: f.note };
+        // ไป-กลับวันเดียว ↔ ค้างคืน ตามวันที่ใหม่
+        const same = f.dS === f.dE, tt = S.tripType(r);
+        if (!same && tt === 'day') data.tripType = 'overnight'; else if (same && tt === 'overnight') data.tripType = 'day';
+        // ส่งเฉพาะที่เปลี่ยน (เวลาเทียบระดับนาที)
+        Object.keys(data).forEach(k => { const a = /At$/.test(k) ? fmt.dt(data[k]) : String(data[k] ?? ''), b = /At$/.test(k) ? fmt.dt(r[k]) : String(r[k] ?? ''); if (a === b) delete data[k]; });
+        await S.requestChange(r.id, data, f.reason);
+        return true;
+      } }]
+    });
+    if (res) UI.toast('ส่งคำขอแก้ไขแล้ว รอแอดมินพิจารณา');
+  }
   Pages.myDetail = ({ params }) => {
     const r = S.request(params.id);
     if (!r) return { html: `<div class="page container">${UI.empty('ไม่พบคำขอนี้')}</div>` };
@@ -747,14 +816,17 @@
     const canEdit = mine && ['pending', 'revise'].includes(r.status);
     const canCancel = mine && ['pending', 'revise', 'approved'].includes(r.status) && (r.assignments || []).every(a => a.status === 'assigned');
     const rates = (r.assignments || []).map((a, i) => ({ a, i })).filter(x => x.a.status === 'returned' && !x.a.rated);
+    const cr = r.changeReq, crPending = cr && cr.status === 'pending';
+    const canChange = mine && r.status === 'approved' && (r.assignments || []).every(a => a.status === 'assigned') && !crPending;
     return {
       html: `<div class="page"><div class="container">
         <a class="crumb" href="#/my">${icon('arrowL')} การขอใช้รถของฉัน</a>
+        ${cr ? `<div class="note-box ${crPending ? 'warn-y' : cr.status === 'approved' ? 'green' : 'red'}" style="margin-bottom:14px">${icon(crPending ? 'clock' : cr.status === 'approved' ? 'checkCircle' : 'xCircle')}<div><b>${crPending ? 'ขอแก้ไขข้อมูลแล้ว — รอแอดมินพิจารณา' : cr.status === 'approved' ? 'แอดมินอนุมัติการแก้ไขข้อมูลแล้ว' : 'แอดมินไม่อนุมัติการแก้ไขข้อมูล'}</b> <small class="muted">${fmt.dt(crPending ? cr.at : cr.decidedAt)}</small>${changeDiff(cr)}<div style="margin-top:4px"><b>เหตุผล:</b> ${esc(cr.reason)}</div>${cr.note && !crPending ? `<div><b>แอดมิน:</b> ${esc(cr.note)}</div>` : ''}</div></div>` : ''}
         <div class="page-head"><div><div class="eyebrow">${r.id}${r.emergency ? ' · บันทึกโดยแอดมิน (เร่งด่วน)' : ''}</div><h1>${esc(S.destName(r))}</h1><p>ส่งเมื่อ ${fmt.dt(r.createdAt)}</p></div>
-          <div class="row">${C.canMemo(r) && (mine || S.isAdmin(S.me)) ? `<button class="btn btn-primary btn-sm" id="memoPrint">${icon('printer')} พิมพ์บันทึกข้อความ</button>` : ''}${mine ? `<a class="btn btn-ghost btn-sm" href="#/request?copy=${r.id}">${icon('copy')} คัดลอกเป็นคำขอใหม่</a>` : ''}${canEdit ? `<a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} ${r.status === 'revise' ? 'แก้ไขและส่งใหม่' : 'แก้ไข'}</a>` : ''}${canCancel ? `<button class="btn btn-danger btn-sm" id="cancelBtn">${icon('xCircle')} ยกเลิกคำขอ</button>` : ''}</div></div>
+          <div class="row">${C.canMemo(r) && (mine || S.isAdmin(S.me)) ? `<button class="btn btn-primary btn-sm" id="memoPrint">${icon('printer')} พิมพ์บันทึกข้อความ</button><button class="btn btn-ghost btn-sm" id="memoPdf">${icon('download')} ดาวน์โหลด PDF</button>` : ''}${canChange ? `<button class="btn btn-gold btn-sm" id="changeBtn">${icon('edit')} ขอแก้ไขข้อมูล</button>` : ''}${mine ? `<a class="btn btn-ghost btn-sm" href="#/request?copy=${r.id}">${icon('copy')} คัดลอกเป็นคำขอใหม่</a>` : ''}${canEdit ? `<a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} ${r.status === 'revise' ? 'แก้ไขและส่งใหม่' : 'แก้ไข'}</a>` : ''}${canCancel ? `<button class="btn btn-danger btn-sm" id="cancelBtn">${icon('xCircle')} ยกเลิกคำขอ</button>` : ''}</div></div>
         <div style="margin-bottom:18px">${decisionBox(r)}</div>
         ${mine && r.status === 'pending' ? `<div class="note-box navy edit-hint" style="margin-bottom:18px">${icon('edit')}<div><b>แก้ไขได้ระหว่างรอตรวจสอบ</b> — เปลี่ยนวันเวลา สถานที่ จำนวนคน หรือแนบไฟล์ใหม่ได้ จนกว่าแอดมินจะพิจารณา<div style="margin-top:8px"><a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขคำขอ</a></div></div></div>` : ''}
-        ${mine && ['approved'].includes(r.status) ? `<p class="hint" style="margin:-8px 0 16px">${icon('info')} อนุมัติแล้ว แก้ไขเองไม่ได้ — ถ้าต้องเปลี่ยนแปลง ติดต่อแอดมินงานยานพาหนะ หรือยกเลิกแล้วส่งคำขอใหม่</p>` : ''}
+        ${mine && ['approved'].includes(r.status) && !crPending ? `<p class="hint" style="margin:-8px 0 16px">${icon('info')} อนุมัติแล้ว — ถ้าต้องเปลี่ยนวันเวลา จำนวนคน หรือจุดขึ้นรถ กด <b>ขอแก้ไขข้อมูล</b> แล้วระบุเหตุผล แอดมินจะพิจารณาอีกครั้ง</p>` : ''}
         ${C.canMemo(r) && mine ? `<div class="note-box ${(r.signed || []).length ? 'green' : 'navy'}" style="margin-bottom:18px">${icon((r.signed || []).length ? 'checkCircle' : 'file')}<div>${(r.signed || []).length
           ? `<b>งานยานพาหนะเก็บบันทึกข้อความฉบับลงนามแล้ว</b><div class="thumbs" style="margin-top:6px">${r.signed.map(p => UI.thumb(p, 'sm')).join('')}</div>`
           : (r.esign || {}).deputy ? `<b>ลงนามอิเล็กทรอนิกส์ครบแล้ว</b> (รองผู้อำนวยการฯ ${r.esign.deputy.decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'} · ${fmt.dt(r.esign.deputy.at)}) — กด "พิมพ์บันทึกข้อความ" เพื่อดู/บันทึก PDF ได้`
@@ -774,6 +846,8 @@
         </div></div></div>`,
       mount(root) {
         $('#memoPrint', root)?.addEventListener('click', () => C.printDialog([S.request(r.id)], { title: 'บันทึกข้อความขอใช้รถ' }));
+        $('#memoPdf', root)?.addEventListener('click', e => UI.busy(e.currentTarget, () => C.downloadMemo(S.request(r.id))).catch(err => UI.toast(err.message, 'error')));
+        $('#changeBtn', root)?.addEventListener('click', () => changeDialog(S.request(r.id)));
         if ($('#memoSave', root)) {
           const getMemo = C.bindFilePicker(root, 'memoLate', [], { pdf: true });
           $('#memoSave', root).addEventListener('click', e => {

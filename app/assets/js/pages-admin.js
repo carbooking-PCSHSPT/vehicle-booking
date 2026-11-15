@@ -242,6 +242,10 @@
         ${docs.length ? `<div class="rq-doc">${C.docSlot()}</div>
           <button type="button" class="dv-fab no-print" id="dvFab">${icon('file')} บันทึกข้อความ${docs.length > 1 ? ` (${docs.length})` : ''}</button>` : ''}
         <div class="rq-main">
+        ${r.changeReq && r.changeReq.status === 'pending' ? `<div class="card ch-card" style="margin-bottom:18px"><div class="card-head"><h3>${icon('edit')} ผู้ขอขอแก้ไขข้อมูล <small class="muted" style="font-weight:400">${esc(r.changeReq.byName)} · ${fmt.dt(r.changeReq.at)}</small></h3><span class="pill tone-warn">รอพิจารณา</span></div>
+          ${Pages._changeDiff(r.changeReq)}<p style="margin-top:8px"><b>เหตุผล:</b> ${esc(r.changeReq.reason)}</p>
+          ${r.changeReq.data.startAt || r.changeReq.data.endAt ? `<p class="hint" style="margin-top:6px">${icon('alert')} เปลี่ยนวันเวลา — ตรวจว่ารถ/คนขับที่จัดไว้ยังว่างในช่วงใหม่ ถ้าไม่ว่าง ให้อนุมัติแล้วปรับรถด้านล่าง</p>` : ''}
+          <div class="row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-chg="1">${icon('check')} อนุมัติการแก้ไข</button><button class="btn btn-ghost btn-sm" data-chg="0">${icon('xCircle')} ไม่อนุมัติ</button></div></div>` : ''}
         <div style="margin-bottom:18px">${Pages._decisionBox(r)}</div>
         ${canDecide || canReassign ? `
         <div class="req-top">${Pages._requestInfo(r, { hideDocs: true })}</div>
@@ -288,6 +292,12 @@
         const P = (canDecide || canReassign) ? bindVehiclePicker(root, () => S.passengers(r)) : null;
         const getSig = $('#sigSave', root) ? C.bindFilePicker(root, 'sig', [], { pdf: true }) : null;
         root.querySelectorAll('[data-memo]').forEach(b => b.addEventListener('click', () => C.printDialog([S.request(r.id)], { title: 'บันทึกข้อความขอใช้รถ' })));
+        root.querySelectorAll('[data-chg]').forEach(b => b.addEventListener('click', async () => {
+          const ok = b.dataset.chg === '1';
+          const res = await UI.confirm(ok ? 'อนุมัติการแก้ไขข้อมูลตามที่ผู้ขอแจ้ง? ข้อมูลในคำขอจะถูกเปลี่ยนทันที' : 'ไม่อนุมัติการแก้ไขข้อมูล? คำขอจะใช้ข้อมูลเดิม', { title: ok ? 'อนุมัติการแก้ไข' : 'ไม่อนุมัติการแก้ไข', ok: ok ? 'อนุมัติ' : 'ไม่อนุมัติ', danger: !ok, input: { label: ok ? 'หมายเหตุถึงผู้ขอ (ถ้ามี)' : 'เหตุผลที่ไม่อนุมัติ', required: !ok } });
+          if (!res) return;
+          S.decideChange(r.id, ok, res.value || '').then(() => { UI.toast(ok ? 'อนุมัติการแก้ไขแล้ว — ตรวจรถ/คนขับให้ตรงกับข้อมูลใหม่' : 'แจ้งผู้ขอว่าไม่อนุมัติการแก้ไขแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error'));
+        }));
         $('#sigSave', root)?.addEventListener('click', e => {
           const files = getSig(); if (!files.length) return UI.toast('กรุณาเลือกไฟล์ที่สแกน', 'error');
           UI.busy(e.currentTarget, () => S.attachSigned(r.id, files)).then(() => { UI.toast('เก็บบันทึกข้อความฉบับลงนามแล้ว'); App.render(); }).catch(() => {});
@@ -1010,8 +1020,8 @@
         ${periodBar('#/admin/ratings', per, query)}${histNote(hist)}
         <div class="kpis" style="margin-bottom:16px">${Object.entries(S.RATE_KEYS).map(([k, l]) => `<div class="kpi" style="--kb:#fef3c7;--kc:#d97706"><span class="k-ic">${icon('star')}</span><b class="num">${avgOf(list, k).toFixed(2)}<em>/ 5</em></b><span class="l">${l}</span></div>`).join('')}</div>
         <div class="split">
-          <div class="card"><div class="card-head"><h3>${icon('users')} คะแนนรายคน</h3></div><div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th>คนขับ</th><th>ครั้ง</th>${Object.values(S.RATE_KEYS).map(l => `<th>${l.split('และ')[0]}</th>`).join('')}<th>เฉลี่ย</th></tr></thead>
-            <tbody>${drivers.map(({ d, rs }) => `<tr><td><b>${esc(d.name)}</b></td><td>${rs.length}</td>${Object.keys(S.RATE_KEYS).map(k => `<td>${rs.length ? avgOf(rs, k).toFixed(2) : '-'}</td>`).join('')}<td>${rs.length ? `${C.stars(avgOf(rs))} <small>${avgOf(rs).toFixed(2)}</small>` : '-'}</td></tr>`).join('')}</tbody></table></div></div>
+          <div class="card"><div class="card-head"><h3>${icon('users')} คะแนนรายคน</h3></div><div class="tbl-wrap"><table class="tbl rt-tbl" style="min-width:0"><thead><tr><th>คนขับ</th><th>ครั้ง</th>${Object.values(S.RATE_KEYS).map(l => `<th>${l.split('และ')[0].replace('ความสะอาดของรถ', 'ความสะอาด')}</th>`).join('')}<th>เฉลี่ย</th></tr></thead>
+            <tbody>${drivers.map(({ d, rs }) => `<tr><td class="nw"><b>${esc(d.name)}</b></td><td>${rs.length}</td>${Object.keys(S.RATE_KEYS).map(k => `<td>${rs.length ? avgOf(rs, k).toFixed(2) : '-'}</td>`).join('')}<td class="nw"><b>${rs.length ? avgOf(rs).toFixed(2) : '-'}</b>${rs.length ? `<div class="rt-st">${C.stars(avgOf(rs))}</div>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
           <div class="card"><div class="card-head"><h3>${icon('mail')} ความคิดเห็น</h3></div><div class="stack">${list.filter(x => x.comment).slice(0, 40).map(x => `<div class="assign"><div class="assign-top"><b>${esc(C.dName(x.driverId))}</b>${C.stars(avgOf([x]))}</div><p style="font-size:.92rem">“${esc(x.comment)}”</p><small class="muted">${fmt.date(x.at)} · ${esc(C.vName(x.vehicleId))}</small></div>`).join('') || UI.empty('ยังไม่มีความคิดเห็น', 'mail')}</div></div>
         </div>`,
       mount(root) { bindPeriod(root, '#/admin/ratings', query); $('#df', root).addEventListener('change', e => { location.hash = '#/admin/ratings?' + new URLSearchParams({ ...query, d: e.target.value }); }); }
@@ -1066,7 +1076,7 @@
     return {
       layout: 'admin',
       html: `<div class="print-brand print-only"><img src="images/logo.png" alt=""><div><b>${esc(S.db.settings.schoolName || '')}</b><span>${esc(S.db.settings.division || '')} · ${esc(S.db.settings.unit || 'งานยานพาหนะ')} · พิมพ์เมื่อ ${fmt.dt(new Date().toISOString())}</span></div></div>
-        ${head('รายงาน', 'สถิติการใช้รถ', `${per.label} · ${fmt.date(per.from)} – ${fmt.date(per.to > new Date(2900, 0) ? new Date() : per.to)}`, `<button class="btn btn-ghost btn-sm no-print" id="pdf">${icon('printer')} PDF / พิมพ์</button><button class="btn btn-primary btn-sm no-print" id="xls">${icon('download')} Excel ทุกตาราง</button>`)}
+        ${head('รายงาน', 'สถิติการใช้รถ', `${per.label} · ${fmt.date(per.from)} – ${fmt.date(per.to > new Date(2900, 0) ? new Date() : per.to)}`, `<button class="btn btn-ghost btn-sm no-print" id="pdf">${icon('printer')} พิมพ์หน้านี้</button><button class="btn btn-primary btn-sm no-print" id="rpt">${icon('file')} รายงาน PDF</button><button class="btn btn-ghost btn-sm no-print" id="xls">${icon('download')} Excel ทุกตาราง</button>`)}
         ${periodBar('#/admin/stats', per, query)}${histNote(hist)}
         <div class="kpis">
           <div class="kpi"><span class="k-ic">${icon('clipboard')}</span><b class="num">${K.req}<em>คำขอ</em></b><span class="l">อนุมัติ ${K.ok} · ไม่อนุมัติ ${K.rej} · ยกเลิก ${K.cancel}</span></div>
@@ -1108,6 +1118,22 @@
       mount(root) {
         bindPeriod(root, '#/admin/stats', query);
         $('#pdf', root).addEventListener('click', () => window.print());
+        // รายงานสรุปแบบเอกสาร (หน้าปก + ตาราง) — คอมเลือก "บันทึกเป็น PDF" ได้ · iPhone ได้ไฟล์ PDF
+        $('#rpt', root).addEventListener('click', () => {
+          const T = (h, rows, foot) => `<table class="pd-tbl rp-t"><thead><tr>${h.map((x, i) => `<th class="${i ? 'r' : ''}">${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${h.length}">ไม่มีข้อมูล</td></tr>`}</tbody>${foot ? `<tfoot><tr>${foot.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr></tfoot>` : ''}</table>`;
+          const first = reqs.length ? new Date(Math.min(...reqs.map(r => +new Date(r.startAt)))) : new Date(), range = `${C.thDate(Math.max(+per.from, +first))} – ${C.thDate(per.to > new Date(2900, 0) ? new Date() : per.to)}`;
+          const kpi = T(['รายการ', 'จำนวน'], [['คำขอทั้งหมด', `${K.req} คำขอ`], ['อนุมัติ / ไม่อนุมัติ / ยกเลิก', `${K.ok} / ${K.rej} / ${K.cancel}`], ['เที่ยวรถ', `${asg.length} เที่ยว`], ['ระยะทางรวม', `${fmt.num(K.km)} กม.`], ['ผู้เดินทาง', `${fmt.num(K.pax)} คน (ครู ${fmt.num(K.tea)} · นักเรียน ${fmt.num(K.stu)}${K.oth ? ` · อื่น ${fmt.num(K.oth)}` : ''})`], ['ค่าน้ำมัน', `${fmt.money(K.fuel)} บาท (${fmt.num(K.liters, 1)} ลิตร)`], ['ค่าใช้จ่ายอื่น', `${fmt.money(K.other)} บาท`], ['ค่าซ่อมบำรุง', `${fmt.money(K.repair)} บาท`], ['รวมค่าใช้จ่าย', `<b>${fmt.money(K.fuel + K.other + K.repair)} บาท</b>`], ['คะแนนคนขับเฉลี่ย', `${avgR(ratings).toFixed(2)} / 5 (${ratings.length} ครั้ง)`]]);
+          const cover = C.reportCover({ title: 'รายงานสถิติการใช้รถส่วนกลาง', sub: per.label, range: `ช่วงวันที่ ${range}`, body: `${kpi}
+            ${T(['หมวดงาน', 'ครั้ง', 'เที่ยวรถ', 'กม.', 'ผู้เดินทาง'], byCat.map(x => [esc(x.name), x.n, x.vt, fmt.num(x.km), fmt.num(x.pax)]), ['รวม', sum(byCat, x => x.n), sum(byCat, x => x.vt), fmt.num(sum(byCat, x => x.km)), fmt.num(sum(byCat, x => x.pax))])}` });
+          const pg = (h, inner) => `<section class="rp-page">${C.reportHead('รายงานสถิติการใช้รถส่วนกลาง', `${per.label} · ${range}`)}${inner}</section>`;
+          const html = cover + pg('', `
+            <h2>แยกตามรถ</h2>${T(['รถ', 'เที่ยว', 'กม.', 'น้ำมัน (ล.)', 'ค่าน้ำมัน', 'กม./ลิตร', 'ค่าใช้จ่ายอื่น', 'ซ่อม', 'ค่าซ่อม'], byVehicle.map(x => [`${esc(x.v.name)}<small>${esc(x.v.plate || '')}</small>`, x.trips, fmt.num(x.km), fmt.num(x.liters, 1), fmt.money(x.fuel), x.kmpl ? fmt.num(x.kmpl, 1) : '-', fmt.money(x.other), x.rpN, fmt.money(x.rpCost)]), ['รวม', sum(byVehicle, x => x.trips), fmt.num(sum(byVehicle, x => x.km)), fmt.num(sum(byVehicle, x => x.liters), 1), fmt.money(sum(byVehicle, x => x.fuel)), '', fmt.money(sum(byVehicle, x => x.other)), sum(byVehicle, x => x.rpN), fmt.money(sum(byVehicle, x => x.rpCost))])}
+            <h2>แยกตามคนขับ</h2>${T(['คนขับ', 'เที่ยว', 'กม.', 'ชั่วโมงขับ', 'ออกตรงเวลา', 'คะแนน'], byDriver.map(x => [esc(x.d.name), x.trips, fmt.num(x.km), fmt.num(x.hours, 1), x.ontime != null ? fmt.num(x.ontime) + '%' : '-', x.rn ? `${x.rating.toFixed(2)} (${x.rn})` : '-']))}
+            <h2>รายเดือน</h2>${T(['เดือน', 'เที่ยว', 'กม.', 'ค่าใช้จ่าย'], byMonth.map(x => [x.label, x.trips, fmt.num(x.km), fmt.money(x.cost)]))}
+            <h2>แยกตามฝ่าย / กลุ่มสาระ</h2>${T(['ฝ่าย', 'ครั้ง', 'ผู้เดินทาง', 'กม.', 'ค่าใช้จ่าย'], byDept.map(x => [esc(x.k), x.n, fmt.num(x.pax), fmt.num(x.km), fmt.money(x.cost)]))}
+            <h2>ปลายทางยอดนิยม</h2>${T(['สถานที่', 'จังหวัด', 'ครั้ง'], byDest.map(x => [esc(x.k), esc(x.prov), x.n]))}`);
+          UI.printDoc(html, { title: `รายงานสถิติการใช้รถ ${per.label}`, footLeft: `รายงานสถิติการใช้รถส่วนกลาง · ${per.label}` });
+        });
         $('#xls', root).addEventListener('click', () => UI.exportSheets(`สถิติการใช้รถ-${per.label}`, [
           { name: 'สรุป', head: ['รายการ', 'ค่า'], rows: [['ช่วงเวลา', per.label], ['คำขอทั้งหมด', K.req], ['อนุมัติ', K.ok], ['ไม่อนุมัติ', K.rej], ['ยกเลิก', K.cancel], ['ระยะทางรวม (กม.)', K.km], ['ผู้เดินทาง', K.pax], ['ครู', K.tea], ['นักเรียน', K.stu], ['บุคคลอื่น', K.oth], ['ค่าน้ำมัน', K.fuel], ['ค่าใช้จ่ายอื่น', K.other], ['ค่าซ่อม', K.repair], ['น้ำมัน (ลิตร)', K.liters], ['คะแนนคนขับเฉลี่ย', +avgR(ratings).toFixed(2)]] },
           { name: 'รายเดือน', head: ['เดือน', 'เที่ยว', 'กม.', 'ค่าใช้จ่าย'], rows: byMonth.map(x => [x.label, x.trips, x.km, x.cost]) },

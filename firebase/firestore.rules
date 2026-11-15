@@ -100,7 +100,12 @@ service cloud.firestore {
                         || (resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                           && request.resource.data.status == resource.data.status
                           && changedOnly(['attachments', 'history', 'updatedAt'])
-                          && request.resource.data.attachments.size() > resource.data.attachments.size())))
+                          && request.resource.data.attachments.size() > resource.data.attachments.size())
+                        // 5) ขอแก้ไขข้อมูลคำขอที่อนุมัติแล้ว — ส่งคำขอแก้ไขให้แอดมินพิจารณา (ไม่เปลี่ยนข้อมูลจริงเอง)
+                        || (resource.data.status == 'approved' && request.resource.data.status == 'approved'
+                          && changedOnly(['changeReq', 'history', 'updatedAt'])
+                          && request.resource.data.changeReq.status == 'pending'
+                          && request.resource.data.changeReq.by == email())))
                     // ผู้ลงนาม (หัวหน้างานยานพาหนะ / รองผู้อำนวยการ): เพิ่มการลงนามอิเล็กทรอนิกส์ได้อย่างเดียว
                     || (memoSigner()
                         && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']

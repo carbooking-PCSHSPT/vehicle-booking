@@ -331,14 +331,17 @@ const UI = (() => {
     });
     area.style.cssText = '';
   }
-  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true, fitWidth = '' } = {}) {
+  async function printDoc(html, { title = 'เอกสาร', landscape = false, margin = '', pageNo = true, fitWidth = '', footLeft = '' } = {}) {
     if (inApp()) {
       await modal({ title: 'เปิดในเบราว์เซอร์ก่อนพิมพ์', body: `<p>แอปนี้ (เช่น LINE) สั่งพิมพ์หรือบันทึก PDF ไม่ได้</p><p style="margin-top:8px">กดเมนู <b>⋮</b> หรือ <b>แชร์</b> มุมจอ แล้วเลือก <b>“เปิดใน Chrome / Safari”</b> จากนั้นกดพิมพ์อีกครั้ง</p>`, actions: [{ label: 'เข้าใจแล้ว', kind: 'btn-primary' }] });
       return;
     }
     $('#printArea')?.remove(); $('#printPage')?.remove();
     const area = document.createElement('div'); area.id = 'printArea'; area.className = 'print-doc'; area.innerHTML = html;
-    const st = document.createElement('style'); st.id = 'printPage'; st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'};${margin ? ` margin: ${margin};` : ''}${pageNo ? '' : ' @bottom-right { content: none; }'} }`;
+    const st = document.createElement('style'); st.id = 'printPage';     // ท้ายกระดาษ (รายงาน): ซ้าย = ชื่อรายงาน/ตัวกรอง · ขวา = เวลาพิมพ์ + เลขหน้า
+    const cssStr = t => '"' + String(t).replace(/["\\\n]/g, ' ') + '"';
+    const printedAt = fmt.dt(new Date().toISOString());
+    st.textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'};${margin ? ` margin: ${margin};` : ''}${!pageNo ? ' @bottom-right { content: none; }' : footLeft ? ` @bottom-left { content: ${cssStr(footLeft)}; font-size: 8pt; color: #777; } @bottom-right { content: ${cssStr('พิมพ์เมื่อ ' + printedAt + ' · หน้า ')} counter(page) " / " counter(pages); font-size: 8pt; color: #777; }` : ''} }`;
     document.body.appendChild(area); document.head.appendChild(st);
     hydrate(area);
     const imgs = $$('img', area);
@@ -376,6 +379,25 @@ const UI = (() => {
       return;
     }
     setTimeout(() => window.print(), 60);
+  }
+  // ───── ดาวน์โหลดเอกสารเป็นไฟล์ PDF โดยตรง (iPhone/iPad ใช้เมนูแชร์ผ่าน printDoc) ─────
+  async function savePdf(html, { title = 'เอกสาร', landscape = false, margin = '', fitWidth = '' } = {}) {
+    if (isIOS() || inApp()) return printDoc(html, { title, landscape, margin, fitWidth, pageNo: false });
+    $('#pdfArea')?.remove();
+    const area = document.createElement('div'); area.id = 'pdfArea'; area.className = 'print-doc'; area.innerHTML = html;
+    area.style.cssText = 'position:absolute;left:-12000px;top:0'; document.body.appendChild(area);
+    try {
+      hydrate(area);
+      const imgs = $$('img', area);
+      const waitImg = img => new Promise(r => { const ok = () => img.complete && img.naturalWidth > 1; if (ok() || img.classList.contains('broken')) return r(); const t = setInterval(() => { if (ok() || img.classList.contains('broken')) { clearInterval(t); r(); } }, 150); });
+      await Promise.race([Promise.all(imgs.map(waitImg)), new Promise(r => setTimeout(r, 12000))]);
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      await fitLines(area, fitWidth);
+      const file = await makePdf(area, { title, landscape, margin });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      toast('ดาวน์โหลดไฟล์ PDF แล้ว');
+    } finally { area.remove(); }
   }
   // ───── สร้าง PDF ในเครื่อง (ใช้บน iPhone/iPad) — วาดเอกสารเป็นภาพทีละส่วนแล้วจัดลงหน้า A4 ─────
   const loadScript = src => new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('โหลดตัวสร้าง PDF ไม่สำเร็จ (ตรวจอินเทอร์เน็ต)')); document.head.appendChild(s); });
@@ -417,5 +439,5 @@ const UI = (() => {
     const blob = pdf.output('blob');
     return new File([blob], title.replace(/[\\/:*?"<>|]/g, '-') + '.pdf', { type: 'application/pdf' });
   }
-  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc, makePdf, signaturePad };
+  return { $, $$, esc, fmt, dayOf, pill, kindIcon, avatar, empty, toast, modal, confirm, readFiles, hydrate, openFile, thumb, img, isPdf, formData, debounce, animate, busy, exportSheets, sameDay, bahtText, printDoc, makePdf, savePdf, signaturePad };
 })();

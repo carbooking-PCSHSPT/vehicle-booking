@@ -87,8 +87,9 @@ const Maps = (() => {
           <div class="field full"><label>ที่อยู่ / ตำบล อำเภอ จังหวัด</label><input id="pkAddr" value="${esc(cur.address)}"></div>
           <div class="field"><label>จังหวัด</label><input id="pkProv" value="${esc(cur.province)}"></div>
           <div class="field"><label>ระยะทางจากโรงเรียน (กม. เที่ยวเดียว)</label><input id="pkKm" type="number" min="0" step="0.1" value="${esc(cur.km)}"></div>
+          <div class="field"><label>ระยะทางรวม ไป + กลับ (กม.)</label><input id="pkKm2" readonly class="pk-ro" value="${cur.km ? (Math.round(cur.km * 20) / 10) : '—'}"></div>
           <div class="field"><label>เวลาเดินทางโดยประมาณ (นาที)</label><input id="pkMin" type="number" min="0" value="${esc(cur.mins)}"></div>
-          <div class="field"><label>พิกัด</label><input id="pkLL" readonly value="${cur.lat != null ? `${(+cur.lat).toFixed(5)}, ${(+cur.lng).toFixed(5)}` : '—'}"></div>
+          <div class="field full"><label>พิกัด</label><input id="pkLL" readonly value="${cur.lat != null ? `${(+cur.lat).toFixed(5)}, ${(+cur.lng).toFixed(5)}` : '—'}"></div>
         </div>
         <p class="hint" id="pkCalc"></p>
       </div>`;
@@ -101,7 +102,10 @@ const Maps = (() => {
       } }],
       onOpen(el) {
         const q = el.querySelector('#pkQ'), res = el.querySelector('#pkRes'), calc = el.querySelector('#pkCalc');
-        const setF = (id, v) => { el.querySelector(id).value = v ?? ''; };
+        // ระยะทางไป + กลับ = เที่ยวเดียว × 2 (อัปเดตทุกครั้งที่ระยะเที่ยวเดียวเปลี่ยน)
+        const syncKm2 = () => { const k = +el.querySelector('#pkKm').value || 0; el.querySelector('#pkKm2').value = k ? Math.round(k * 20) / 10 : '—'; };
+        const setF = (id, v) => { el.querySelector(id).value = v ?? ''; if (id === '#pkKm') syncKm2(); };
+        el.querySelector('#pkKm').addEventListener('input', syncKm2);
         async function setPoint(p, { fromMap } = {}) {
           cur = { ...cur, ...p };
           ['name', 'address', 'province'].forEach(k => { if (p[k]) setF({ name: '#pkName', address: '#pkAddr', province: '#pkProv' }[k], p[k]); });
@@ -113,7 +117,7 @@ const Maps = (() => {
             if (fromMap && enabled) { try { const r = await reverse(cur.lat, cur.lng); if (!el.querySelector('#pkName').value) setF('#pkName', r.name || r.address.split(' ').slice(0, 2).join(' ')); setF('#pkAddr', r.address); setF('#pkProv', r.province); cur.address = r.address; cur.province = r.province; } catch (e) { /* ข้าม */ } }
             calc.textContent = 'กำลังคำนวณระยะทาง…';
             const r = await route({ lat: s.lat, lng: s.lng }, cur);
-            if (r) { setF('#pkKm', r.km); setF('#pkMin', r.mins); cur.km = r.km; cur.mins = r.mins; calc.textContent = `${r.estimated ? 'ประมาณ' : 'ระยะทางตามถนน'} ${r.km} กม. · ${r.mins} นาที จากโรงเรียน (เที่ยวเดียว)`; }
+            if (r) { setF('#pkKm', r.km); setF('#pkMin', r.mins); cur.km = r.km; cur.mins = r.mins; calc.textContent = `${r.estimated ? 'ประมาณ' : 'ระยะทางตามถนน'} ${r.km} กม. · ${r.mins} นาที จากโรงเรียน (เที่ยวเดียว) · ไป + กลับ ${Math.round(r.km * 20) / 10} กม.`; }
           }
         }
         function addMarker() {

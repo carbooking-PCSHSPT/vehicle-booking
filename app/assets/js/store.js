@@ -250,14 +250,15 @@ const Store = (() => {
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
       depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน',
-      memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว', memowaive: 'แอดมินยกเว้นบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้'
+      memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว', memowaive: 'แอดมินยกเว้นบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้',
+      changereq: 'มีคำขอแก้ไขข้อมูล รอพิจารณา', changeok: 'แอดมินอนุมัติการแก้ไขข้อมูลแล้ว', changeno: 'แอดมินไม่อนุมัติการแก้ไขข้อมูล'
     };
     db.requests.forEach(r => {
       (r.history || []).forEach(h => {
         if (h.by === me.email) return;
         let mine = false, link = '';
-        if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
-        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
+        if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive', 'changeok', 'changeno'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
+        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen && h.at <= nowStr });
       });
@@ -1036,6 +1037,45 @@ const Store = (() => {
         check(r);
         r.status = 'cancelled'; r.cancel = { at: nowISO(), by: me.email, reason: String(reason || '').trim() };
         r.history.push(H('cancel', reason));
+        return r;
+      });
+    },
+    // ผู้ขอ: ขอแก้ไขข้อมูลคำขอที่อนุมัติแล้ว (วันเวลา จำนวนคน ฯลฯ) + เหตุผล → แอดมินพิจารณาอีกครั้ง
+    async requestChange(id, data, reason) {
+      reason = String(reason || '').trim();
+      if (!reason) throw new Error('กรุณาระบุเหตุผลที่ขอแก้ไข');
+      const KEYS = ['startAt', 'endAt', 'tripType', 'teachers', 'students', 'others', 'passengerNames', 'pickup', 'contactPhone', 'note'];
+      const d = {}; KEYS.forEach(k => { if (data[k] !== undefined) d[k] = typeof data[k] === 'string' ? data[k].trim() : data[k]; });
+      ['teachers', 'students', 'others'].forEach(k => { if (d[k] !== undefined) d[k] = Math.max(0, +d[k] || 0); });
+      if (d.startAt && d.endAt && new Date(d.endAt) <= new Date(d.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
+      const check = r => {
+        if (!r) throw new Error('ไม่พบคำขอ');
+        if (r.requester.email !== me.email) throw new Error('ขอแก้ไขได้เฉพาะคำขอของตัวเอง');
+        if (r.status !== 'approved' || (r.assignments || []).some(a => a.status !== 'assigned')) throw new Error('ขอแก้ไขได้เฉพาะคำขอที่อนุมัติแล้วและรถยังไม่ออกเดินทาง');
+        if (r.changeReq && r.changeReq.status === 'pending') throw new Error('มีคำขอแก้ไขที่รอแอดมินพิจารณาอยู่แล้ว');
+      };
+      const r0 = request(id); check(r0);
+      const changed = Object.keys(d).filter(k => String(d[k] ?? '') !== String(r0[k] ?? ''));
+      if (!changed.length) throw new Error('ยังไม่ได้เปลี่ยนแปลงข้อมูลใด');
+      const pick = (o, ks) => ks.reduce((m, k) => { m[k] = o[k] ?? ''; return m; }, {});
+      return mutateReq(id, r => {
+        check(r);
+        r.changeReq = { status: 'pending', at: nowISO(), by: me.email, byName: me.name || me.email, reason, data: pick(d, changed), before: pick(r, changed) };
+        r.history.push(H('changereq', reason));
+        return r;
+      });
+    },
+    // แอดมิน: อนุมัติ / ไม่อนุมัติ คำขอแก้ไขข้อมูล
+    async decideChange(id, ok, note = '') {
+      needAdmin();
+      note = String(note || '').trim();
+      if (!ok && !note) throw new Error('กรุณาระบุเหตุผลที่ไม่อนุมัติการแก้ไข');
+      return mutateReq(id, r => {
+        const cr = r.changeReq;
+        if (!cr || cr.status !== 'pending') throw new Error('ไม่มีคำขอแก้ไขที่รอพิจารณา');
+        if (ok) Object.assign(r, cr.data);
+        r.changeReq = { ...cr, status: ok ? 'approved' : 'rejected', decidedAt: nowISO(), decidedBy: me.email, decidedByName: me.name || me.email, note };
+        r.history.push(H(ok ? 'changeok' : 'changeno', note || (ok ? 'แก้ไขตามที่ขอ' : '')));
         return r;
       });
     },
