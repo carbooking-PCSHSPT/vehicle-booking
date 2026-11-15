@@ -518,13 +518,13 @@ const C = (() => {
       ${vrows.length ? tb(['รถ', 'เที่ยว', 'ระยะทาง (กม.)', 'ผู้เดินทาง (คน)'], vrows.map(x => [`${esc(x.v.name)}${x.v.plate ? ` <small>${esc(x.v.plate)}</small>` : ''}`, x.n, UI.fmt.num(x.km), x.pax]), ['รวม', vrows.reduce((t, x) => t + x.n, 0), UI.fmt.num(vrows.reduce((t, x) => t + x.km, 0)), vrows.reduce((t, x) => t + x.pax, 0)]) : ''}` });
     let no = 0;
     const rows = groups.map(([k, g]) => `<tr class="rp-grp"><td colspan="6">${esc(k)} · ${g.length} รายการ</td></tr>` + g.map(r => { const st = s.STATUS[r.status] || {}; return `<tr><td class="c">${++no}</td>
-      <td class="nw">${UI.fmt.date(r.startAt)}<small>${UI.fmt.time(r.startAt)}–${UI.fmt.when(r.endAt)}</small><small>${r.id}</small></td>
+      <td><span class="one" data-fit>${UI.fmt.date(r.startAt)}</span><small class="one" data-fit>${UI.fmt.time(r.startAt)}–${UI.sameDay(r.startAt, r.endAt) ? UI.fmt.time(r.endAt) : UI.fmt.dayMonth(r.endAt) + ' ' + UI.fmt.time(r.endAt)} น.</small><small class="one" data-fit>${r.id}</small></td>
       <td>${esc(s.destName(r))}<small>${esc(r.purpose || '')}${r.totalKm ? ` · ${UI.fmt.num(r.totalKm, 0)} กม.` : ''}</small></td>
-      <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')} · ${s.passengers(r)} คน</small></td>
-      <td>${(r.assignments || []).map(a => `${esc(vName(a.vehicleId))}<small>${esc(dName(a.driverId))}</small>`).join('') || '-'}</td>
+      <td><span class="one" data-fit>${esc(r.requester.name)}</span><small>${esc(r.requester.dept || '')} · ${s.passengers(r)} คน</small></td>
+      <td>${(r.assignments || []).map(a => `<span class="one" data-fit>${esc(vName(a.vehicleId))}</span><small class="one" data-fit>${esc(dName(a.driverId))}</small>`).join('') || '-'}</td>
       <td><span class="rp-st" style="--c:${RP_TONE[r.status] || '#555'}">${esc(st.label || r.status)}</span></td></tr>`; }).join('')).join('');
     return cover + `<section class="rp-page">${reportHead(docTitle, `${sub ? sub + ' · ' : ''}${items.length} รายการ · ${range}`)}
-      <table class="pd-tbl rp-list"><thead><tr><th class="c">ที่</th><th>วันเดินทาง</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+      <table class="pd-tbl rp-list"><colgroup><col style="width:5%"><col style="width:15%"><col style="width:27%"><col style="width:23%"><col style="width:17%"><col style="width:13%"></colgroup><thead><tr><th class="c">ที่</th><th>วันเดินทาง</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   }
   function coverPage(items, docTitle, range) {
     const st = S().db.settings, cnt = f => items.filter(f).length;

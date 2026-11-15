@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>บันทึกนอกเวลา คนขับ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: 'THSarabunNew'; src: url('../app/fonts/THSarabunNew.woff') format('woff'); font-weight: 400; }
+@font-face { font-family: 'THSarabunNew'; src: url('../app/fonts/THSarabunNew-Bold.woff') format('woff'); font-weight: 700; }
+:root { --navy: #24307a; --navy-50: #eef0fa; --gold: #c9962b; --gold-50: #fdf6e3; --cream: #faf6ee; --ink: #1b2147; --muted: #6e6a7c; --line: #e8e1d2; --ok: #047857; --warn: #a16207; --bad: #b91c1c; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #ece7db; color: var(--ink); font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; overflow-x: hidden; }
+.top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font: 600 1.05rem Prompt; color: var(--navy); }
+.seg { display: inline-flex; flex-wrap: wrap; padding: 4px; border-radius: 14px; background: #efe8d8; gap: 2px; }
+.seg button { border: 0; background: none; padding: 8px 14px; border-radius: 10px; font: 500 .9rem Prompt; color: var(--ink); cursor: pointer; }
+.seg button.on { background: #fff; color: var(--navy); box-shadow: 0 4px 10px -6px rgba(60, 40, 10, .5); }
+main { max-width: 1180px; margin: 0 auto; padding: 22px 16px 70px; }
+.view { display: none; } .view.on { display: block; }
+.intro { display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; background: #fff; border: 1px solid var(--line); margin-bottom: 22px; }
+.intro h2 { margin: 0; font: 600 1.1rem Prompt; color: var(--navy); }
+.intro ol { margin: 0; padding-left: 1.3em; line-height: 1.8; font-size: .93rem; }
+.rule { display: flex; flex-wrap: wrap; gap: 8px; } .rule span { padding: 5px 12px; border-radius: 99px; background: var(--gold-50); color: #7a5410; font: 500 .8rem Prompt; border: 1px solid #f1dfb4; }
+.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; vertical-align: -3px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 9px 16px; border-radius: 99px; font: 500 .9rem Prompt; cursor: pointer; }
+.btn.p { background: var(--navy); color: #fff; border-color: var(--navy); } .btn.g { background: linear-gradient(135deg, #f6d27a, var(--gold)); border: 0; }
+.btn.sm { padding: 6px 12px; font-size: .82rem; }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 99px; font: 500 .74rem Prompt; white-space: nowrap; }
+.pill.wait { background: #fff4d6; color: var(--warn); } .pill.ok { background: #dcf5ea; color: var(--ok); } .pill.auto { background: var(--navy-50); color: var(--navy); } .pill.man { background: #f3e8ff; color: #6d28d9; }
+
+/* ── มือถือคนขับ ── */
+.phone-wrap { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 26px; align-items: start; }
+.phone { width: 390px; max-width: 100%; border-radius: 34px; background: var(--cream); border: 8px solid #1b1f3b; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(20, 20, 60, .6); }
+.ph-bar { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #fff; border-bottom: 1px solid var(--line); font: 600 .95rem Prompt; color: var(--navy); }
+.ph-body { padding: 14px; display: grid; gap: 12px; max-height: 760px; overflow: auto; }
+.ot-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ot-sum div { padding: 10px; border-radius: 14px; background: #fff; border: 1px solid var(--line); text-align: center; }
+.ot-sum b { display: block; font: 700 1.3rem Prompt; color: var(--navy); } .ot-sum small { font-size: .72rem; color: var(--muted); }
+.ot-card { padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid var(--line); display: grid; gap: 6px; }
+.ot-card .h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ot-card .h b { font: 600 .95rem Prompt; }
+.ot-card .t { display: flex; gap: 10px; align-items: center; font-size: .86rem; }
+.ot-card .t em { font-style: normal; font: 600 .95rem Prompt; color: var(--navy); }
+.ot-card small { color: var(--muted); font-size: .8rem; }
+.hrs { margin-left: auto; padding: 3px 10px; border-radius: 10px; background: var(--gold-50); color: #7a5410; font: 600 .82rem Prompt; }
+.hint { color: var(--muted); font-size: .84rem; line-height: 1.6; }
+.note { padding: 14px 16px; border-radius: 16px; background: #fff; border: 1px solid var(--line); font-size: .9rem; line-height: 1.7; }
+.note h3 { margin: 0 0 6px; font: 600 1rem Prompt; color: var(--navy); }
+.form { display: grid; gap: 10px; padding: 14px; border-radius: 16px; background: #fff; border: 1.5px dashed #c9cde0; }
+.form label { display: grid; gap: 4px; font: 500 .8rem Prompt; color: var(--muted); }
+.form input, .form select, .tools input, .tools select { font: 400 .92rem 'IBM Plex Sans Thai'; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); width: 100%; }
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ── หลังบ้าน ── */
+.card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
+.tools label { display: grid; gap: 4px; font: 500 .78rem Prompt; color: var(--muted); }
+.tools input, .tools select { width: auto; }
+.tbl-wrap { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 820px; }
+.t th, .t td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.t th { font: 600 .78rem Prompt; color: var(--muted); background: #fbf8f1; }
+.t td small { display: block; color: var(--muted); font-size: .76rem; }
+.t .r { text-align: right; } .t .nw { white-space: nowrap; }
+.t tfoot td { font: 600 .9rem Prompt; background: var(--navy-50); }
+.drv-sum { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+.drv-sum div { padding: 10px 14px; border-radius: 14px; background: var(--cream); border: 1px solid var(--line); font-size: .86rem; }
+.drv-sum b { font: 600 1rem Prompt; color: var(--navy); }
+
+/* ── เอกสาร (ตามแบบฟอร์มของฝ่ายการเงิน) ── */
+.paper-scroll { overflow-x: auto; padding: 16px 0; }
+.paper { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 10mm 12mm; background: #fff; box-shadow: 0 20px 50px -24px rgba(0, 0, 0, .5); font-family: 'THSarabunNew', sans-serif; font-size: 15pt; color: #000; line-height: 1.25; }
+.doc-h { display: flex; align-items: center; gap: 10px; }
+.doc-h img { width: 17mm; }
+.doc-h b { font-weight: 700; font-size: 15pt; } .doc-h p { font-size: 14.5pt; } .doc-tbl td.pl { font-size: 13.5pt; line-height: 1.1; } .doc-tbl th, .doc-tbl td.c { white-space: nowrap; } .doc-tbl th { font-size: 14pt; padding: 2px 3px; }
+.doc-h p { margin: 0; }
+.doc-tbl { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
+.doc-tbl th, .doc-tbl td { border: 1px solid #000; padding: 1px 6px; height: 9.4mm; font-size: 14.5pt; vertical-align: middle; }
+.doc-tbl th { height: auto; font-weight: 400; padding: 2px 6px; }
+.doc-tbl td.c, .doc-tbl th { text-align: center; }
+.doc-tbl td .one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.doc-sign { margin: 10mm 8mm 0 auto; width: 95mm; text-align: center; }
+.doc-sign p { margin: 0 0 2px; }
+.doc-sign .ln { display: flex; justify-content: space-between; }
+.fill { display: inline-block; min-width: 10mm; padding: 0 3px; border-bottom: 1px dotted #000; text-align: center; }
+.cap { margin: 14px 0 0; text-align: center; color: var(--muted); font-size: .86rem; }
+@media (max-width: 900px) { .phone-wrap { grid-template-columns: 1fr; } .phone { margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div class="top"><h1>เดโม่: บันทึกปฏิบัติงานนอกเวลาราชการ (พนักงานขับรถ)</h1>
+  <div class="seg" id="tabs"><button data-v="drv" class="on">1. มือถือคนขับ</button><button data-v="adm">2. หลังบ้าน (รับรอง / เลือกช่วงวัน)</button><button data-v="doc">3. เอกสารที่พิมพ์</button></div></div>
+<main>
+  <section class="intro">
+    <h2>แนวคิด — ไม่ต้องกรอกซ้ำ ระบบดึงจากเวลาที่คนขับกด "ออกเดินทาง / กลับถึง" อยู่แล้ว</h2>
+    <ol>
+      <li><b>ดึงอัตโนมัติ:</b> งานที่กลับถึงหลัง <b>18.00 น.</b> (หรือวันหยุด) → สร้างรายการนอกเวลาให้เอง พร้อมรายการที่ไป · เวลาไป-กลับ · ชื่อครูผู้โดยสาร (ผู้ขอใช้รถ)</li>
+      <li><b>คนขับเพิ่มเองได้:</b> งานนอกเวลาที่ไม่มีในระบบ (เช่น รับ-ส่งเอกสารด่วน ล้างรถ) กด "เพิ่มงานนอกเวลา"</li>
+      <li><b>หัวหน้างานยานพาหนะรับรอง</b> ในหลังบ้าน (แก้เวลาได้ / ไม่รับรองได้)</li>
+      <li><b>เลือกช่วงวันที่</b> (เช่น 1–30 พ.ย.) → พิมพ์ "บันทึกการลงเวลาปฏิบัติงานนอกเวลาราชการ" ตามแบบฟอร์มเดิม ส่งฝ่ายการเงินเบิก</li>
+    </ol>
+    <div class="rule"><span>นับหลัง 18.00 น.</span><span>ไม่เกิน 3 ชั่วโมง/ครั้ง</span><span>เวลาจริงจากปุ่มของคนขับ</span><span>ข้อมูลในเดโม่เป็นตัวอย่าง</span></div>
+  </section>
+
+  <!-- 1. มือถือคนขับ -->
+  <section class="view on" id="v-drv"><div class="phone-wrap">
+    <div class="phone"><div class="ph-bar"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> งานนอกเวลาของฉัน · พ.ย. 69</div>
+      <div class="ph-body" id="drvList"></div></div>
+    <div class="note"><h3>หน้าจอคนขับ (เมนู "งานนอกเวลา")</h3>
+      <p>• ทุกครั้งที่คนขับกด <b>"กลับถึงแล้ว"</b> หลัง 18.00 น. ระบบเพิ่มรายการนอกเวลาให้ทันที (ป้าย <span class="pill auto">อัตโนมัติ</span>)</p>
+      <p>• ระบบคิดชั่วโมงนอกเวลา = ตั้งแต่ 18.00 น. ถึงเวลากลับ <b>ไม่เกิน 3 ชม./ครั้ง</b></p>
+      <p>• งานที่ไม่ได้ขอผ่านระบบ กด <b>+ เพิ่มงานนอกเวลา</b> (ป้าย <span class="pill man">เพิ่มเอง</span>) — ต้องให้หัวหน้ารับรอง</p>
+      <p>• สถานะ <span class="pill wait">รอรับรอง</span> → <span class="pill ok">รับรองแล้ว</span> เห็นชั่วโมงสะสมของเดือนตลอด</p>
+      <p class="hint">ลองกด "เพิ่มงานนอกเวลา" แล้วบันทึก — รายการจะไปโผล่ในแท็บ 2 และ 3 ด้วย</p></div>
+  </div></section>
+
+  <!-- 2. หลังบ้าน -->
+  <section class="view" id="v-adm"><div class="card">
+    <div class="tools">
+      <label>ตั้งแต่วันที่<input type="date" id="fFrom" value="2026-11-01"></label>
+      <label>ถึงวันที่<input type="date" id="fTo" value="2026-11-30"></label>
+      <label>พนักงานขับรถ<select id="fDrv"><option value="">ทุกคน</option></select></label>
+      <label>สถานะ<select id="fSt"><option value="">ทั้งหมด</option><option value="wait">รอรับรอง</option><option value="ok">รับรองแล้ว</option></select></label>
+      <span style="flex:1"></span>
+      <button class="btn" id="okAll"><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> รับรองที่เลือก</button>
+      <button class="btn p" id="toDoc"><svg class="i" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> พิมพ์แบบฟอร์มเบิก</button>
+    </div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th><input type="checkbox" id="ckAll"></th><th>วันที่</th><th>รายการที่ไป</th><th>เวลาไป</th><th>เวลากลับ</th><th>พนักงานขับรถ</th><th>ครูผู้โดยสาร</th><th class="r">ชม.นอกเวลา</th><th>ที่มา</th><th>สถานะ</th></tr></thead><tbody id="admRows"></tbody><tfoot id="admFoot"></tfoot></table></div>
+    <div class="drv-sum" id="drvSum"></div>
+    <p class="hint" style="margin-top:12px">• พิมพ์เฉพาะรายการที่ <b>รับรองแล้ว</b> ในช่วงวันที่เลือก · เลือกคนขับ 1 คน = ได้ใบแยกรายคน (สะดวกเบิกรายบุคคล) · ทุกคน = ใบรวม<br>• กดแถวเพื่อแก้เวลา / ไม่รับรอง (ในระบบจริง)</p>
+  </div></section>
+
+  <!-- 3. เอกสาร -->
+  <section class="view" id="v-doc">
+    <div class="paper-scroll"><div class="paper" id="paper"></div></div>
+    <p class="cap">A4 แนวนอน · ฟอนต์ TH Sarabun New · ตามแบบฟอร์มเดิมของโรงเรียน (มีแถวว่างให้เขียนเพิ่ม) · ถ้ารายการเกินหน้า ขึ้นหน้าใหม่พร้อมหัวตารางให้อัตโนมัติ</p>
+  </section>
+</main>
+<script>
+const DRV = ['นายสวง เพไร', 'นายบุญทัน กองไรสง', 'นายพัลลภ สุนทร', 'นายไชยวัฒน์ กุณฑล'];
+let OT = [
+  { d: '2026-11-03', place: 'สนามบินสุวรรณภูมิ (รับคณะครูดูงาน)', out: '15:30', back: '20:10', drv: 0, pax: 'นางสาวพิศมัย แจ่มจำรัส', src: 'auto', st: 'ok' },
+  { d: '2026-11-06', place: 'มหาวิทยาลัยมหิดล ศาลายา (แข่งขันโครงงาน)', out: '13:00', back: '19:05', drv: 1, pax: 'นายชลธีร์ จันทร์ลอย', src: 'auto', st: 'ok' },
+  { d: '2026-11-08', place: 'อุทยานแห่งชาติเขาใหญ่ (ค่ายวิทยาศาสตร์)', out: '07:00', back: '21:40', drv: 0, pax: 'นางปิยะนุช ใจดี', src: 'auto', st: 'ok' },
+  { d: '2026-11-12', place: 'รับ-ส่งเอกสารด่วน สพม.ปทุมธานี', out: '18:00', back: '19:30', drv: 2, pax: 'นายณรงค์ฤทธิ์ แมนสืบชาติ', src: 'man', st: 'wait' },
+  { d: '2026-11-14', place: 'โรงพยาบาลธรรมศาสตร์ (ส่งนักเรียนป่วย)', out: '17:20', back: '19:45', drv: 3, pax: 'นางนิตยา สุขทอง', src: 'auto', st: 'wait' },
+  { d: '2026-11-18', place: 'ศูนย์ประชุมแห่งชาติสิริกิติ์ (นิทรรศการ)', out: '06:30', back: '18:50', drv: 1, pax: 'นายอรรถพล แก้วประเสริฐ', src: 'auto', st: 'wait' }
+];
+const TH_M = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const TH_S = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const dd = s => { const d = new Date(s + 'T12:00'); return { d: d.getDate(), m: d.getMonth(), y: d.getFullYear() + 543 }; };
+const dShort = s => { const x = dd(s); return `${x.d} ${TH_S[x.m]} ${String(x.y).slice(2)}`; };
+const dSlash = s => { const x = dd(s); return `${x.d}/${x.m + 1}/${x.y}`; };
+const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+// ชั่วโมงนอกเวลา: ตั้งแต่ 18.00 (หรือเวลาออกถ้าออกหลัง 18.00) ถึงเวลากลับ ไม่เกิน 3 ชม.
+const otH = o => Math.min(3, Math.max(0, (mins(o.back) - Math.max(mins(o.out), 18 * 60)) / 60));
+const hm = h => { const t = Math.round(h * 60); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pill = o => `<span class="pill ${o.st}">${o.st === 'ok' ? 'รับรองแล้ว' : 'รอรับรอง'}</span>`;
+const srcP = o => `<span class="pill ${o.src}">${o.src === 'auto' ? 'อัตโนมัติ' : 'เพิ่มเอง'}</span>`;
+
+function drawDrv() {
+  const me = 0, mine = OT.filter(o => o.drv === me);
+  const tot = mine.reduce((s, o) => s + otH(o), 0), ok = mine.filter(o => o.st === 'ok').reduce((s, o) => s + otH(o), 0);
+  document.getElementById('drvList').innerHTML = `
+    <div class="hint">${DRV[me]} · พนักงานขับรถ</div>
+    <div class="ot-sum"><div><b>${mine.length}</b><small>ครั้ง</small></div><div><b>${hm(tot)}</b><small>ชม.นอกเวลา</small></div><div><b>${hm(ok)}</b><small>รับรองแล้ว</small></div></div>
+    ${mine.map(o => `<div class="ot-card"><div class="h"><b>${dShort(o.d)}</b>${pill(o)}</div>
+      <div>${esc(o.place)}</div>
+      <div class="t">ไป <em>${o.out}</em> กลับ <em>${o.back}</em><span class="hrs">นอกเวลา ${hm(otH(o))} ชม.</span></div>
+      <small>ครูผู้โดยสาร: ${esc(o.pax)} · ${srcP(o)}</small></div>`).join('')}
+    <form class="form" id="addF">
+      <b style="font:600 .92rem Prompt;color:var(--navy)">+ เพิ่มงานนอกเวลา (ที่ไม่มีในระบบ)</b>
+      <label>วันที่<input type="date" name="d" value="2026-11-20" required></label>
+      <label>รายการที่ไป<input name="place" placeholder="เช่น ล้างรถ / รับ-ส่งเอกสารด่วน" required></label>
+      <div class="g2"><label>เวลาไป<input type="time" name="out" value="18:00" required></label><label>เวลากลับ<input type="time" name="back" value="20:00" required></label></div>
+      <label>ครูผู้โดยสาร / ผู้สั่งงาน<input name="pax" placeholder="ชื่อ-นามสกุล" required></label>
+      <button class="btn p" type="submit">บันทึก — ส่งให้หัวหน้ารับรอง</button>
+    </form>`;
+  document.getElementById('addF').addEventListener('submit', e => {
+    e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    OT.push({ ...f, drv: me, src: 'man', st: 'wait' }); OT.sort((a, b) => a.d.localeCompare(b.d)); drawAll();
+  });
+}
+const sel = new Set();
+function filtered() {
+  const f = document.getElementById('fFrom').value, t = document.getElementById('fTo').value, dv = document.getElementById('fDrv').value, st = document.getElementById('fSt').value;
+  return OT.map((o, i) => ({ o, i })).filter(({ o }) => o.d >= f && o.d <= t && (dv === '' || o.drv === +dv) && (!st || o.st === st));
+}
+function drawAdm() {
+  const rows = filtered();
+  document.getElementById('admRows').innerHTML = rows.map(({ o, i }) => `<tr><td><input type="checkbox" data-i="${i}" ${sel.has(i) ? 'checked' : ''}></td><td class="nw">${dShort(o.d)}</td><td>${esc(o.place)}</td><td>${o.out}</td><td>${o.back}</td><td class="nw">${DRV[o.drv]}</td><td class="nw">${esc(o.pax)}</td><td class="r"><b>${hm(otH(o))}</b></td><td>${srcP(o)}</td><td>${pill(o)}</td></tr>`).join('') || `<tr><td colspan="10" class="hint" style="text-align:center;padding:24px">ไม่มีรายการในช่วงนี้</td></tr>`;
+  const tot = rows.reduce((s, { o }) => s + otH(o), 0);
+  document.getElementById('admFoot').innerHTML = rows.length ? `<tr><td colspan="7">รวม ${rows.length} ครั้ง</td><td class="r">${hm(tot)}</td><td colspan="2"></td></tr>` : '';
+  document.getElementById('drvSum').innerHTML = DRV.map((n, k) => { const rs = rows.filter(x => x.o.drv === k); return rs.length ? `<div>${n}<br><b>${rs.length} ครั้ง · ${hm(rs.reduce((s, x) => s + otH(x.o), 0))} ชม.</b></div>` : ''; }).join('');
+}
+function drawDoc() {
+  const f = document.getElementById('fFrom').value, t = document.getElementById('fTo').value, dv = document.getElementById('fDrv').value;
+  const rows = OT.filter(o => o.d >= f && o.d <= t && (dv === '' || o.drv === +dv) && o.st === 'ok');
+  const a = dd(f), b = dd(t), N = Math.max(11, rows.length);
+  document.getElementById('paper').innerHTML = `
+    <div class="doc-h"><img src="../app/images/logo.png" alt=""><div>
+      <p><b>บันทึกการลงเวลาปฏิบัติงานนอกเวลาราชการ โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ปทุมธานี</b></p>
+      <p><b>สำหรับพนักงานขับรถ (ปฏิบัติงานหลังเวลา 18.00 น. และไม่เกิน 3 ชั่วโมง/ครั้ง)</b> วันที่ <span class="fill">${a.d}</span> เดือน <span class="fill">${TH_M[a.m]}</span> พ.ศ. <span class="fill">${a.y}</span> ถึง วันที่ <span class="fill">${b.d}</span> เดือน <span class="fill">${TH_M[b.m]}</span> พ.ศ. <span class="fill">${b.y}</span>${dv !== '' ? ` &nbsp;·&nbsp; <b>${DRV[+dv]}</b>` : ''}</p></div></div>
+    <table class="doc-tbl"><colgroup><col style="width:4%"><col style="width:10%"><col style="width:25%"><col style="width:9%"><col style="width:20.5%"><col style="width:9%"><col style="width:22.5%"></colgroup>
+      <thead><tr><th>ที่</th><th>วัน/เดือน/ปี</th><th>รายการที่ไป</th><th>เวลาไป</th><th>ชื่อ-นามสกุล พนักงานขับรถ</th><th>เวลากลับ</th><th>ชื่อ-นามสกุล ครูผู้โดยสาร</th></tr></thead>
+      <tbody>${Array.from({ length: N }, (_, k) => { const o = rows[k]; return o ? `<tr><td class="c">${k + 1}</td><td class="c">${dSlash(o.d)}</td><td class="pl">${esc(o.place)}</td><td class="c">${o.out.replace(':', '.')} น.</td><td><span class="one">${DRV[o.drv]}</span></td><td class="c">${o.back.replace(':', '.')} น.</td><td><span class="one">${esc(o.pax)}</span></td></tr>` : '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>'; }).join('')}</tbody></table>
+    <div class="doc-sign"><p class="ln"><span>ลงชื่อ</span><span>หัวหน้างานยานพาหนะ</span></p><p>(นายณรงค์ฤทธิ์ แมนสืบชาติ)</p></div>`;
+}
+function drawAll() { drawDrv(); drawAdm(); drawDoc(); }
+document.getElementById('fDrv').innerHTML += DRV.map((n, k) => `<option value="${k}">${n}</option>`).join('');
+['fFrom', 'fTo', 'fDrv', 'fSt'].forEach(id => document.getElementById(id).addEventListener('change', () => { drawAdm(); drawDoc(); }));
+document.getElementById('admRows').addEventListener('change', e => { const c = e.target.closest('[data-i]'); if (c) c.checked ? sel.add(+c.dataset.i) : sel.delete(+c.dataset.i); });
+document.getElementById('ckAll').addEventListener('change', e => { filtered().forEach(({ i }) => e.target.checked ? sel.add(i) : sel.delete(i)); drawAdm(); });
+document.getElementById('okAll').addEventListener('click', () => { sel.forEach(i => { OT[i].st = 'ok'; }); sel.clear(); document.getElementById('ckAll').checked = false; drawAll(); });
+const show = v => { document.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v)); document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); };
+document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
+document.getElementById('toDoc').addEventListener('click', () => show('doc'));
+drawAll();
+const q = new URLSearchParams(location.search).get('v'); if (q) show(q);
+</script>
+</body>
+</html>

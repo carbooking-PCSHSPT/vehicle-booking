@@ -1892,3 +1892,17 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .lt640 .pk-ll { flex-direction: column; }
 
 .lt420 .pk-plate { font-size: .47rem; padding: 0 2px; letter-spacing: -.02em; max-width: calc(100% + 2px); }
+
+/* ตารางในเอกสาร: ระยะบรรทัดอ่านสบาย ชื่อ-นามสกุลบรรทัดเดียว (ย่อให้พอดีช่อง) */
+.print-doc .one { display: block; white-space: nowrap; overflow: hidden; }
+.print-doc small.one { font-size: 12pt; }
+.print-doc .rp-list { table-layout: fixed; }
+.print-doc .rp-list th, .print-doc .rp-list td { padding: 4px 6px; font-size: 13.5pt; line-height: 1.32; vertical-align: top; }
+.print-doc .rp-list small, .print-doc .pd-tbl small { font-size: 12pt; line-height: 1.3; margin-top: 1px; }
+.print-doc .rp-grp td { padding: 3px 6px; line-height: 1.3; }
+.print-doc .rp-st { white-space: nowrap; font-size: 11.5pt; line-height: 1.35; }
+.print-doc .pd-tbl th, .print-doc .pd-tbl td { line-height: 1.3; }
+.print-doc .rp-t th, .print-doc .rp-t td { line-height: 1.28; padding: 2px 7px; }
+.print-doc .pd-list { table-layout: fixed; }
+.print-doc .rp-st { font-size: 11pt; padding: 0 4px; }
+.print-doc .rp-list td:last-child { padding-left: 4px; padding-right: 3px; }
