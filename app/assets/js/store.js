@@ -1128,7 +1128,7 @@ const Store = (() => {
       return r;
     },
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
-    async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '' } = {}) {
+    async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '', paxSign = null } = {}) {
       const when = at ? new Date(at).toISOString() : nowISO();
       // ทุกคน: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน
       // ยกเว้นแอดมินบันทึกแทนจากหน้าหลังบ้าน (override = เหตุผล) หรือการย้อนสถานะ
@@ -1136,6 +1136,7 @@ const Store = (() => {
       if (!ov && status !== 'assigned') {
         const cur = request(id);
         if (status === 'ontrip' && cur && Date.now() < new Date(cur.startAt).getTime() - 30 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 30 นาที)');
+        if (status === 'ontrip' && cur && Date.now() > new Date(cur.startAt).getTime() + 24 * 36e5) throw new Error('เลยกำหนดออกเดินทางเกิน 24 ชั่วโมง — ให้แอดมินบันทึกแทน');
         if (new Date(when).getTime() > Date.now() + 5 * 6e4) throw new Error('เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน');
       }
       return mutateReq(id, r => {
@@ -1155,6 +1156,7 @@ const Store = (() => {
           // ต้องกด "ออกเดินทาง" ก่อนเสมอ (ยกเว้นแอดมินบันทึกแทนพร้อมเหตุผล)
           if (a.status !== 'ontrip' && !ov) throw new Error(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้');
           if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
+          if (paxSign) a.paxSign = paxSign.has ? { has: true, name: String(paxSign.name || '').trim(), img: String(paxSign.img || ''), at: paxSign.at || nowISO() } : { has: false, at: paxSign.at || nowISO() };
           a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
         return r;

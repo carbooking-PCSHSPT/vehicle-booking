@@ -145,11 +145,13 @@ const C = (() => {
   function gantt(list, vehicles, { day = new Date(), hrefOf = () => '' } = {}) {
     const d0 = new Date(day); d0.setHours(0, 0, 0, 0);
     const d1 = new Date(d0.getTime() + 864e5);
-    // ช่วงเวลาอัจฉริยะ: ปกติ 06:00–18:00 · ขยายได้ทั้ง 24 ชม. ตามงานจริง (งานต่อจากเมื่อวาน = เริ่ม 00:00 · ค้างคืน = ถึง 24:00)
-    let H0 = 6, H1 = 18;
+    // ช่วงเวลาอัจฉริยะ: แสดงเฉพาะช่วงที่มีการใช้รถจริง (ทั้ง 24 ชม. ได้: งานต่อจากเมื่อวาน = 00:00 · ค้างคืน = 24:00)
+    if (!list.length) return `<div class="g-empty">${icon('checkCircle')}<p>วันนี้ไม่มีการใช้รถ — รถว่างทุกคัน</p></div>`;
+    let H0 = 24, H1 = 0;
     list.forEach(r => { const s = new Date(r.startAt), e = new Date(r.endAt);
       H0 = Math.min(H0, s < d0 ? 0 : s.getHours());
       H1 = Math.max(H1, e >= d1 ? 24 : Math.min(24, e.getHours() + (e.getMinutes() ? 1 : 0))); });
+    if (H1 - H0 < 3) { H1 = Math.min(24, H0 + 3); H0 = Math.max(0, H1 - 3); }
     const pos = t => Math.max(0, Math.min(100, ((new Date(t) - d0) / 36e5 - H0) / (H1 - H0) * 100));
     const hours = Array.from({ length: H1 - H0 + 1 }, (_, i) => H0 + i);
     const bar = (r, extra = '') => {
@@ -173,6 +175,10 @@ const C = (() => {
       <div class="g-legend"><span><i class="lg done"></i>กลับแล้ว</span><span><i class="lg live"></i>กำลังเดินทาง</span><span><i class="lg ok"></i>อนุมัติแล้ว</span><span><i class="lg wait"></i>รอจัดรถ</span><span><i class="lg mt"></i>ซ่อมบำรุง</span></div>`;
   }
 
+  // ชื่อผู้ขอแบบสั้นบนมือถือ: บุคคล → "ครู" + ชื่อ (ไม่มีนามสกุล) · ชื่อหน่วยงาน → คงเดิม
+  const teacherShort = n => { const s = String(n || '').trim(); const m = /^(นางสาว|นาย|นาง|ครู|ดร\.|ว่าที่ร้อยตรี|ว่าที่ ร\.ต\.)\s*(\S+)/.exec(s); if (m) return 'ครู' + m[2]; return /ฝ่าย|งาน|กลุ่ม|โรงเรียน/.test(s) ? s : 'ครู' + s.split(/\s+/)[0]; };
+  // บรรทัดย่อบนมือถือ: ครู · N คน · รถ · คนขับ (ชื่อ)
+  const tripMeta = r => [teacherShort(r.requester.name), S().passengers(r) + ' คน', ...(r.assignments || []).map(a => vName(a.vehicleId) + (a.driverId ? ' · ' + firstName(dName(a.driverId)) : ''))].map(esc).join(' · ');
   // ชื่อคนขับแบบสั้น (ตัดคำนำหน้า/นามสกุล)
   const firstName = n => String(n || '').replace(/^(นาย|นางสาว|นาง|ว่าที่ร้อยตรี|ว่าที่ ร\.ต\.|ดร\.)\s*/, '').trim().split(/\s+/)[0] || '';
 
@@ -214,7 +220,7 @@ const C = (() => {
       return pre + `<tr class="bd-row ${st[0]} link" data-trip="${r.id}" ${href ? `data-href="${href}"` : ''}>
         <td><span class="flip">${flip(st0, k)}</span>${UI.sameDay(st0, day) ? '' : `<small>${fmt.dayMonth(st0)}</small>`}</td>
         <td><span class="flip">${flip(en, k)}</span>${UI.sameDay(en, day) ? '' : `<small>${fmt.dayMonth(en)}</small>`}</td>
-        <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${S().tripTag(r) ? ` · ${S().tripTag(r).text}` : ''}</small><small>${esc(r.purpose)}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
+        <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${S().tripTag(r) ? ` · ${S().tripTag(r).text}` : ''}</small><small>${esc(r.purpose)}</small><small class="bd-m">${tripMeta(r)}${as.length ? '' : ' · รอจัดรถ'}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
         <td>${esc(r.requester.name)}</td>
         <td><span class="bd-ppl"><span>${icon('teacher')}${r.teachers}</span><span>${icon('student')}${r.students}</span>${+r.others ? `<span title="บุคคลอื่น">${icon('users')}${r.others}</span>` : ''}</span></td>
         <td>${as.length ? as.map(a => `<span class="bd-v">${esc(vName(a.vehicleId))}<small>${esc(vPlate(a.vehicleId))}</small></span>`).join('') : '<span class="bd-wait">รอแอดมินจัดรถ</span>'}</td>
@@ -273,7 +279,9 @@ const C = (() => {
 
   // ประวัติคำขอ
   const HIST = { memo: ['paperclip', 'แนบบันทึกข้อความตามหลัง'], memowaive: ['shield', 'ยกเว้นบันทึกข้อความ'], esign: ['edit', 'ลงนามอิเล็กทรอนิกส์'], signed: ['file', 'บันทึกข้อความฉบับลงนาม'], submit: ['send', 'ส่งคำขอ'], edit: ['edit', 'แก้ไขคำขอ'], resubmit: ['refresh', 'แก้ไขและส่งใหม่'], cancel: ['xCircle', 'ยกเลิกคำขอ'], approve: ['checkCircle', 'อนุมัติ'], reject: ['xCircle', 'ไม่อนุมัติ'], revise: ['undo', 'ส่งกลับให้แก้ไข'], reassign: ['refresh', 'ปรับรถ/คนขับ'], depart: ['navigation', 'ออกเดินทาง'], return: ['home', 'กลับถึงโรงเรียน'], undo: ['undo', 'ย้อนสถานะ'], close: ['check', 'ปิดงาน'], reopen: ['refresh', 'เปิดงานอีกครั้ง'], emergency: ['alert', 'บันทึกคำขอเร่งด่วน'], changereq: ['edit', 'ขอแก้ไขข้อมูล'], changeok: ['checkCircle', 'อนุมัติการแก้ไข'], changeno: ['xCircle', 'ไม่อนุมัติการแก้ไข'] };
-  const history = r => `<div class="hist">${(r.history || []).slice().reverse().map(h => { const [ic, t] = HIST[h.action] || ['info', h.action]; return `<div class="hist-item"><span class="hi">${icon(ic)}</span><div><b>${t}${h.action === 'depart' || h.action === 'return' ? ` · ${esc(h.note)}` : ''}</b><small>${esc(h.byName || h.by || '')} · ${fmt.dt(h.at)}</small>${h.note && !['depart', 'return'].includes(h.action) ? `<p>${esc(h.note)}</p>` : ''}</div></div>`; }).join('')}</div>`;
+  // สีตามประเภทความเคลื่อนไหว: อนุมัติ = เขียว · ส่งกลับแก้ไข = เหลือง · ไม่อนุมัติ/ยกเลิก = แดง · เดินทาง = ส้ม · กลับ/ปิดงาน = เทา · ส่งคำขอ = ม่วง
+  const HTONE = { approve: 'ok', changeok: 'ok', memowaive: 'ok', signed: 'ok', esign: 'ok', revise: 'warn', changereq: 'warn', edit: 'warn', reject: 'bad', cancel: 'bad', changeno: 'bad', depart: 'live', return: 'done', close: 'done', submit: 'sub', resubmit: 'sub', emergency: 'bad', reassign: 'ok', memo: 'sub' };
+  const history = r => `<div class="hist">${(r.history || []).slice().reverse().map(h => { const [ic, t] = HIST[h.action] || ['info', h.action]; return `<div class="hist-item ht-${HTONE[h.action] || 'n'}"><span class="hi">${icon(ic)}</span><div><b>${t}${h.action === 'depart' || h.action === 'return' ? ` · ${esc(h.note)}` : ''}</b><small>${esc(h.byName || h.by || '')} · ${fmt.dt(h.at)}</small>${h.note && !['depart', 'return'].includes(h.action) ? `<p>${esc(h.note)}</p>` : ''}</div></div>`; }).join('')}</div>`;
 
   // รถที่ได้รับมอบหมาย (สำหรับผู้ขอ/แอดมินดู)
   function assignList(r) {
@@ -289,6 +297,7 @@ const C = (() => {
           ${km != null ? `<span class="muted">${icon('gauge')} ${fmt.num(km)} กม. (ไมล์ ${fmt.num(a.odoStart)} → ${fmt.num(a.odoEnd)})</span>` : ''}
         </div>
         ${a.note ? `<div class="note">${icon('info')} ${esc(a.note)}</div>` : ''}
+        ${a.paxSign ? (a.paxSign.has ? `<div class="ps-show">${icon('edit')}<span>ครูผู้ร่วมเดินทางลงชื่อยืนยันกลับถึง <b>${esc(a.paxSign.name)}</b> <small>${fmt.dt(a.paxSign.at)}</small></span>${a.paxSign.img ? `<img src="${a.paxSign.img}" alt="ลายเซ็นครู">` : ''}</div>` : `<div class="ps-show none">${icon('info')}<span>ไม่มีครูไปด้วย <small>${fmt.dt(a.paxSign.at)}</small></span></div>`) : ''}
       </div>`;
     }).join('');
   }
@@ -334,12 +343,12 @@ const C = (() => {
   const DV = { key: '', el: null, api: null };
   // iPhone/iPad (Safari): เปิดไฟล์ในแท็บใหม่ไม่ได้ (หน้าว่าง / WebKitBlobResource) → ดูในหน้าเดิม + ปุ่มบันทึก/แชร์
   const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  async function saveFile(ref) {
+  async function saveFile(ref, { download = false, name: nm = '' } = {}) {
     try {
       const url = await S().fileUrl(ref), blob = await (await fetch(url)).blob();
-      const ext = (blob.type.split('/')[1] || 'bin').replace('jpeg', 'jpg'), name = `ไฟล์แนบ.${ext}`;
+      const ext = (blob.type.split('/')[1] || 'bin').replace('jpeg', 'jpg'), name = `${nm || 'ไฟล์แนบ'}.${ext}`;
       const file = new File([blob], name, { type: blob.type });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+      if ((!download || isIOS()) && navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; } }
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
     } catch (e) { UI.toast('บันทึกไฟล์ไม่สำเร็จ: ' + e.message, 'error'); }
   }
@@ -367,6 +376,7 @@ const C = (() => {
           <button type="button" class="icon-btn sm" data-dv="fit" title="พอดีความกว้าง" aria-label="พอดีความกว้าง">${icon('fitWidth')}</button>
           <button type="button" class="icon-btn sm" data-dv="rot" title="หมุน 90°" aria-label="หมุน">${icon('rotate')}</button>
           <button type="button" class="icon-btn sm" data-dv="max" title="ขยายเต็มจอ (Esc ออก)" aria-label="ขยายเต็มจอ">${icon('maximize')}</button>
+          <button type="button" class="icon-btn sm dv-dl" data-dv="dl" title="ดาวน์โหลดไฟล์" aria-label="ดาวน์โหลดไฟล์">${icon('download')}</button>
           ${useSave() ? `<button type="button" class="icon-btn sm" data-dv="tab" title="บันทึก / แชร์ไฟล์" aria-label="บันทึก / แชร์ไฟล์">${icon('download')}</button>` : `<button type="button" class="icon-btn sm" data-dv="tab" title="เปิดในแท็บใหม่" aria-label="เปิดในแท็บใหม่">${icon('arrowUR')}</button>`}
           <button type="button" class="icon-btn sm dv-close" data-dv="close" title="ปิด" aria-label="ปิด">${icon('x')}</button>
         </div></div>
@@ -431,6 +441,7 @@ const C = (() => {
       if (a === 'rot') { st.rot = (st.rot + 90) % 360; draw(); }
       if (a === 'max') setMax(!el.classList.contains('dv-max'));
       if (a === 'tab') (useSave() ? saveFile : UI.openFile)(refs[st.i]);
+      if (a === 'dl') { b.disabled = true; saveFile(refs[st.i], { download: true, name: /^VR-/.test(key) ? `บันทึกข้อความ ${key.split('|')[0]}${refs.length > 1 ? '-' + (st.i + 1) : ''}` : '' }).finally(() => { b.disabled = false; }); }
       if (a === 'close') { if (el.classList.contains('dv-max')) setMax(false); document.documentElement.classList.remove('dv-sheet'); }
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && el.classList.contains('dv-max')) setMax(false); });
@@ -460,8 +471,10 @@ const C = (() => {
   // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
   const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);
   // ── เปิดนำทางใน Google Maps (มือถือเปิดแอป Google Maps ให้เอง) — มีพิกัดใช้พิกัด ไม่มีใช้ชื่อ+ที่อยู่ค้นหา ──
-  const gq = d => d && d.lat != null && d.lng != null && d.lat !== '' ? `${(+d.lat).toFixed(6)},${(+d.lng).toFixed(6)}` : [d && d.name, d && d.address, d && d.province].filter(Boolean).join(' ');
-  const gmapPlace = d => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq(d))}`;
+  const gq = d => d && d.lat != null && d.lng != null && d.lat !== '' && !isNaN(+d.lat) ? `${(+d.lat).toFixed(6)},${(+d.lng).toFixed(6)}` : [d && d.name, d && d.address, d && d.province].filter(Boolean).join(' ');
+  // มีพิกัด → หมุดตรงจุดที่ครูปักเป๊ะ (/maps/place/lat,lng ไม่ให้ Google เลื่อนไปจับสถานที่ใกล้เคียง) · ไม่มีพิกัด → ค้นจากชื่อ+ที่อยู่
+  const hasLL = d => d && d.lat != null && d.lng != null && d.lat !== '' && !isNaN(+d.lat) && !isNaN(+d.lng);
+  const gmapPlace = d => hasLL(d) ? `https://www.google.com/maps/place/${(+d.lat).toFixed(6)},${(+d.lng).toFixed(6)}/@${(+d.lat).toFixed(6)},${(+d.lng).toFixed(6)},17z` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gq(d))}`;
   function gmapRoute(dests) {
     const ds = (dests || []).filter(d => gq(d)); if (!ds.length) return '';
     const last = ds[ds.length - 1], mid = ds.slice(0, -1);
@@ -636,7 +649,7 @@ const C = (() => {
     </div>`;
   }
 
-  return { tripModal, gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
+  return { teacherShort, tripMeta, hasLL, tripModal, gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {

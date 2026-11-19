@@ -170,7 +170,7 @@
             <div id="sigNow" ${needSig ? 'hidden' : ''}><div class="sig-now"><img id="sigImg" alt="ลายเซ็นปัจจุบัน"><span class="hint">เซ็นเมื่อ ${me.sigAt ? fmt.dt(me.sigAt) : '-'}</span></div><button type="button" class="btn btn-ghost btn-sm" id="sigRedo" style="margin-top:8px">${icon('edit')} เซ็นใหม่</button></div>
             <div id="sigBox" ${needSig ? '' : 'hidden'}>
               <div class="sig-pad"><canvas id="sigPad" aria-label="ช่องเซ็นชื่อ"></canvas><span class="sig-base">ลงชื่อบนเส้นนี้</span><span class="sig-x">✕</span></div>
-              <div class="row between" style="margin-top:8px"><span class="hint">${icon('info')} เซ็นด้วยนิ้ว/ปากกาบนมือถือหรือแท็บเล็ต หรือใช้เมาส์ · เซ็นให้เต็มกรอบ เหมือนเซ็นบนกระดาษ · ระบบไม่รับการอัปโหลดรูปลายเซ็น</span><button type="button" class="btn btn-ghost btn-sm" id="sigClear">${icon('trash')} ล้าง</button></div>
+              <div class="row between" style="margin-top:8px"><span class="hint">${icon('info')} เซ็นด้วยนิ้ว/ปากกาบนมือถือหรือแท็บเล็ต หรือใช้เมาส์ · เซ็นขนาดปกติเหมือนเซ็นบนกระดาษ · ระบบไม่รับการอัปโหลดรูปลายเซ็น</span><button type="button" class="btn btn-ghost btn-sm" id="sigClear">${icon('trash')} ล้าง</button></div>
             </div></div>`}
           <div class="form-actions" style="position:static;background:none;padding-bottom:0"><button class="btn btn-primary" type="submit">${icon('check')} บันทึก${first ? 'และเริ่มใช้งาน' : ''}</button></div>
         </form></div></div>`,
@@ -634,7 +634,7 @@
               const meta = [esc(r.requester.name), ...as.map(a => `${esc(C.vName(a.vehicleId))}${plate(a.vehicleId) ? ` ${esc(plate(a.vehicleId))}` : ''}${C.dName(a.driverId) ? ` · ${esc(C.firstName(C.dName(a.driverId)))}` : ''}`)].join(' · ');
               return `<div class="cv-ag ${stCls(r)} link" data-trip="${r.id}" ${href ? `data-href="${href}"` : ''}>
                 ${tcell(r, d)}
-                <div class="w"><b>${esc(S.destName(r))}</b><small class="cv-pp">${esc(r.purpose)} · ${esc(r.requester.name)}</small><small class="cv-m">${as.length ? meta : `${esc(r.requester.name)} · รอแอดมินจัดรถ`}</small></div>
+                <div class="w"><b>${esc(S.destName(r))}</b><small class="cv-pp">${esc(r.purpose)} · ${esc(r.requester.name)}</small><small class="cv-m">${C.tripMeta(r)}${as.length ? '' : ' · รอจัดรถ'}</small></div>
                 <div class="v">${vn.length ? `<b>${esc(vn.join(', '))}</b><small>${icon('wheel')} ${dn.length ? esc(dn.join(', ')) : 'ยังไม่ระบุคนขับ'}</small>` : '<span class="wt">รอแอดมินจัดรถ</span>'}</div>
                 ${C.statusPill(r)}</div>`; }).join('') || `<div class="empty" style="padding:22px">${icon('checkCircle')}<p>ไม่มีรายการใช้รถในวันนี้</p></div>`}</div>`;
         }).join('') || `<div class="empty">${icon('calendar')}<p>${per}ยังไม่มีรายการใช้รถ</p></div>`}</div>

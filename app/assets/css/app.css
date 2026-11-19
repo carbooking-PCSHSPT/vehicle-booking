@@ -2028,3 +2028,49 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .tc, .tc-kv, .tc-veh { min-width: 0; } .tc-kv dd { min-width: 0; overflow-wrap: anywhere; }
 .tc-time { flex-wrap: wrap; } .lt420 .tc-time .bd-st { margin-left: 0; }
 .tc-time > div { flex: none; } .tc-time .bd-st { flex-shrink: 1; min-width: 0; } .tc-time .bd-st em { white-space: nowrap; }
+
+/* ความเคลื่อนไหว: สีตามสถานะ */
+.hist-item.ht-ok .hi { background: #dcf5ea; color: #047857; } .hist-item.ht-ok b { color: #047857; } .hist-item.ht-ok p { background: #ecfbf3; }
+.hist-item.ht-warn .hi { background: #fef3c7; color: #a16207; } .hist-item.ht-warn b { color: #a16207; } .hist-item.ht-warn p { background: #fffaeb; }
+.hist-item.ht-bad .hi { background: #fde2e2; color: #b91c1c; } .hist-item.ht-bad b { color: #b91c1c; } .hist-item.ht-bad p { background: #fff3f3; }
+.hist-item.ht-live .hi { background: #ffe7d4; color: #c2410c; } .hist-item.ht-live b { color: #c2410c; }
+.hist-item.ht-done .hi { background: #eceff3; color: #64748b; }
+.hist-item.ht-sub .hi { background: #ede7fe; color: #6d28d9; } .hist-item.ht-sub b { color: #6d28d9; }
+.is-wait.is-late { background: #fde2e2 !important; color: #b91c1c !important; border-color: #f5c9c9 !important; }
+.gm-dest small.gm-ll { font-size: .7rem; color: #047857; }
+.g-empty { display: grid; place-items: center; gap: 6px; padding: 30px 16px; color: var(--muted); text-align: center; } .g-empty .i { width: 28px; height: 28px; color: var(--ok); }
+
+/* กระดานเที่ยวรถมือถือ/แท็บเล็ต: สถานที่ + ครู · คน · รถ · คนขับ */
+.bd .bd-m { display: none; }
+.lt1060 .bd .dst small { display: none; }
+.lt1060 .bd .dst small.bd-m { display: block; font-size: .74rem; color: rgba(255, 255, 255, .72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.lt1060 .bd tr.bd-row > td:nth-child(6) { display: none; }
+.lt1060 .bd tr.bd-row { grid-template-areas: "s d st" "e d st"; }
+
+/* ช่องเซ็นชื่อ: ขนาดลายเซ็นปกติ (ไม่ต้องเซ็นใหญ่เต็มจอ) */
+.sig-pad { width: min(100%, 340px); height: 130px; margin-inline: auto; }
+.sig-pad .sig-base { bottom: 32px; } .sig-pad .sig-x { bottom: 36px; }
+
+/* หน้าจัดรถ: หมวดงาน (ช่องเลือก) + คนขับว่าง/ไม่ว่าง แบบกระชับ */
+.dc-top { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 14px 18px; align-items: start; margin-bottom: 14px; }
+.dc-top .field { margin: 0; }
+.drv-day .label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-family: var(--font-display); font-weight: 500; font-size: .86rem; color: var(--ink-2); margin-bottom: 6px; }
+.drv-day .label .i { width: 16px; height: 16px; color: var(--gold); }
+.dd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dd-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; font: 500 .8rem var(--font-display); border: 1px solid; white-space: nowrap; max-width: 100%; }
+.dd-chip .i { width: 13px; height: 13px; flex: none; }
+.dd-chip.ok { background: #ecfbf3; color: #047857; border-color: #b5e6cf; }
+.dd-chip.bad { background: #fff3f3; color: #b91c1c; border-color: #f5c9c9; }
+.dd-chip small { font-weight: 400; font-size: .72rem; color: #9b2c2c; overflow: hidden; text-overflow: ellipsis; }
+.lt900 .dc-top { grid-template-columns: 1fr; }
+
+/* ครูผู้ร่วมเดินทางลงชื่อตอนกลับถึง */
+.ps-box { padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fdfaf3; display: grid; gap: 10px; }
+.ps-opt { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-opt label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font: 500 .9rem var(--font-display); cursor: pointer; }
+.ps-opt label:has(input:checked) { border-color: var(--navy); background: var(--navy-50); color: var(--navy); }
+.ps-opt input { accent-color: var(--navy); width: 18px; height: 18px; }
+.ps-show { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #ecfbf3; color: #065f46; font-size: .86rem; }
+.ps-show .i { width: 16px; height: 16px; flex: none; } .ps-show small { color: var(--muted); margin-left: 4px; }
+.ps-show img { height: 44px; max-width: 160px; object-fit: contain; background: #fff; border-radius: 8px; padding: 2px 6px; margin-left: auto; }
+.ps-show.none { background: #f3f4f6; color: var(--ink-2); }

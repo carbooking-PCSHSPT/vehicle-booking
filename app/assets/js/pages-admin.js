@@ -241,6 +241,21 @@
     return { read, meter };
   }
 
+  // หมวดงานแบบช่องเลือก (ประหยัดพื้นที่)
+  function catSelect(sel = '', other = '') {
+    const cats = S.categories(); if (sel && !cats.some(c => c.id === sel) && S.catOf(sel)) cats.push(S.catOf(sel));
+    return `<select class="input" name="dcat">${sel ? '' : '<option value="">— เลือกหมวดงาน —</option>'}${cats.map(c => `<option value="${esc(c.id)}" ${c.id === sel ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ (ระบุ)' : c.name)}</option>`).join('')}</select>
+      <input class="input" name="dcatOther" placeholder="ระบุหมวดงาน" value="${esc(other || '')}" ${sel === 'other' ? '' : 'hidden'} style="margin-top:8px">`;
+  }
+  // คนขับในช่วงเวลาของคำขอนี้: ว่าง (เขียว) / ติดงาน (แดง + งานและเวลาแบบสั้น)
+  function driverDay(r) {
+    if (!r.startAt) return '';
+    const ds = S.db.drivers.filter(d => d.active !== false).map(d => ({ d, c: S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) }));
+    const tm = x => `${fmt.time(x.startAt)}–${UI.sameDay(x.startAt, x.endAt) ? fmt.time(x.endAt) : fmt.dayMonth(x.endAt)}`;
+    const free = ds.filter(x => !x.c.length), busy = ds.filter(x => x.c.length);
+    return `<div class="drv-day"><div class="label">${icon('wheel')} คนขับช่วงเวลานี้ <span class="hint">ว่าง ${free.length} · ติดงาน ${busy.length}</span></div>
+      <div class="dd-chips">${free.map(x => `<span class="dd-chip ok">${icon('check')}${esc(C.firstName(x.d.name))}</span>`).join('')}${busy.map(x => `<span class="dd-chip bad" title="${esc(x.c.map(y => `${y.id} ${S.destName(y)}`).join(', '))}">${icon('xCircle')}${esc(C.firstName(x.d.name))} <small>${x.c.map(y => `${tm(y)} ${esc(S.destName(y))}`).join(', ')}</small></span>`).join('')}</div></div>`;
+  }
   // ═════════ รายละเอียดคำขอ (แอดมิน) ═════════
   Pages.adminRequest = ({ params }) => {
     const r = S.request(params.id);
@@ -271,7 +286,10 @@
         <div class="card" style="margin-bottom:18px;border-color:var(--navy);box-shadow:0 0 0 4px var(--navy-50)">
           <div class="card-head"><h3>${icon(canDecide ? 'clipboard' : 'refresh')} ${canDecide ? 'พิจารณาคำขอ' : 'ปรับรถ / คนขับ'}</h3><span class="hint">${fmt.range(r.startAt, r.endAt)} · ผู้เดินทาง ${S.passengers(r)} คน</span></div>
           ${canDecide ? `<div class="note-box navy" style="margin-bottom:14px">${icon('paperclip')}<div>ตรวจบันทึกข้อความ (ลายเซ็นผู้อำนวยการ/ผู้รักษาราชการแทน · วันที่ · สถานที่ ตรงกับคำขอ) ${docs.length ? `<b>— เปิดดูที่ช่องเอกสาร${docs.length > 1 ? ` (${docs.length} ไฟล์)` : ''}</b>` : '<b style="color:var(--bad)">ไม่มีไฟล์แนบ</b>'}</div></div>` : ''}
-          <div class="field" style="margin-bottom:14px"><label>${icon('flag')} หมวดงาน <span class="hint" style="font-weight:400">(แก้ได้ถ้าผู้ขอเลือกผิด)</span></label>${Pages._catPicker.html(r.category, r.categoryOther, 'dcat')}</div>
+          <div class="dc-top">
+            <div class="field"><label>${icon('flag')} หมวดงาน <span class="hint" style="font-weight:400">(แก้ได้ถ้าผู้ขอเลือกผิด)</span></label>${catSelect(r.category, r.categoryOther)}</div>
+            ${driverDay(r)}
+          </div>
           <div class="label" style="margin-bottom:8px">เลือกรถ (เลือกได้หลายคัน) · คนขับ · หมายเหตุรายคัน</div>
           ${vehiclePickerHTML(r, r.assignments)}
           <div class="field" style="margin-top:14px"><label>${icon('mail')} หมายเหตุถึงผู้ขอใช้รถ ${canDecide ? '(จำเป็นเมื่อไม่อนุมัติ/ส่งกลับแก้ไข)' : ''}</label><textarea id="dNote" rows="3" placeholder="เช่น ขอให้มาถึงจุดนัดก่อนเวลา 15 นาที / รถตู้ 1 คันไม่พอ จัดรถบัสให้แทน">${esc(r.decision && r.decision.action === 'approve' ? r.decision.note : '')}</textarea></div>
@@ -326,7 +344,7 @@
           e.stopPropagation();
           if (await UI.confirm('ลบไฟล์ฉบับลงนามนี้ออกจากคำขอ?', { danger: true, ok: 'ลบ' })) S.removeSigned(r.id, rm.dataset.rmsig).then(() => { UI.toast('ลบแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error'));
         });
-        Pages._catPicker.bind(root, 'dcat');
+        $('[name=dcat]', root)?.addEventListener('change', e => { const o = $('[name=dcatOther]', root); o.hidden = e.target.value !== 'other'; if (!o.hidden) o.focus(); });
         const DVA = docs.length ? C.mountDocViewer(root, docs, r.id + '|' + docs.join(',')) : null;
         const split = root.querySelector('.rq-split');
         const sheetMode = () => document.documentElement.classList.contains('lt1000');
@@ -354,7 +372,7 @@
           if (dec) {
             const action = dec.dataset.dec, note = $('#dNote', root).value.trim();
             const assignments = P ? P.read() : [];
-            const category = (root.querySelector('[name=dcat]:checked') || {}).value || '', categoryOther = (root.querySelector('[name=dcatOther]') || {}).value || '';
+            const category = (root.querySelector('[name=dcat]') || {}).value || '', categoryOther = (root.querySelector('[name=dcatOther]') || {}).value || '';
             if (action === 'approve') {
               if (!assignments.length) return UI.toast('กรุณาเลือกรถอย่างน้อย 1 คัน', 'error');
               const miss = assignments.filter(a => !a.driverId).length;

@@ -165,17 +165,20 @@
 
   // ───────── กติกาเวลา: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · กลับก่อนเวลาที่ขอ ต้องระบุเหตุผล ─────────
   const EARLY_MIN = 30;
+  const LATE_H = 24;
   const departFrom = r => new Date(new Date(r.startAt).getTime() - EARLY_MIN * 6e4);
   // ใช้กับทุกคนในหน้างานคนขับ (รวมแอดมิน) · แอดมินบันทึกแทนนอกเวลาได้จากหน้าคำขอในระบบหลังบ้านเท่านั้น (ต้องใส่เหตุผล)
   function departState(r) {
     const from = departFrom(r), now = new Date();
+    // เลยเวลาออกเกิน 24 ชม. → คนขับกดเองไม่ได้ (ให้แอดมินบันทึกแทนพร้อมเหตุผล)
+    if (now - new Date(r.startAt) > LATE_H * 36e5) return { ok: false, late: true, msg: 'เลยกำหนดออกเกิน 24 ชม. — ติดต่อแอดมิน' };
     if (now >= from) return { ok: true };
     return { ok: false, msg: `ออกเดินทางได้ ${UI.sameDay(from, now) ? '' : dShort(from) + ' '}${fmt.time(from)}` };
   }
   const earlyReturn = r => new Date() < new Date(new Date(r.endAt).getTime() - EARLY_MIN * 6e4);
   const departBtn = (r, i, cls = 'btn btn-primary full') => { const st = departState(r); return st.ok
     ? `<button class="${cls}" data-go="ontrip" data-r="${r.id}" data-i="${i}">${icon('navigation')} ออกเดินทาง</button>`
-    : `<button class="${cls} is-wait" disabled title="กดได้ก่อนเวลาออก ${EARLY_MIN} นาที">${icon('clock')} ${st.msg}</button>`; };
+    : `<button class="${cls} is-wait ${st.late ? 'is-late' : ''}" disabled title="${st.late ? 'เลยกำหนดออกเกิน 24 ชั่วโมง ให้แอดมินบันทึกแทน' : `กดได้ก่อนเวลาออก ${EARLY_MIN} นาที`}">${icon(st.late ? 'alert' : 'clock')} ${st.msg}</button>`; };
   Pages._departState = departState;
   // ตรวจสภาพรถก่อนออกเดินทาง (คนขับต้องติ๊กครบ หรือแจ้งปัญหาที่พบ — แอดมินเห็นในหน้าภาพรวม)
   const CHECKS = ['น้ำมันเพียงพอสำหรับการเดินทาง', 'ลมยางและสภาพยางปกติ', 'ไฟหน้า ไฟเลี้ยว ไฟเบรก ใช้งานได้', 'เบรก พวงมาลัย ไม่มีไฟเตือนบนหน้าปัด', 'น้ำมันเครื่อง น้ำหล่อเย็น ระดับปกติ', 'อุปกรณ์ฉุกเฉินและเอกสารประจำรถครบ', 'ห้องโดยสารสะอาด เข็มขัดนิรภัยใช้งานได้'];
@@ -185,7 +188,7 @@
   Pages._tripAction = async (r, idx, status, { override = '' } = {}) => {
     const a = r.assignments[idx], v = S.vehicle(a.vehicleId) || {};
     const admin = S.isAdmin(S.me) && !!override, dep = status === 'ontrip';
-    if (dep && !override && !departState(r).ok) return UI.toast(`ยังไม่ถึงเวลา — ${departState(r).msg} (ก่อนเวลาออก ${EARLY_MIN} นาที)`, 'error');
+    if (dep && !override && !departState(r).ok) return UI.toast(departState(r).late ? departState(r).msg : `ยังไม่ถึงเวลา — ${departState(r).msg} (ก่อนเวลาออก ${EARLY_MIN} นาที)`, 'error');
     if (!dep && a.status !== 'ontrip' && !override) return UI.toast(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้', 'error');
     const early = !dep && earlyReturn(r);
     const def = dep ? (a.odoStart ?? lastOdo(a.vehicleId) ?? '') : (a.odoEnd ?? '');
@@ -198,10 +201,20 @@
           <div class="field" style="margin-top:8px"><label>พบปัญหา / ข้อสังเกต <span class="hint">(ถ้ามีข้อที่ไม่ผ่าน ต้องระบุ — แจ้งแอดมินอัตโนมัติ)</span></label><input id="chkNote" placeholder="เช่น ไฟเลี้ยวขวาไม่ติด"></div></div>` : ''}
         ${early ? `<div class="note-box warn-y">${icon('alert')}<div><b>กลับก่อนเวลาที่ขอ</b> (กำหนดกลับ ${fmt.when(r.endAt)}) — ระบุเหตุผล เช่น ภารกิจเสร็จเร็ว</div></div>
           <div class="field"><label>เหตุผลที่กลับก่อนเวลา <b class="req">*</b></label><input id="earlyNote" placeholder="เช่น ส่งเอกสารเสร็จเร็วกว่ากำหนด"></div>` : ''}
-        <div class="field"><label>เลขไมล์${dep ? 'ตอนออก' : 'ตอนกลับ'} (กม.)</label><input id="odoIn" type="number" inputmode="numeric" min="0" value="${def}" placeholder="ไม่บังคับ — กรอกภายหลังได้"></div>
+        ${!dep ? `<div class="ps-box"><div class="chk-head"><b>${icon('edit')} ครูผู้ร่วมเดินทางลงชื่อ</b><span class="hint">ยืนยันเวลากลับถึง</span></div>
+          <div class="ps-opt"><label><input type="radio" name="psHas" value="1"> มีครูไปด้วย</label><label><input type="radio" name="psHas" value="0"> ไม่มีครูไปด้วย</label></div>
+          <div id="psWrap" hidden><div class="field"><label>ชื่อครูที่ลงชื่อ <b class="req">*</b></label><input id="psName" list="psList" value="${esc(r.requester.name)}" autocomplete="off"><datalist id="psList">${[r.requester.name, ...String(r.passengerNames || '').split(/[,\n،]+/)].map(x => x.trim()).filter(x => x && !/^[-–.\s]+$/.test(x)).map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+            <div class="sig-pad"><canvas id="psPad" aria-label="ช่องเซ็นชื่อครู"></canvas><span class="sig-base">ครูลงชื่อบนเส้นนี้</span><span class="sig-x">✕</span></div>
+            <div class="row between" style="margin-top:6px"><span class="hint">ส่งมือถือให้ครูเซ็น</span><button type="button" class="btn btn-ghost btn-sm" id="psClear">${icon('trash')} ล้าง</button></div></div></div>` : ''}        <div class="field"><label>เลขไมล์${dep ? 'ตอนออก' : 'ตอนกลับ'} (กม.)</label><input id="odoIn" type="number" inputmode="numeric" min="0" value="${def}" placeholder="ไม่บังคับ — กรอกภายหลังได้"></div>
         ${!dep && a.odoStart != null ? `<p class="hint">เลขไมล์ตอนออก ${fmt.num(a.odoStart)} กม.</p>` : ''}
         <div class="field"><label>เวลา</label><input id="atIn" type="datetime-local" value="${fmt.local(new Date())}" max="${fmt.local(new Date(Date.now() + 5 * 6e4))}"></div>
       </div>`,
+      onOpen(el) {
+        if (dep) return;
+        let pad = null; const wrap = el.querySelector('#psWrap');
+        el.addEventListener('change', e => { if (e.target.name !== 'psHas') return; wrap.hidden = e.target.value !== '1'; if (!wrap.hidden && !pad) { pad = UI.signaturePad(el.querySelector('#psPad')); el._ps = pad; } });
+        el.querySelector('#psClear').addEventListener('click', () => pad && pad.clear());
+      },
       actions: [{ label: 'ยกเลิก', value: null }, { label: dep ? 'ตรวจแล้ว ออกเดินทาง' : 'กลับถึงแล้ว', kind: dep ? 'btn-primary' : 'btn-ok', icon: 'check', onClick: async el => {
         let check = null, note = '';
         if (dep) {
@@ -211,7 +224,18 @@
           check = { ok: !miss.length && !cn, miss, note: cn, skipped: admin && miss.length === CHECKS.length && !cn };
         }
         if (early) { note = el.querySelector('#earlyNote').value.trim(); if (!note && !admin) { UI.toast('กรุณาระบุเหตุผลที่กลับก่อนเวลา', 'error'); return false; } }
-        await S.tripStatus(r.id, idx, status, { odo: el.querySelector('#odoIn').value, at: el.querySelector('#atIn').value, check, note, override });
+        let paxSign = null;
+        if (!dep) {
+          const has = (el.querySelector('[name=psHas]:checked') || {}).value;
+          if (!has && !admin) { UI.toast('กรุณาเลือกว่ามีครูไปด้วยหรือไม่', 'error'); return false; }
+          if (has === '1') {
+            const nm = el.querySelector('#psName').value.trim(), pad = el._ps;
+            if (!nm) { UI.toast('กรุณาระบุชื่อครูที่ลงชื่อ', 'error'); return false; }
+            const er = pad ? pad.check() : 'กรุณาให้ครูเซ็นชื่อ'; if (er) { UI.toast(er, 'error'); return false; }
+            paxSign = { has: true, name: nm, img: pad.toPNG(), at: new Date().toISOString() };
+          } else if (has === '0') paxSign = { has: false, at: new Date().toISOString() };
+        }
+        await S.tripStatus(r.id, idx, status, { odo: el.querySelector('#odoIn').value, at: el.querySelector('#atIn').value, check, note, override, paxSign });
         return true;
       } }]
     });
@@ -238,7 +262,7 @@
           <div><small>จุดนัดขึ้นรถ</small>${esc(r.pickup || '-')}</div>
           <div><small>ผู้เดินทาง</small>${S.paxText(r)}</div>
           <div class="full"><small>ผู้ขอใช้รถ</small>${esc(r.requester.name)} · <a class="link" href="tel:${esc(r.contactPhone || r.requester.phone)}">${esc(r.contactPhone || r.requester.phone || '')}</a></div>
-          ${(r.destinations || []).length ? `<div class="full"><small>ปลายทาง <span class="muted">· กดชื่อสถานที่เพื่อเปิด Google Maps</span></small>${r.destinations.map((d, k) => `<a class="gm-dest" href="${C.gmapPlace(d)}" target="_blank" rel="noopener">${icon('pin')}<span><b>${r.destinations.length > 1 ? `${k + 1}. ` : ''}${esc(d.name)}</b>${d.address || d.province ? `<small>${esc(d.address || d.province)}</small>` : ''}</span>${icon('arrowUR')}</a>`).join('')}${r.totalKm ? `<span class="muted">ระยะทางรวมประมาณ ${fmt.num(r.totalKm, 0)} กม. (ไป + กลับ)</span>` : ''}
+          ${(r.destinations || []).length ? `<div class="full"><small>ปลายทาง <span class="muted">· กดชื่อสถานที่เพื่อเปิด Google Maps</span></small>${r.destinations.map((d, k) => `<a class="gm-dest" href="${C.gmapPlace(d)}" target="_blank" rel="noopener">${icon('pin')}<span><b>${r.destinations.length > 1 ? `${k + 1}. ` : ''}${esc(d.name)}</b>${d.address || d.province ? `<small>${esc(d.address || d.province)}</small>` : ''}<small class="gm-ll">${C.hasLL(d) ? `ตามพิกัดที่ครูปัก ${(+d.lat).toFixed(5)}, ${(+d.lng).toFixed(5)}` : 'ไม่มีพิกัด — ค้นจากชื่อสถานที่'}</small></span>${icon('arrowUR')}</a>`).join('')}${r.totalKm ? `<span class="muted">ระยะทางรวมประมาณ ${fmt.num(r.totalKm, 0)} กม. (ไป + กลับ)</span>` : ''}
             <a class="btn btn-ghost btn-sm gm-nav" href="${C.gmapRoute(r.destinations)}" target="_blank" rel="noopener">${icon('navigation')} นำทางด้วย Google Maps${r.destinations.length > 1 ? ` (ทุกจุด ${r.destinations.length} แห่ง)` : ''}</a></div>` : ''}
           ${a.note ? `<div class="full" style="background:var(--gold-50)"><small>หมายเหตุจากแอดมิน</small>${esc(a.note)}</div>` : ''}
           ${S.tripTag(r) ? `<div class="full"><small>ลักษณะการเดินทาง</small>${S.tripTag(r).text}${S.tripType(r) === 'daily' ? ` · ออก ${fmt.time(r.startAt)} กลับ ${fmt.time(r.endAt)} น. ทุกวัน` : ''}${r.lodging ? ' · ที่พัก ' + esc(r.lodging) : ''}</div>` : ''}
@@ -291,7 +315,7 @@
       <div class="dcal-nav"><a class="icon-btn sm" href="${link({ date: fmt.localDate(step(-1)) })}" aria-label="ก่อนหน้า">${icon('chevL')}</a>
         <b>${title}</b>
         <a class="icon-btn sm" href="${link({ date: fmt.localDate(step(1)) })}" aria-label="ถัดไป">${icon('chevR')}</a></div>
-      <div class="seg"><a href="${link({ view: 'month' })}"><button class="${view === 'month' ? 'on' : ''}" tabindex="-1">เดือน</button></a><a href="${link({ view: 'week' })}"><button class="${view === 'week' ? 'on' : ''}" tabindex="-1">สัปดาห์</button></a><a href="${link({ view: 'day', date: fmt.localDate(new Date()) })}"><button class="${view === 'day' ? 'on' : ''}" tabindex="-1">วันนี้</button></a></div></div>`;
+      <div class="seg"><a href="${link({ view: 'week' })}"><button class="${view === 'week' ? 'on' : ''}" tabindex="-1">สัปดาห์</button></a><a href="${link({ view: 'month' })}"><button class="${view === 'month' ? 'on' : ''}" tabindex="-1">เดือน</button></a></div></div>`;
     let grid = '';
     if (view === 'day') grid = '';
     else if (view === 'month') {
@@ -369,7 +393,7 @@
     return `<div class="dh-grid">
       <div class="dh-side">
         ${nextCard}
-        ${late.length ? `<div class="dh-late">${icon('alert')}<div><b>ยังไม่ได้กดสถานะ ${late.length} งาน</b><small>เลยวันเดินทางแล้ว กดเข้าไปกด "ออกเดินทาง / กลับถึง" ให้เรียบร้อย</small>${late.map(j => `<a href="${jobHref(j)}">${dShort(j.r.startAt)} · ${esc(S.destName(j.r))}</a>`).join('')}</div></div>` : ''}
+        ${late.length ? `<div class="dh-late">${icon('alert')}<div><b>ยังไม่ได้กดสถานะ ${late.length} งาน</b><small>เลยวันเดินทางแล้ว — ถ้ายังไม่เกิน 24 ชม. กดเข้าไปกด "ออกเดินทาง / กลับถึง" ได้ · เกิน 24 ชม. ให้แจ้งแอดมินบันทึกแทน</small>${late.map(j => `<a href="${jobHref(j)}">${dShort(j.r.startAt)} · ${esc(S.destName(j.r))}</a>`).join('')}</div></div>` : ''}
         ${noExp.length ? `<div class="dh-late dh-exp">${icon('fuel')}<div><b>ยังไม่บันทึกค่าใช้จ่าย ${noExp.length} งาน</b><small>ถ้ามีค่าน้ำมัน/ทางด่วน บันทึกย้อนหลังได้ภายใน 30 วัน (ไม่มีค่าใช้จ่ายก็ไม่ต้องทำอะไร)</small>${noExp.map(j => `<button type="button" data-fuel data-r="${j.r.id}" data-v="${j.a.vehicleId}">${dShort(j.r.startAt)} · ${esc(S.destName(j.r))}</button>`).join('')}</div></div>` : ''}
         <div class="seg dh-seg">${Object.entries(RANGES).map(([k, l]) => { const n = left(k); return `<a href="${link({ r: k, date: '' })}"><button class="${k === mode ? 'on' : ''}" tabindex="-1">${l}<small>${n ? `เหลือ ${n} งาน` : 'ไม่มีงานค้าง'}</small></button></a>`; }).join('')}</div>
         <div class="dh-nav"><a class="icon-btn" href="${link({ r: mode, date: fmt.localDate(shiftRange(mode, ref, -1)) })}" aria-label="ก่อนหน้า">${icon('chevL')}</a>
@@ -390,11 +414,11 @@
     if (adminView) d = S.driver(query.d) || S.db.drivers[0];
     if (!d) return { html: `<div class="drv">${UI.empty('บัญชีนี้ยังไม่ได้ผูกกับรายชื่อพนักงานขับรถ กรุณาติดต่อแอดมิน', 'user')}</div>`, layout: 'driver' };
     const jobs = myJobs(d.id);
-    const mode = RANGES[query.r] ? query.r : 'week';
+    const mode = RANGES[query.r] ? query.r : 'day';   // เข้ามาครั้งแรก = ดูงานวันนี้
     const ref = query.date ? UI.dayOf(query.date) : new Date();
     const linkL = o => { const p = { ...(adminView ? { d: d.id } : {}), r: mode, ...o }; Object.keys(p).forEach(k => { if (!p[k]) delete p[k]; }); return '#/driver?' + new URLSearchParams(p); };
     const tab = query.tab === 'cal' ? 'cal' : 'list';
-    const view = ['week', 'day'].includes(query.view) ? query.view : 'month';
+    const view = query.view === 'month' ? 'month' : 'week';   // ค่าเริ่มต้น = สัปดาห์ (ไม่มีมุมมองวันนี้แล้ว)
     const sel = UI.dayOf(query.date);
     const link = o => '#/driver?' + new URLSearchParams({ ...(adminView ? { d: d.id } : {}), tab: 'cal', view, date: fmt.localDate(sel), ...o });
     const tabs = `<div class="seg" style="margin-top:16px;display:flex"><a href="#/driver${adminView ? `?d=${d.id}` : ''}" style="flex:1"><button class="${tab === 'list' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('list')} งานของฉัน</button></a><a href="${link({})}" style="flex:1"><button class="${tab === 'cal' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('calendar')} ปฏิทินงาน</button></a></div>`;
@@ -407,6 +431,7 @@
         ${tabs}
         ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
       </div>`,
+      patch: true,
       mount: bindJobs
     };
   };
@@ -420,6 +445,7 @@
       layout: 'driver',
       html: `<div class="drv"><div class="row between" style="margin-bottom:6px"><a class="crumb" href="#/driver${S.isAdmin(S.me) && !S.driverOfUser(S.me) ? `?d=${a.driverId}` : ''}">${icon('arrowL')} งานของฉัน</a>${S.isAdmin(S.me) ? `<a class="crumb" href="#/admin/requests/${r.id}">${icon('shield')} เปิดในหลังบ้าน</a>` : ''}</div>${jobCard({ r, a, i }, { detail: true })}
         <div class="card" style="margin-top:14px"><div class="card-head"><h3>${icon('activity')} ความเคลื่อนไหว</h3></div>${C.history(r)}</div></div>`,
+      patch: true,
       mount: bindJobs
     };
   };

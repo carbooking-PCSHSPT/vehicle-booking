@@ -111,13 +111,13 @@ service cloud.firestore {
                         && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && request.resource.data.status == resource.data.status
                         && changedOnly(['esign', 'history', 'updatedAt']))
-                    // คนขับ: กดออกเดินทาง/กลับถึง (กลับครบทุกคัน = ปิดงานอัตโนมัติ) เลขไมล์ ค่าน้ำมัน (บันทึกได้หลังปิดงาน)
+                    // คนขับ: กดออกเดินทาง/กลับถึง (กลับครบทุกคัน = ปิดงานอัตโนมัติ) เลขไมล์ ค่าน้ำมัน (บันทึกได้หลังปิดงาน) · ครูผู้ร่วมเดินทางลงชื่อตอนกลับถึง (paxSign)
                     // — เปลี่ยนรถ/คนขับ/รายละเอียดคำขอไม่ได้
                     || (role('driver') && email() in resource.data.driverEmails
                         && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && request.resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && changedOnly(['assignments', 'expenses', 'history', 'status', 'closedAt', 'updatedAt'])
-                        && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd', 'check']));
+                        && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd', 'check', 'paxSign']));
       allow delete: if admin();
     }
 
