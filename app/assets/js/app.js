@@ -145,15 +145,17 @@ const C = (() => {
   function gantt(list, vehicles, { day = new Date(), hrefOf = () => '' } = {}) {
     const d0 = new Date(day); d0.setHours(0, 0, 0, 0);
     const d1 = new Date(d0.getTime() + 864e5);
-    // ช่วงเวลาเริ่ม 06:00–20:00 ขยายอัตโนมัติถ้ามีงานนอกช่วง
-    let H0 = 6, H1 = 20;
-    list.forEach(r => { const s = new Date(r.startAt), e = new Date(r.endAt); if (s >= d0 && s < d1) H0 = Math.min(H0, s.getHours()); if (e >= d0 && e < d1) H1 = Math.max(H1, Math.min(24, e.getHours() + (e.getMinutes() ? 1 : 0))); });
+    // ช่วงเวลาอัจฉริยะ: ปกติ 06:00–18:00 · ขยายได้ทั้ง 24 ชม. ตามงานจริง (งานต่อจากเมื่อวาน = เริ่ม 00:00 · ค้างคืน = ถึง 24:00)
+    let H0 = 6, H1 = 18;
+    list.forEach(r => { const s = new Date(r.startAt), e = new Date(r.endAt);
+      H0 = Math.min(H0, s < d0 ? 0 : s.getHours());
+      H1 = Math.max(H1, e >= d1 ? 24 : Math.min(24, e.getHours() + (e.getMinutes() ? 1 : 0))); });
     const pos = t => Math.max(0, Math.min(100, ((new Date(t) - d0) / 36e5 - H0) / (H1 - H0) * 100));
     const hours = Array.from({ length: H1 - H0 + 1 }, (_, i) => H0 + i);
     const bar = (r, extra = '') => {
       const l = pos(r.startAt), w = Math.max(3, pos(r.endAt) - l), href = hrefOf(r);
       const cont = new Date(r.startAt) < d0 ? '← ' : '', more = new Date(r.endAt) > d1 ? ' →' : '';
-      return `<div class="g-bar s-${r.status} ${href ? 'link' : ''}" style="left:${l}%;width:${w}%" ${href ? `data-href="${href}"` : ''} title="${esc(S().destName(r))} · ${fmt.time(r.startAt)}–${fmt.when(r.endAt)} · ${esc(r.requester.name)}${extra}">${icon(r.status === 'pending' ? 'clock' : 'pin')}<span>${cont}${esc(S().destName(r))}${r.overnight ? ' · ค้างคืน' : ''}${more}</span></div>`;
+      return `<div class="g-bar s-${r.status} link" data-trip="${r.id}" style="left:${l}%;width:${w}%" ${href ? `data-href="${href}"` : ''} title="${esc(S().destName(r))} · ${fmt.time(r.startAt)}–${fmt.when(r.endAt)} · ${esc(r.requester.name)}${extra}">${icon(r.status === 'pending' ? 'clock' : 'pin')}<span>${cont}${esc(S().destName(r))}${r.overnight ? ' · ค้างคืน' : ''}${more}</span></div>`;
     };
     const rows = vehicles.map(v => {
       const mine = list.filter(r => (r.assignments || []).some(a => a.vehicleId === v.id));
@@ -209,7 +211,7 @@ const C = (() => {
       const st0 = new Date(r.startAt), en = new Date(r.endAt);
       let pre = '';
       if (!placed && st0 > now) { placed = true; pre = `<tr class="bd-now"><td colspan="8"><span>ตอนนี้ ${fmt.time(now)} น.</span></td></tr>`; }
-      return pre + `<tr class="bd-row ${st[0]} ${href ? 'link' : ''}" ${href ? `data-href="${href}"` : ''}>
+      return pre + `<tr class="bd-row ${st[0]} link" data-trip="${r.id}" ${href ? `data-href="${href}"` : ''}>
         <td><span class="flip">${flip(st0, k)}</span>${UI.sameDay(st0, day) ? '' : `<small>${fmt.dayMonth(st0)}</small>`}</td>
         <td><span class="flip">${flip(en, k)}</span>${UI.sameDay(en, day) ? '' : `<small>${fmt.dayMonth(en)}</small>`}</td>
         <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${S().tripTag(r) ? ` · ${S().tripTag(r).text}` : ''}</small><small>${esc(r.purpose)}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
@@ -222,6 +224,29 @@ const C = (() => {
     return `<div class="bd"><div class="bd-scroll"><table><thead><tr><th>ออก</th><th>กลับ</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>ผู้เดินทาง</th><th>รถ</th><th>คนขับ</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
+  // การ์ดรายละเอียดเที่ยวรถ (มือถือ/แท็บเล็ต กดแถวในกระดาน/ปฏิทิน) — ข้อมูลครบแบบตารางในมุมมองคอม
+  function tripModal(id, href = '') {
+    const r = S().request(id); if (!r) return;
+    const st = BD[r.status] || BD.approved, as = r.assignments || [];
+    const s = new Date(r.startAt), e = new Date(r.endAt), same = UI.sameDay(s, e);
+    const row = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
+    UI.modal({
+      title: esc(S().destName(r)), size: 'tc-modal',
+      body: `<div class="tc">
+        <div class="tc-time"><div><small>ออก</small><b class="num">${fmt.time(s)}</b><span>${fmt.dayMonth(s)}</span></div>${icon('chevR')}<div><small>กลับ</small><b class="num">${fmt.time(e)}</b><span>${same ? 'วันเดียวกัน' : fmt.dayMonth(e)}</span></div><span class="bd-st ${st[0]}"><span><em>${st[2]}</em></span></span></div>
+        <dl class="kv tc-kv">
+          ${row('ภารกิจ', esc(r.purpose || ''))}
+          ${row('ปลายทาง', (r.destinations || []).map(d => `${esc(d.name)}${d.province ? ` <small>${esc(d.province)}</small>` : ''}`).join('<br>') + (r.totalKm ? ` <small>· ${fmt.num(r.totalKm, 0)} กม. (ไป-กลับ)</small>` : ''))}
+          ${row('ผู้ขอใช้รถ', `${esc(r.requester.name)}${r.requester.dept ? ` <small>${esc(r.requester.dept)}</small>` : ''}`)}
+          ${row('ผู้เดินทาง', `${S().passengers(r)} คน <small>· ครู ${+r.teachers || 0} · นักเรียน ${+r.students || 0}${+r.others ? ` · อื่น ${+r.others}` : ''}</small>`)}
+          ${row('ลักษณะ', S().tripTag(r) ? esc(S().tripTag(r).text) : '')}
+          ${row('จุดขึ้นรถ', esc(r.pickup || ''))}
+        </dl>
+        <div class="tc-veh">${as.length ? as.map(a => `<div class="tc-v">${icon('van')}<div><b>${esc(vName(a.vehicleId))} <small>${esc(vPlate(a.vehicleId))}</small></b><span>${icon('wheel')} ${esc(dName(a.driverId) || 'ยังไม่ระบุคนขับ')}${dPhone(a.driverId) ? ` · <a class="link" href="tel:${esc(dPhone(a.driverId))}">${esc(dPhone(a.driverId))}</a>` : ''}</span></div></div>`).join('') : '<p class="hint">รอแอดมินจัดรถ</p>'}</div>
+      </div>`,
+      actions: href ? [{ label: 'ปิด', value: null }, { label: 'ดูคำขอ', kind: 'btn-primary', icon: 'chevR', onClick: () => { location.hash = href; return true; } }] : [{ label: 'ปิด', value: null }]
+    });
+  }
   // ตัวเลือกวันที่ (‹ วันที่ › วันนี้) — base เช่น '#/?date=' หรือ '#/schedule?date='
   function dayPicker(day, base, { dark = false } = {}) {
     const d = new Date(day), prev = new Date(d), next = new Date(d);
@@ -464,7 +489,7 @@ const C = (() => {
       body: `<form id="pf" class="stack" style="gap:14px">
         <div class="label">รูปแบบเอกสาร</div>
         <div class="pf-opts">${one ? '' : fmtOpt('report', 'chart', 'รายงานสรุป', 'หน้าปกสรุปตามสถานะ/หมวด/รถ + ผู้รายงาน แล้วตามด้วยรายการแยกหมวด')}${fmtOpt('memo', 'file', 'บันทึกข้อความ', 'มีตราครุฑ ตามแบบฟอร์มราชการ รายการละ 1 หน้า')}${fmtOpt('letter', 'printer', 'หัวกระดาษโรงเรียน', 'ไม่มีตราครุฑ ใช้ตราโรงเรียน รายการละ 1 หน้า')}</div>
-        ${one ? '' : `<label class="check pf-nr"><input type="checkbox" name="sec" ${sv.sec !== false ? 'checked' : ''}> แยกเป็นส่วนตามหมวดงาน พร้อมหน้าคั่น</label>
+        ${one ? '' : `<label class="check pf-nr"><input type="checkbox" name="sec" ${sv.sec === true ? 'checked' : ''}> แยกตามหมวดงาน <span class="hint">(ขึ้นหน้าใหม่ทุกหมวด · ไม่เลือก = รวมทุกรายการเรียงตามวันที่)</span></label>
         <label class="check"><input type="checkbox" name="cover" ${sv.cover !== false ? 'checked' : ''}> มีหน้าปกสรุปจำนวนตามสถานะและหมวดงาน</label>`}
         <div class="field"><label>หัวข้อเอกสาร ${one ? '<span class="hint">(ใช้เป็นชื่อไฟล์ PDF)</span>' : ''}</label><input class="input" name="title" value="${esc(sv.title || title)}"></div>
       </form>`,
@@ -476,7 +501,7 @@ const C = (() => {
     const rs = list.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
     if (opt.fmt === 'report') {
       const range = `${thDate(rs[0].startAt)} – ${thDate(rs[rs.length - 1].startAt)}`;
-      return UI.printDoc(requestReport(rs, docTitle, sub, range), { title: `${docTitle} ${rs.length} รายการ`, fitWidth: '186mm', fitPage: 264, footLeft: `${docTitle}${sub ? ' · ' + sub : ''} · ${rs.length} รายการ` });
+      return UI.printDoc(requestReport(rs, docTitle, sub, range, { sec: !!opt.sec, cover: !!opt.cover }), { title: `${docTitle} ${rs.length} รายการ`, fitWidth: '186mm', fitPage: 264, footLeft: `${docTitle}${sub ? ' · ' + sub : ''} · ${rs.length} รายการ` });
     }
     const memoOk = opt.fmt !== 'table';
     const items = memoOk ? rs.filter(r => !['rejected', 'cancelled'].includes(r.status)) : rs;
@@ -505,26 +530,37 @@ const C = (() => {
   }
   const reportHead = (title, sub = '') => { const st = S().db.settings; return `<div class="rp-head"><img src="images/logo.png" alt=""><div><b>${esc(title)}</b><span>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} · ${esc(st.schoolName || '')}</span>${sub ? `<span>${esc(sub)}</span>` : ''}</div></div>`; };
   const RP_TONE = { pending: '#7c3aed', revise: '#a16207', approved: '#047857', ontrip: '#c2410c', returned: '#64748b', closed: '#64748b', rejected: '#b91c1c', cancelled: '#b91c1c' };
-  // รายงานสรุปคำขอใช้รถ: หน้า 1 สรุปตามสถานะ/หมวด/รถ · หน้า 2+ รายการแยกตามหมวดงาน
-  function requestReport(items, docTitle, sub, range) {
+  // รายงานสรุปคำขอใช้รถ: หน้าปกสรุป + รายการ (รวมเรียงตามวันที่ หรือ แยกหมวดงานหมวดละหน้า)
+  function requestReport(items, docTitle, sub, range, { sec = false, cover = true } = {}) {
     const s = S(), cnt = f => items.filter(f).length;
-    const byStatus = Object.entries(s.STATUS).map(([k, v]) => [v.label, cnt(r => r.status === k)]);
-    const groups = [...items.reduce((m, r) => { const k = s.catName(r) || 'ไม่ระบุหมวด'; (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map())];
+    const byStatus = Object.entries(s.STATUS).map(([k, v]) => [v.label, cnt(r => r.status === k)]).filter(x => x[1]);
+    const catOf = r => s.catName(r) || 'ไม่ระบุหมวด';
+    const groups = [...items.reduce((m, r) => { const k = catOf(r); (m.get(k) || m.set(k, []).get(k)).push(r); return m; }, new Map())];
     const ok = items.filter(r => !['rejected', 'cancelled'].includes(r.status));
     const vrows = s.db.vehicles.map(v => { const rs = ok.filter(r => (r.assignments || []).some(a => a.vehicleId === v.id)); const km = rs.reduce((t, r) => { const a = r.assignments.find(x => x.vehicleId === v.id); return t + (a.odoStart != null && a.odoEnd != null ? a.odoEnd - a.odoStart : (+r.totalKm || 0)); }, 0); return { v, n: rs.length, km, pax: rs.reduce((t, r) => t + s.passengers(r), 0) }; }).filter(x => x.n);
     const tb = (h, rows, foot) => `<table class="pd-tbl rp-t"><thead><tr>${h.map((x, i) => `<th class="${i ? 'r' : ''}">${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody>${foot ? `<tfoot><tr>${foot.map((c, i) => `<td class="${i ? 'r' : ''}">${c}</td>`).join('')}</tr></tfoot>` : ''}</table>`;
-    const cover = reportCover({ title: docTitle, sub: `${sub ? sub + ' · ' : ''}${items.length} รายการ`, range: `ช่วงวันที่เดินทาง ${range}`, body: `
+    const coverHtml = cover ? reportCover({ title: docTitle, sub: `${sub ? sub + ' · ' : ''}${items.length} รายการ`, range: `ช่วงวันที่เดินทาง ${range}`, body: `
       <div class="rp-grid">${tb(['สถานะ', 'จำนวน'], byStatus.map(([l, n]) => [esc(l), n]), ['รวม', items.length])}${tb(['หมวดงาน', 'จำนวน'], groups.map(([k, g]) => [esc(k), g.length]), ['รวม', items.length])}</div>
-      ${vrows.length ? tb(['รถ', 'เที่ยว', 'ระยะทาง (กม.)', 'ผู้เดินทาง (คน)'], vrows.map(x => [`${esc(x.v.name)}${x.v.plate ? ` <small>${esc(x.v.plate)}</small>` : ''}`, x.n, UI.fmt.num(x.km), x.pax]), ['รวม', vrows.reduce((t, x) => t + x.n, 0), UI.fmt.num(vrows.reduce((t, x) => t + x.km, 0)), vrows.reduce((t, x) => t + x.pax, 0)]) : ''}` });
-    let no = 0;
-    const rows = groups.map(([k, g]) => `<tr class="rp-grp"><td colspan="6">${esc(k)} · ${g.length} รายการ</td></tr>` + g.map(r => { const st = s.STATUS[r.status] || {}; return `<tr><td class="c">${++no}</td>
-      <td><span class="one" data-fit>${UI.fmt.date(r.startAt)}</span><small class="one" data-fit>${UI.fmt.time(r.startAt)}–${UI.sameDay(r.startAt, r.endAt) ? UI.fmt.time(r.endAt) : UI.fmt.dayMonth(r.endAt) + ' ' + UI.fmt.time(r.endAt)} น.</small><small class="one" data-fit>${r.id}</small></td>
-      <td>${esc(s.destName(r))}<small>${esc(r.purpose || '')}${r.totalKm ? ` · ${UI.fmt.num(r.totalKm, 0)} กม.` : ''}</small></td>
-      <td><span class="one" data-fit>${esc(r.requester.name)}</span><small>${esc(r.requester.dept || '')} · ${s.passengers(r)} คน</small></td>
-      <td>${(r.assignments || []).map(a => `<span class="one" data-fit>${esc(vName(a.vehicleId))}</span><small class="one" data-fit>${esc(dName(a.driverId))}</small>`).join('') || '-'}</td>
-      <td><span class="rp-st" style="--c:${RP_TONE[r.status] || '#555'}">${esc(st.label || r.status)}</span></td></tr>`; }).join('')).join('');
-    return cover + `<section class="rp-page">${reportHead(docTitle, `${sub ? sub + ' · ' : ''}${items.length} รายการ · ${range}`)}
-      <table class="pd-tbl rp-list"><colgroup><col style="width:5%"><col style="width:15%"><col style="width:27%"><col style="width:23%"><col style="width:17%"><col style="width:13%"></colgroup><thead><tr><th class="c">ที่</th><th>วันเดินทาง</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+      ${vrows.length ? tb(['รถ', 'เที่ยว', 'ระยะทาง (กม.)', 'ผู้เดินทาง (คน)'], vrows.map(x => [`${esc(x.v.name)}${x.v.plate ? ` <small>${esc(x.v.plate)}</small>` : ''}`, x.n, UI.fmt.num(x.km), x.pax]), ['รวม', vrows.reduce((t, x) => t + x.n, 0), UI.fmt.num(vrows.reduce((t, x) => t + x.km, 0)), vrows.reduce((t, x) => t + x.pax, 0)]) : ''}` }) : '';
+    // ตารางรายการ: คอลัมน์แยกชัด (ตามรูปแบบรายงานแจ้งซ่อม) · บรรทัดรองตัวเล็กใต้รายการหลัก
+    const tCell = r => { const a = new Date(r.startAt), b = new Date(r.endAt); return `${UI.fmt.time(a)}–${UI.sameDay(a, b) ? UI.fmt.time(b) : UI.fmt.dayMonth(b) + ' ' + UI.fmt.time(b)} น.`; };
+    const list = rs => { let no = 0; return `<table class="pd-tbl rp-list"><colgroup><col style="width:4%"><col style="width:11.5%"><col style="width:22%"><col style="width:17.5%"><col style="width:5%"><col style="width:12%"><col style="width:16%"><col style="width:12%"></colgroup>
+      <thead><tr><th class="c">ที่</th><th>วันที่</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th class="c">คน</th><th>รถ</th><th>คนขับ</th><th class="c">สถานะ</th></tr></thead>
+      <tbody>${rs.map(r => { const st = s.STATUS[r.status] || {}, as = r.assignments || []; return `<tr><td class="c">${++no}</td>
+        <td><span class="one" data-fit>${UI.fmt.date(r.startAt)}</span><small class="one" data-fit>${tCell(r)}</small></td>
+        <td>${esc(s.destName(r))}<small>${esc(r.purpose || '')}${r.totalKm ? ` · ${UI.fmt.num(r.totalKm, 0)} กม.` : ''}${sec ? '' : ` · ${esc(catOf(r))}`}</small></td>
+        <td><span class="one" data-fit>${esc(r.requester.name)}</span><small>${esc(r.requester.dept || '')}</small></td>
+        <td class="c">${s.passengers(r)}</td>
+        <td>${as.map(a => `<span class="one" data-fit>${esc(vName(a.vehicleId))}</span><small class="one" data-fit>${esc(vPlate(a.vehicleId) || '')}</small>`).join('') || '-'}</td>
+        <td>${as.map(a => `<span class="one" data-fit>${esc(dName(a.driverId) || '-')}</span>`).join('') || '-'}</td>
+        <td class="c"><span class="rp-st" style="--c:${RP_TONE[r.status] || '#555'}">${esc(st.label || r.status)}</span></td></tr>`; }).join('')}</tbody></table>`; };
+    const sorted = items.slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const head = extra => reportHead(docTitle, `${sub ? sub + ' · ' : ''}${extra} · ${range}`);
+    // แยกตามหมวดงาน: หมวดละหน้า (ขึ้นหน้าใหม่ทุกหมวด) · ไม่แยก: รวมทุกรายการเรียงตามวันที่
+    const pages = sec
+      ? groups.map(([k, g]) => `<section class="rp-page">${head(`หมวด${k} · ${g.length} รายการ`)}${list(g.slice().sort((a, b) => a.startAt.localeCompare(b.startAt)))}</section>`).join('')
+      : `<section class="rp-page">${head(`${items.length} รายการ เรียงตามวันที่`)}${list(sorted)}</section>`;
+    return coverHtml + pages;
   }
   function coverPage(items, docTitle, range) {
     const st = S().db.settings, cnt = f => items.filter(f).length;
@@ -541,66 +577,66 @@ const C = (() => {
     return `<table class="pd-tbl pd-sum"><thead><tr><th class="c">ที่</th><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอใช้รถ</th><th class="r">คน</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
       <tbody>${rs.map((r, i) => `<tr><td class="c">${i + 1}</td><td class="nw">${r.id}</td><td class="nw">${UI.fmt.date(r.startAt)}<small>${UI.fmt.time(r.startAt)}–${UI.fmt.when(r.endAt)}</small></td><td>${esc(S().destName(r))}<small>${esc(r.purpose || '')}</small></td><td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td><td class="r">${S().passengers(r)}</td><td>${(r.assignments || []).map(a => `${esc(vName(a.vehicleId))}<small>${esc(dName(a.driverId))}</small>`).join('') || '-'}</td><td class="nw">${esc(S().STATUS[r.status].label)}</td></tr>`).join('')}</tbody></table>`;
   }
+  // บันทึกข้อความขออนุญาตใช้รถ — รูปแบบเดียวกับบันทึกแจ้งซ่อมของฝ่าย (ไม่มีกรอบ · ช่องพิจารณา 2 คอลัมน์ · อ้างอิงระบบมุมขวาบน)
   function memoHTML(r, { krut = true } = {}) {
     const s = S(), st = s.db.settings, M = memoSettings();
     const dTh = d => new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-    // วัน/เดือน/ปี แบบสั้น (พ.ศ.) ใต้ลายมือชื่อ เช่น 15/11/2569
-    const dNum = d => { const x = new Date(d); return `${x.getDate()}/${x.getMonth() + 1}/${x.getFullYear() + 543}`; };
-    const tm = d => `${UI.fmt.time(d)} น.`;
+    const tm = d => `${UI.fmt.time(d).replace(':', '.')} น.`;
     const u = s.user(r.requester.email) || (s.me && s.me.email === r.requester.email ? s.me : {}) || {};
     const pos = u.position || '';
     const t = s.tripType(r), sameDay = s.sameDay(r.startAt, r.endAt);
-    const when = sameDay ? `วันที่ ${dTh(r.startAt)} เวลา ${UI.fmt.time(r.startAt)} – ${tm(r.endAt)}`
-      : `ตั้งแต่วันที่ ${dTh(r.startAt)} เวลา ${tm(r.startAt)} ถึงวันที่ ${dTh(r.endAt)} เวลา ${tm(r.endAt)}`;
+    const when = sameDay ? `วันที่ ${dTh(r.startAt)} เวลา ${UI.fmt.time(r.startAt).replace(':', '.')} – ${tm(r.endAt)}`
+      : `วันที่ ${dTh(r.startAt)} เวลา ${tm(r.startAt)} ถึงวันที่ ${dTh(r.endAt)} เวลา ${tm(r.endAt)}`;
     const pax = s.passengers(r);
     const paxParts = [r.teachers ? `ครู/บุคลากร ${r.teachers} คน` : '', r.students ? `นักเรียน ${r.students} คน` : '', r.others ? `บุคคลอื่น ${r.others} คน` : ''].filter(Boolean).join(' ');
+    const names = String(r.passengerNames || '').trim(), hasNames = names && !/^[-–—.\s]+$/.test(names);
     const dests = (r.destinations || []).map(d => d.name + (d.province ? ` จังหวัด${d.province.replace(/^จ(\.|ังหวัด)\s*/, '')}` : '')).join(', ') || s.destName(r);
     const asg = r.assignments || [];
     const E = r.esign || {};
     const deny = !!(E.deputy && E.deputy.decision === 'deny') || r.status === 'rejected';
-    // อนุมัติในระบบแล้ว → ลงวันที่ตามวันที่กดอนุมัติ
     const apv = (r.history || []).filter(h => h.action === 'approve').pop();
     const okd = !deny && ((E.deputy && E.deputy.decision !== 'deny') || ['approved', 'ontrip', 'returned', 'closed'].includes(r.status));
     const apvAt = apv ? apv.at : (okd ? (r.decision && r.decision.at) || '' : '');
-    // ลายมือชื่อ: ไม่มีเส้นจุด — มีลายเซ็นอิเล็กทรอนิกส์ก็วางรูป ไม่มีก็เว้นที่ว่างไว้เซ็นด้วยปากกา
-    const sig = (role, name, p, img, at) => `<div class="mm-sig"><p class="mm-sl">ลงชื่อ <span class="mm-sp">${img ? `<img src="${img}" alt="">` : ''}</span> ${role}</p><p>(${name ? esc(name) : '<span class="mm-blank"></span>'})</p><p>${p ? esc(p) : ''}</p>${at ? `<p>${dNum(at)}</p>` : ''}</div>`;
+    // เลขที่หนังสือ: VR-2569-0009 → 9/2569
+    const m = /(\d{4})-(\d+)$/.exec(r.id || ''), no = m ? `${+m[2]}/${m[1]}` : r.id;
+    const sig = (img, name, title) => `<div class="m2-sig"><p class="m2-sl">ลงชื่อ <span class="m2-sp">${img ? `<img src="${img}" alt="">` : ''}</span> ${title.role || ''}</p><p>(${name ? esc(name) : '<span class="m2-blank"></span>'})</p>${title.pos ? `<p data-fit>${esc(title.pos)}</p>` : ''}</div>`;
     const reqImg = r.createdBy === r.requester.email ? s.sigOf(r.requester.email) : '';
     const headImg = E.head ? s.sigOf(E.head.email) : '', depImg = E.deputy ? s.sigOf(E.deputy.email) : '';
-    const headAt = (E.head && E.head.at) || apvAt, depAt = (E.deputy && E.deputy.at) || apvAt;
-    return `<div class="memo-doc">
+    const cb = on => `<span class="cb ${on ? 'on' : ''}"></span>`;
+    const line = (k, v) => `<div class="m2-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    return `<div class="memo-doc m2">
+      <p class="m2-ref">อ้างอิงระบบ ${esc(r.id)}</p>
       ${krut ? `<div class="mm-top"><img class="mm-krut" src="images/krut.png" alt="" onerror="this.onerror=null;this.src='images/logo.png'"><h1>บันทึกข้อความ</h1></div>`
         : `<div class="mm-lh"><img src="images/logo.png" alt=""><div><b>${esc(st.schoolName || '')}</b><span>${esc(st.division || '')} · ${esc(st.unit || 'งานยานพาหนะ')}</span></div></div><h1 class="mm-lh-t">บันทึกข้อความ</h1>`}
-      <div class="mm-line"><b>ส่วนราชการ</b><span data-fit>${esc(st.unit || 'งานยานพาหนะ')} ${esc(st.division || '')} ${esc(st.schoolName || '')}</span></div>
-      <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${r.id}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(apvAt || r.createdAt)}</span></div></div>
+      <div class="mm-line"><b>ส่วนราชการ</b><span data-fit>${esc(st.schoolName || '')}</span></div>
+      <div class="mm-row"><div class="mm-line"><b>ที่</b><span>${esc(M.noPrefix ? M.noPrefix + ' ' : '')}${esc(no)}</span></div><div class="mm-line"><b>วันที่</b><span>${dTh(apvAt || r.createdAt)}</span></div></div>
       <div class="mm-line"><b>เรื่อง</b><span>ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน</span></div>
+      <hr class="m2-hr">
       <p class="mm-to"><b>เรียน</b> ${esc(M.to)}</p>
-      <p class="mm-p">ด้วยข้าพเจ้า ${esc(r.requester.name)}${pos ? ` ตำแหน่ง ${esc(pos)}` : ''}${r.requester.dept ? ` ${esc(r.requester.dept)}` : ''} มีความประสงค์ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน เพื่อ${esc(r.purpose || '')}${r.project ? ` (${esc(r.project)})` : ''} โดยมีรายละเอียดดังนี้</p>
-      <ol class="mm-list">
-        <li><b>สถานที่ไปราชการ</b> ${esc(dests)}</li>
-        <li><b>กำหนดเดินทาง</b> ${when} (${esc(s.tripLabel(r))}${t === 'overnight' && r.lodging ? ` · ที่พัก ${esc(r.lodging)}` : ''})</li>
-        <li><b>ผู้เดินทาง</b> รวม ${pax} คน${paxParts ? ` (${paxParts})` : ''}${r.passengerNames ? ` ได้แก่ ${esc(r.passengerNames)}` : ''}</li>
-        <li><b>จุดขึ้นรถ</b> ${esc(r.pickup || '-')} <b>โทรศัพท์ติดต่อระหว่างเดินทาง</b> ${esc(r.contactPhone || r.requester.phone || '-')}</li>
-        ${r.note ? `<li><b>หมายเหตุ</b> ${esc(r.note)}</li>` : ''}
-      </ol>
+      <p class="mm-p">ด้วยข้าพเจ้า ${esc(r.requester.name)}${pos ? ` ตำแหน่ง ${esc(pos)}` : ''}${r.requester.dept ? ` ${esc(r.requester.dept)}` : ''}${(r.contactPhone || r.requester.phone) ? ` เบอร์ติดต่อ ${esc(r.contactPhone || r.requester.phone)}` : ''} มีความประสงค์ขออนุญาตใช้รถยนต์ส่วนกลางของโรงเรียน เพื่อ${esc(r.purpose || '')}${r.project ? ` (${esc(r.project)})` : ''} โดยมีรายละเอียดดังนี้</p>
+      <div class="m2-list">
+        ${line('สถานที่ไปราชการ', esc(dests))}
+        ${line('กำหนดเดินทาง', `${when} (${esc(s.tripLabel(r))}${t === 'overnight' && r.lodging ? ` ที่พัก ${esc(r.lodging)}` : ''})`)}
+        ${line('ผู้เดินทาง', `รวม ${pax} คน${paxParts ? ` (${paxParts})` : ''}${hasNames ? ` ได้แก่ ${esc(names)}` : ''}`)}
+        ${line('จุดขึ้นรถ', esc(r.pickup || '-'))}
+      </div>
       <p class="mm-p">จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต</p>
-      <div class="mm-right">${sig('ผู้ขอใช้รถ', r.requester.name, pos, reqImg, r.createdAt)}</div>
-      <div class="mm-boxes">
-        <div class="mm-box"><h3>ความเห็นหัวหน้างานยานพาหนะ</h3>
-          <p>เรียน ${esc(M.to)}</p>
-          <p class="mm-ind">งานยานพาหนะได้ตรวจสอบแล้ว${asg.length ? ' และจัดรถให้ดังนี้' : ''}</p>
-          ${asg.length ? `<ul>${asg.map(a => `<li>${esc(vName(a.vehicleId))}${vPlate(a.vehicleId) ? ` ทะเบียน ${esc(vPlate(a.vehicleId))}` : ''} พนักงานขับรถ ${esc(dName(a.driverId))}${dPhone(a.driverId) ? ` โทร ${esc(dPhone(a.driverId))}` : ''}</li>`).join('')}</ul>` : '<p class="mm-gap"></p>'}
-          ${r.decision && r.decision.note ? `<p class="mm-note">หมายเหตุ: ${esc(r.decision.note)}</p>` : ''}
-          <p class="mm-ind">${deny ? 'เห็นควรไม่อนุญาต' : okd ? 'เห็นควรอนุญาต' : ''}</p>
-          ${sig('', E.head ? E.head.name : M.headName, M.headPos, headImg, headAt)}</div>
-        <div class="mm-box"><h3>ความเห็น / คำสั่ง</h3>
-          <p class="mm-ks">${deny ? '- ไม่อนุญาต' : okd ? '- ทราบ<br>- อนุญาตตามเสนอ' : ''}</p>
-          ${E.deputy && E.deputy.note ? `<p class="mm-note">${esc(E.deputy.note)}</p>` : ''}
-          ${sig('', E.deputy ? E.deputy.name : M.depName, M.depPos, depImg, depAt)}</div>
+      <div class="m2-req">${sig(reqImg, r.requester.name, { role: 'ผู้ขอใช้รถ', pos: r.requester.dept || pos })}</div>
+      <div class="m2-cols">
+        <div class="m2-col"><p class="m2-h" data-fit>หัวหน้างานยานพาหนะ</p>
+          <p>${cb(okd)} เห็นควรพิจารณาอนุญาต${asg.length ? '' : ''}</p>
+          ${asg.length ? `<p class="m2-asg">จัด${asg.map(a => `${esc(vName(a.vehicleId))}${vPlate(a.vehicleId) ? ` ทะเบียน ${esc(vPlate(a.vehicleId))}` : ''} พนักงานขับรถ ${esc(dName(a.driverId) || '-')}`).join(' และ ')}</p>` : ''}
+          <p>${cb(deny)} ไม่อนุญาต เนื่องจาก ${deny && r.decision && r.decision.note ? esc(r.decision.note) : ''}</p>
+          ${sig(headImg, E.head ? E.head.name : M.headName, { pos: M.headPos })}</div>
+        <div class="m2-col"><p class="m2-h" data-fit>${esc(M.depPos)}</p>
+          <p>พิจารณา/สั่งการ</p>
+          <p class="m2-cmd">${deny ? 'ไม่อนุญาต' : okd ? 'อนุญาต' : ''}${E.deputy && E.deputy.note ? ` ${esc(E.deputy.note)}` : ''}</p>
+          ${sig(depImg, E.deputy ? E.deputy.name : M.depName, { pos: M.depPos })}</div>
       </div>
     </div>`;
   }
 
-  return { gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
+  return { tripModal, gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {
@@ -733,7 +769,9 @@ const App = (() => {
     let view;
     try { view = await page(ctx); }
     catch (e) { console.error(e); view = { html: `<div class="page container">${UI.empty('เกิดข้อผิดพลาด: ' + esc(e.message), 'alert')}</div>` }; }
-    const same = current.path === location.hash;
+    // หน้าเดิมแต่เปลี่ยนเฉพาะตัวกรอง (เช่น วันที่ของกระดานเที่ยวรถ/ตารางรถ) → แก้เฉพาะส่วนที่เปลี่ยน ไม่วาดใหม่ทั้งหน้า ไม่เด้งขึ้นบน
+    const samePage = !!current.path && current.path.split('?')[0] === location.hash.split('?')[0];
+    const same = current.path === location.hash || (samePage && !!view.patch && !!(current.view && current.view.patch));
     const y = scrollY;
     const layout = view.layout || 'public';
     const inner = layout === 'bare' ? '' : (layout === 'admin' ? Pages._adminShell(path, view.html) : view.html);
@@ -868,6 +906,12 @@ const App = (() => {
         const refs = all.length ? all : [op.dataset.view];
         C.viewFiles(refs, Math.max(0, refs.indexOf(op.dataset.view)));
         return;
+      }
+      // เที่ยวรถในกระดาน/แกนเวลา/ปฏิทิน: มือถือ-แท็บเล็ต (หรือไม่มีสิทธิ์เปิดคำขอ) → การ์ดรายละเอียด · คอมที่มีสิทธิ์ → เปิดคำขอ
+      const tr = e.target.closest('[data-trip]');
+      if (tr && !e.target.closest('a,button,input,select')) {
+        const href = tr.dataset.href || '';
+        if (!href || document.documentElement.classList.contains('lt1060')) { e.preventDefault(); C.tripModal(tr.dataset.trip, href); return; }
       }
       // การ์ดที่กดได้ทั้งใบ (ไม่ใช้ <a> ซ้อน <a>)
       const card = e.target.closest('[data-href]');

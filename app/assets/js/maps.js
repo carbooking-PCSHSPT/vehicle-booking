@@ -93,10 +93,10 @@ const Maps = (() => {
           : `<div class="note-box">${icon('info')}<div>ยังไม่ได้เชื่อม Longdo Map (ใส่ <b>longdoKey</b> ใน config.js) — ตอนนี้เลือกจาก “สถานที่ที่เคยไป” หรือกรอกข้อมูลเองได้</div></div>`}
         <div class="grid2" style="margin-top:14px">
           <div class="field full"><label>ชื่อสถานที่ <b class="req">*</b></label><input id="pkName" value="${esc(cur.name)}"></div>
-          <div class="field full"><label>ที่อยู่ / ตำบล อำเภอ จังหวัด</label><input id="pkAddr" value="${esc(cur.address)}"></div>
-          <div class="field"><label>จังหวัด</label><input id="pkProv" list="pkProvList" autocomplete="off" value="${esc(cur.province)}" placeholder="พิมพ์หรือเลือกจังหวัด"><datalist id="pkProvList">${PROVS.map(p => `<option value="${p}">`).join('')}</datalist></div>
-          <div class="field"><label>เวลาเดินทางโดยประมาณ (นาที)</label><input id="pkMin" type="number" min="0" inputmode="numeric" value="${esc(cur.mins)}"></div>
-          <div class="field"><label>ระยะทางจากโรงเรียน (กม. เที่ยวเดียว)</label><input id="pkKm" type="number" min="0" step="0.1" inputmode="decimal" value="${esc(cur.km)}"></div>
+          <div class="field full"><label>ที่อยู่ / ตำบล อำเภอ จังหวัด <b class="req">*</b></label><input id="pkAddr" value="${esc(cur.address)}"></div>
+          <div class="field"><label>จังหวัด <b class="req">*</b></label><input id="pkProv" list="pkProvList" autocomplete="off" value="${esc(cur.province)}" placeholder="พิมพ์หรือเลือกจังหวัด"><datalist id="pkProvList">${PROVS.map(p => `<option value="${p}">`).join('')}</datalist></div>
+          <div class="field"><label>เวลาเดินทางโดยประมาณ (นาที) <b class="req">*</b></label><input id="pkMin" type="number" min="0" inputmode="numeric" value="${cur.mins ? esc(cur.mins) : ''}"></div>
+          <div class="field"><label>ระยะทางจากโรงเรียน (กม. เที่ยวเดียว) <b class="req">*</b></label><input id="pkKm" type="number" min="0" step="0.1" inputmode="decimal" value="${cur.km ? esc(cur.km) : ''}"></div>
           <div class="field"><label>ระยะทางรวม ไป + กลับ (กม.) <span class="hint">กรอกช่องไหนก็ได้</span></label><input id="pkKm2" type="number" min="0" step="0.1" inputmode="decimal" value="${cur.km ? (Math.round(cur.km * 20) / 10) : ''}"></div>
           <div class="field full"><label>พิกัด หรือ ลิงก์ Google Maps <span class="hint">(ไม่บังคับ — วางแล้วระบบคำนวณระยะทางให้)</span></label>
             <div class="pk-ll"><input id="pkLL" value="${cur.lat != null ? `${(+cur.lat).toFixed(5)}, ${(+cur.lng).toFixed(5)}` : ''}" placeholder="เช่น 13.75302, 100.49046 หรือวางลิงก์จาก Google Maps" autocomplete="off"><a class="btn btn-ghost btn-sm" id="pkGm" target="_blank" rel="noopener" href="https://www.google.com/maps">${icon('pin')} หาใน Google Maps</a></div></div>
@@ -112,7 +112,11 @@ const Maps = (() => {
       title: `${icon('pin')} เลือกสถานที่ปลายทาง`, size: 'lg', body,
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'ใช้สถานที่นี้', kind: 'btn-primary', icon: 'check', onClick: el => {
         const v = id => el.querySelector(id).value.trim();
-        if (!v('#pkName')) { UI.toast('กรุณาระบุชื่อสถานที่', 'error'); return false; }
+        // บังคับกรอกทุกช่อง ยกเว้นพิกัด
+        const need = [['#pkName', 'ชื่อสถานที่'], ['#pkAddr', 'ที่อยู่ / ตำบล อำเภอ จังหวัด'], ['#pkProv', 'จังหวัด']].find(([id]) => !v(id));
+        if (need) { UI.toast(`กรุณากรอก${need[1]}`, 'error'); el.querySelector(need[0]).focus(); return false; }
+        if (!(+v('#pkMin') > 0)) { UI.toast('กรุณากรอกเวลาเดินทางโดยประมาณ (นาที)', 'error'); el.querySelector('#pkMin').focus(); return false; }
+        if (!(+v('#pkKm') > 0)) { UI.toast('กรุณากรอกระยะทาง (เที่ยวเดียว หรือ ไป + กลับ)', 'error'); el.querySelector('#pkKm').focus(); return false; }
         return { ...cur, name: v('#pkName'), address: v('#pkAddr'), province: v('#pkProv') || provinceOf(v('#pkAddr')), km: +v('#pkKm') || 0, mins: +v('#pkMin') || 0 };
       } }],
       onOpen(el) {

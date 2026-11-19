@@ -1063,14 +1063,20 @@ img.broken { color: transparent; background: #efe9dc; }
 .lt1380 .user-chip { padding: 4px; }
 .lt1380 .brand { padding-right: 22px; }
 /* max-width 1180px */
-.lt1180 .nav-toggle { display: grid; }
-.lt1180 .menu { position: absolute; top: calc(100% + 6px); left: 12px; right: 12px; flex-direction: column; align-items: stretch; gap: 2px; padding: 12px; border-radius: 22px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow-lg); display: none; max-height: calc(100vh - 110px); overflow: auto; }
-.lt1180 .menu.open { display: flex; }
-.lt1180 .menu-link { justify-content: space-between; padding: 12px 16px; border-radius: 14px; }
-.lt1180 .menu-link.active::after { display: none; }
-.lt1180 .menu-link.active { background: var(--navy-50); }
-.lt1180 .menu .dd-panel { position: static; transform: none !important; opacity: 1; visibility: visible; display: none; box-shadow: none; border: 0; min-width: 0; padding: 0 0 6px 12px; background: none; }
-.lt1180 .menu .dd[data-open="true"] > .dd-panel { display: block; }
+.lt900 .nav-toggle { display: grid; }
+/* แท็บเล็ต (900–1180): เมนูอยู่แถบบนแบบคอม — ย่อชื่อระบบ/ตัวอักษรให้พอดี */
+html.lt1180:not(.lt900) .brand { padding-right: 8px; } html.lt1180:not(.lt900) .brand small { display: none; } html.lt1180:not(.lt900) .brand strong { font-size: .92rem; }
+html.lt1180:not(.lt900) .atom { width: 46px; height: 46px; } html.lt1180:not(.lt900) .atom img { height: 36px; }
+html.lt1180:not(.lt900) .menu { gap: 0; } html.lt1180:not(.lt900) .menu-link { padding: 8px 7px; font-size: .8rem; gap: 4px; } html.lt1180:not(.lt900) .menu-link .pill { padding: 0 6px !important; }
+html.lt1180:not(.lt900) .nav-inner { gap: 8px; width: calc(100% - 24px); }
+html.lt1060:not(.lt900) .brand strong { display: none; }
+.lt900 .menu { position: absolute; top: calc(100% + 6px); left: 12px; right: 12px; flex-direction: column; align-items: stretch; gap: 2px; padding: 12px; border-radius: 22px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow-lg); display: none; max-height: calc(100vh - 110px); overflow: auto; }
+.lt900 .menu.open { display: flex; }
+.lt900 .menu-link { justify-content: space-between; padding: 12px 16px; border-radius: 14px; }
+.lt900 .menu-link.active::after { display: none; }
+.lt900 .menu-link.active { background: var(--navy-50); }
+.lt900 .menu .dd-panel { position: static; transform: none !important; opacity: 1; visibility: visible; display: none; box-shadow: none; border: 0; min-width: 0; padding: 0 0 6px 12px; background: none; }
+.lt900 .menu .dd[data-open="true"] > .dd-panel { display: block; }
 .lt1180 .user-chip .u-name { display: none; }
 .lt1180 .user-chip { padding: 4px; }
 /* max-width 1120px */
@@ -1663,11 +1669,11 @@ details.more > summary::-webkit-details-marker { display: none; } details.more[o
 /* แถบเมนูบนภาพเข้ม (หน้าแรก ก่อนเลื่อนลง) */
 .nav:not(.solid):not(.scrolled) .brand strong { color: #fff; }
 .nav:not(.solid):not(.scrolled) .brand small { color: var(--gold-2); }
-html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link { color: rgba(255, 255, 255, .86); }
-html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link:hover, html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link.active { color: #fff; background: rgba(255, 255, 255, .1); }
-html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link.active { background: none; }
-html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link.active::after { background: var(--gold-2); }
-html:not(.lt1180) .nav:not(.solid):not(.scrolled) .menu-link.back { color: var(--gold-2); }
+html:not(.lt900) .nav:not(.solid):not(.scrolled) .menu-link { color: rgba(255, 255, 255, .86); }
+html:not(.lt900) .nav:not(.solid):not(.scrolled) .menu-link:hover, html:not(.lt900) .nav:not(.solid):not(.scrolled) .menu-link.active { color: #fff; background: rgba(255, 255, 255, .1); }
+html:not(.lt900) .nav:not(.solid):not(.scrolled) .menu-link.active { background: none; }
+html:not(.lt900) .nav:not(.solid):not(.scrolled) .menu-link.active::after { background: var(--gold-2); }
+html:not(.lt900) .nav:not(.solid):not(.scrolled) .menu-link.back { color: var(--gold-2); }
 .nav:not(.solid):not(.scrolled) .nav-actions .icon-btn, .nav:not(.solid):not(.scrolled) .nav-toggle, .nav:not(.solid):not(.scrolled) .user-chip { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .28); color: #fff; }
 .nav:not(.solid):not(.scrolled) .bell-count { border-color: #24307a; }
 /* แท็บเล็ต */
@@ -1906,3 +1912,119 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .print-doc .pd-list { table-layout: fixed; }
 .print-doc .rp-st { font-size: 11pt; padding: 0 4px; }
 .print-doc .rp-list td:last-child { padding-left: 4px; padding-right: 3px; }
+
+/* คนขับ: ตัวเลือกคนขับของแอดมิน · ปฏิทินเดือนบอกแค่จำนวนงาน · ตรวจสภาพรถไม่ขีดฆ่า */
+.adm-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; }
+.adm-pick-row select { width: auto; max-width: 100%; padding: 6px 10px; }
+.chk-item:has(input:checked) span { color: var(--ink); text-decoration: none; }
+.dcal .cal-day .dj { display: inline-flex; align-items: baseline; justify-content: center; gap: 3px; margin-top: 4px; padding: 2px 8px; border-radius: 99px; background: var(--navy); color: #fff; font-size: .74rem; white-space: nowrap; }
+.dcal .cal-day .dj b { font-size: .86rem; } .dcal .cal-day .dj.live { background: #f97316; }
+.lt640 .dcal .cal-day .dj { padding: 1px 6px; font-size: .64rem; gap: 2px; } .lt640 .dcal .cal-day .dj b { font-size: .78rem; }
+.lt420 .dcal .cal-day .dj em { display: none; }
+
+/* ปฏิทินการใช้รถ: เวลาบรรทัดเดียว · รายการกระชับบนมือถือ */
+.cv-nav h3 { min-width: 210px; text-align: center; color: var(--navy); margin: 0; }
+.cv-ag { grid-template-columns: 112px minmax(0, 1.6fr) minmax(0, 1.1fr) auto; }
+.cv-ag .t { white-space: nowrap; }
+.cv-ag .t b { font-family: var(--font-display); font-weight: 600; color: var(--navy); }
+.cv-ag .cv-m { display: none; }
+.cv-agenda.free { max-height: none; min-height: 0; }
+.lt1000 .cv-ag { grid-template-columns: 104px 1fr; }
+.lt640 .cv-top { flex-wrap: wrap; gap: 10px; } .lt640 .cv-nav { width: 100%; justify-content: space-between; } .lt640 .cv-nav h3 { min-width: 0; font-size: 1rem; }
+.lt640 .cv-ag { grid-template-columns: 86px minmax(0, 1fr); gap: 2px 10px; margin: 0 10px 6px; padding: 9px 10px 9px 14px; }
+.lt640 .cv-ag .t b { font-size: .8rem; } .lt640 .cv-ag .t small { font-size: .66rem; }
+.lt640 .cv-ag .v, .lt640 .cv-ag .cv-pp { display: none; }
+.lt640 .cv-ag .cv-m { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.lt640 .cv-ag .w b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt640 .cv-ag > .pill { grid-column: 2; justify-self: start; font-size: .68rem; padding: 2px 8px; }
+.lt640 .cv-dayh { padding: 10px 12px 6px; }
+/* การ์ดรายละเอียดเที่ยวรถ (มือถือ/แท็บเล็ต) */
+.modal.tc-modal { width: min(520px, 100%); }
+.tc { display: grid; gap: 12px; }
+.tc-time { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: var(--navy); color: #fff; }
+.tc-time > div { display: grid; line-height: 1.15; } .tc-time small { font-size: .7rem; opacity: .7; } .tc-time b { font-family: var(--font-display); font-size: 1.5rem; color: var(--gold-2); } .tc-time span { font-size: .74rem; opacity: .8; }
+.tc-time > .i { opacity: .6; } .tc-time .bd-st { margin-left: auto; }
+.tc-kv { grid-template-columns: 92px minmax(0, 1fr); gap: 6px 12px; font-size: .9rem; }
+.tc-kv dd small { color: var(--muted); font-weight: 400; }
+.tc-veh { display: grid; gap: 8px; }
+.tc-v { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #fdfaf3; border: 1px solid var(--line); }
+.tc-v > .i { color: var(--navy); margin-top: 2px; } .tc-v > div { display: grid; gap: 2px; min-width: 0; } .tc-v small { color: var(--muted); font-weight: 400; } .tc-v span { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: .86rem; color: var(--ink-2); } .tc-v span .i { width: 14px; height: 14px; color: var(--gold); }
+.lt640 .tc-kv { grid-template-columns: 1fr; gap: 0; } .lt640 .tc-kv dd { margin-bottom: 6px; }
+.bd tr.bd-row { cursor: pointer; }
+
+/* ───── บันทึกข้อความแบบใหม่ (ตามแบบบันทึกแจ้งซ่อม) ───── */
+.memo-doc.m2 { position: relative; font-size: 16pt; line-height: 1.3; }
+.memo-doc.m2 .m2-ref { position: absolute; right: 0; top: -4mm; margin: 0; font-size: 11pt; color: #555; }
+.memo-doc.m2 .mm-top { height: 16mm; margin-bottom: 2mm; }
+.memo-doc.m2 .mm-line { margin: 0; }
+.memo-doc.m2 .mm-line b { font-size: 20pt; }
+.memo-doc.m2 .mm-line span { font-size: 16pt; }
+.memo-doc.m2 .m2-hr { border: 0; border-top: 1px solid #000; margin: 2px 0 6px; }
+.memo-doc.m2 .mm-to { margin: 4px 0 2px; }
+.memo-doc.m2 .mm-p { text-indent: 2.5cm; margin: 0 0 2px; }
+.memo-doc.m2 .m2-list { margin: 0 0 4px 2.5cm; }
+.memo-doc.m2 .m2-row { display: grid; grid-template-columns: 3.4cm minmax(0, 1fr); column-gap: 4px; }
+.memo-doc.m2 .m2-row .k { white-space: nowrap; }
+.memo-doc.m2 .m2-req { display: flex; justify-content: flex-end; margin: 10px 0 8px; }
+.memo-doc.m2 .m2-sig { text-align: center; min-width: 70mm; }
+.memo-doc.m2 .m2-sig p { margin: 0; white-space: nowrap; }
+.memo-doc.m2 .m2-sl { display: flex; align-items: flex-end; justify-content: center; gap: 6px; margin-top: 8px !important; }
+.memo-doc.m2 .m2-sp { position: relative; display: inline-block; width: 40mm; height: 9mm; }
+.memo-doc.m2 .m2-sp img { position: absolute; left: 50%; bottom: -1mm; transform: translateX(-50%); height: 12mm; max-width: 130%; object-fit: contain; }
+.memo-doc.m2 .m2-blank { display: inline-block; width: 40mm; }
+.memo-doc.m2 .m2-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; border-top: 1px solid #000; padding-top: 6px; break-inside: avoid; }
+.memo-doc.m2 .m2-col { min-width: 0; }
+.memo-doc.m2 .m2-col p { margin: 0; }
+.memo-doc.m2 .m2-col .m2-sig { min-width: 0; margin-top: 4px; }
+.memo-doc.m2 .m2-col .m2-sig p { white-space: normal; }
+.memo-doc.m2 .m2-h { font-weight: 700; }
+.memo-doc.m2 .m2-asg { font-size: 14pt; padding-left: 1.2em; line-height: 1.25; }
+.memo-doc.m2 .m2-cmd { min-height: 1.3em; padding-left: 1.2em; }
+.memo-doc.m2 .cb { width: 13px; height: 13px; border: 1.3px solid #000; vertical-align: -1px; margin-right: 4px; }
+.memo-doc.m2 .cb.on::after { top: -9px; left: 1px; }
+.memo-preview .memo-doc.m2 .m2-ref { top: -14px; }
+.lt640 .memo-preview .memo-doc.m2 .m2-cols { grid-template-columns: 1fr; row-gap: 10px; }
+.lt640 .memo-preview .memo-doc.m2 .m2-list { margin-left: 1cm; } .lt640 .memo-preview .memo-doc.m2 .m2-row { grid-template-columns: 1fr; }
+
+/* ข้อความไม่ตัดกลางคำ · ชื่อบรรทัดเดียว (ย่อให้พอดี) */
+.fitw { display: inline-block; max-width: 100%; white-space: nowrap; vertical-align: bottom; }
+.person b.pn { display: block; overflow: hidden; }
+.person .pos .nw { white-space: nowrap; }
+.ct-sub .fitw { font-size: inherit; }
+.lt640 .person b.pn { font-size: .92rem; }
+.lt640 .person .ct a[href^="mailto"] { font-size: .72rem; }
+
+/* รายงานสรุป (รอบใหม่): หน้าปกฟอนต์ 16 pt ทั้งหมด · ตารางรายการแยกคอลัมน์ชัด */
+.print-doc .rp-cover, .print-doc .rp-cover .rp-t th, .print-doc .rp-cover .rp-t td, .print-doc .rp-cover p, .print-doc .rp-sign { font-size: 16pt; }
+.print-doc .rp-cover .rp-t small { font-size: 14pt; }
+.print-doc .rp-cover .rp-t th, .print-doc .rp-cover .rp-t td { padding: 1px 8px; line-height: 1.25; }
+.print-doc .rp-page { padding-top: 3mm; }
+.print-doc .rp-page + .rp-page, .print-doc .rp-cover + .rp-page { break-before: page; }
+.print-doc .rp-head b { line-height: 1.35; padding-top: 1mm; display: block; }
+.print-doc .rp-list th { font-size: 13.5pt; padding: 3px 5px; background: #ececec; vertical-align: middle; }
+.print-doc .rp-list td { font-size: 13.5pt; padding: 4px 5px; line-height: 1.3; }
+.print-doc .rp-list small { display: block; font-size: 11.5pt; color: #555; line-height: 1.25; }
+.print-doc .rp-list td.c, .print-doc .rp-list th.c { text-align: center; }
+.print-doc .rp-list .rp-st { font-size: 11pt; }
+
+/* ช่วงวันที่ (รายการคำขอของแอดมิน) */
+.dr-pick { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dr-pick label { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); font-family: var(--font-display); }
+.dr-pick input { width: auto; }
+.dr-pick .chip-x { display: inline-grid; place-items: center; min-width: 34px; height: 34px; padding: 0 10px; border-radius: 99px; border: 1px solid var(--line); background: #fff; color: var(--ink-2); font: 500 .82rem var(--font-display); }
+.dr-pick .chip-x .i { width: 15px; height: 15px; }
+.lt640 .dr-pick { width: 100%; } .lt640 .dr-pick label { flex: 1; min-width: 0; } .lt640 .dr-pick input { flex: 1; min-width: 0; }
+.memo-doc.m2 .m2-row { grid-template-columns: 4.1cm minmax(0, 1fr); }
+.memo-doc.m2 .m2-col .m2-h, .memo-doc.m2 .m2-col .m2-sig p:last-child { white-space: nowrap; overflow: hidden; }
+.print-doc .rp-list th { white-space: nowrap; }
+
+.lt640 .cv-ag { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; }
+.lt640 .cv-ag .t { grid-column: 1; grid-row: 1; }
+.lt640 .cv-ag > .pill { grid-column: 2; grid-row: 1; justify-self: end; }
+.lt640 .cv-ag .w { grid-column: 1 / -1; grid-row: 2; }
+.lt640 .cv-ag .cv-m { font-size: .74rem; }
+
+.modal.tc-modal { width: min(520px, calc(100% - 4px)); max-width: calc(100vw - 24px); }
+.tc, .tc-kv, .tc-veh { min-width: 0; } .tc-kv dd { min-width: 0; overflow-wrap: anywhere; }
+.tc-time { flex-wrap: wrap; } .lt420 .tc-time .bd-st { margin-left: 0; }
+.tc-time > div { flex: none; } .tc-time .bd-st { flex-shrink: 1; min-width: 0; } .tc-time .bd-st em { white-space: nowrap; }

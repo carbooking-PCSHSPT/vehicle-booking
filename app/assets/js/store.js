@@ -1031,6 +1031,7 @@ const Store = (() => {
         if (!r) throw new Error('ไม่พบคำขอ');
         if (r.requester.email !== me.email && !isAdmin(me)) throw new Error('ไม่มีสิทธิ์ยกเลิกคำขอนี้');
         if (!['pending', 'revise', 'approved'].includes(r.status) || (r.assignments || []).some(a => a.status !== 'assigned')) throw new Error('ยกเลิกไม่ได้ เพราะรถออกเดินทางแล้ว');
+        if (!isAdmin(me) && Date.now() >= new Date(r.startAt).getTime()) throw new Error('ถึงเวลาเดินทางแล้ว ยกเลิกเองไม่ได้ — ติดต่อแอดมิน');
       };
       check(request(id));
       return mutateReq(id, r => {
@@ -1052,6 +1053,7 @@ const Store = (() => {
         if (!r) throw new Error('ไม่พบคำขอ');
         if (r.requester.email !== me.email) throw new Error('ขอแก้ไขได้เฉพาะคำขอของตัวเอง');
         if (r.status !== 'approved' || (r.assignments || []).some(a => a.status !== 'assigned')) throw new Error('ขอแก้ไขได้เฉพาะคำขอที่อนุมัติแล้วและรถยังไม่ออกเดินทาง');
+        if (Date.now() >= new Date(r.startAt).getTime()) throw new Error('ถึงเวลาเดินทางแล้ว ขอแก้ไขข้อมูลไม่ได้');
         if (r.changeReq && r.changeReq.status === 'pending') throw new Error('มีคำขอแก้ไขที่รอแอดมินพิจารณาอยู่แล้ว');
       };
       const r0 = request(id); check(r0);

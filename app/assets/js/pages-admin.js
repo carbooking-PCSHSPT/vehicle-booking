@@ -137,11 +137,14 @@
 
   // ═════════ รายการคำขอ ═════════
   Pages.adminRequests = ({ query }) => {
-    const f = query.md ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', cf = query.c || '', sg = query.sg || '', md = query.md || '';
+    const f = query.md ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', df = query.df || '', dt = query.dt || '', cf = query.c || '', sg = query.sg || '', md = query.md || '';
     // กลับถึงโรงเรียน = ปิดงานอัตโนมัติ (ไม่มีแท็บ "รอปิดงาน" · ข้อมูลเก่าสถานะ returned รวมอยู่ใน "ปิดงานแล้ว")
     const G = { pending: ['pending'], revise: ['revise'], approved: ['approved'], ontrip: ['ontrip'], closed: ['returned', 'closed'], rejected: ['rejected', 'cancelled'], all: null };
     let list = S.db.requests.filter(r => !G[f] || G[f].includes(r.status));
     if (m) list = list.filter(r => r.startAt.slice(0, 7) === m);
+    // ช่วงวันที่เดินทาง (ตั้งแต่ – ถึง) · เลือกวันเดียวก็ได้
+    if (df) list = list.filter(r => fmt.localDate(r.endAt) >= df);
+    if (dt) list = list.filter(r => fmt.localDate(r.startAt) <= dt);
     if (cf) list = list.filter(r => (r.category || '') === (cf === 'none' ? '' : cf));
     // ฉบับลงนาม: no = อนุมัติแล้วแต่ยังไม่แนบฉบับลงนาม · yes = เก็บฉบับลงนามแล้ว
     const hasSig = r => (r.signed || []).length > 0;
@@ -152,14 +155,14 @@
     if (q) list = list.filter(r => [r.id, r.purpose, r.requester.name, r.requester.dept, S.destName(r)].join(' ').toLowerCase().includes(q.toLowerCase()));
     list.sort((a, b) => f === 'pending' || f === 'approved' ? a.startAt.localeCompare(b.startAt) : b.startAt.localeCompare(a.startAt));
     const cnt = k => S.db.requests.filter(r => !G[k] || G[k].includes(r.status)).length;
-    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, c: cf, sg, md, ...o });
+    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, df, dt, c: cf, sg, md, ...o });
     const printable = list;
     return {
       layout: 'admin',
       html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a>`)}
         <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '' })}"><button class="${f === k && !md ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
           ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}</div>
-        <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><input class="input" type="month" id="m" value="${esc(m)}" style="width:auto"><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
+        <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><div class="dr-pick" title="ช่วงวันที่เดินทาง"><label>ตั้งแต่<input class="input" type="date" id="df" value="${esc(df)}"></label><span>–</span><label>ถึง<input class="input" type="date" id="dt" value="${esc(dt)}" ${df ? `min="${esc(df)}"` : ''}></label>${df || dt || m ? `<a class="chip-x" href="${qs({ df: '', dt: '', m: '' })}" title="ล้างช่วงวันที่">${icon('x')}</a>` : `<a class="chip-x today" href="${qs({ df: fmt.localDate(new Date()), dt: fmt.localDate(new Date()) })}">วันนี้</a>`}</div><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
           <select class="input" id="sg" style="width:auto" title="บันทึกข้อความฉบับลงนาม"><option value="">ฉบับลงนาม: ทั้งหมด</option><option value="no" ${sg === 'no' ? 'selected' : ''}>ยังไม่มีฉบับลงนาม</option><option value="yes" ${sg === 'yes' ? 'selected' : ''}>เก็บฉบับลงนามแล้ว</option></select>
           <button class="btn btn-primary btn-sm" id="memoBatch" ${printable.length ? '' : 'disabled'}>${icon('printer')} <span>พิมพ์ / PDF</span></button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
         ${printable.length ? `<p class="hint" style="margin:-4px 0 10px">${icon('info')} ติ๊กเลือกรายการที่ต้องการพิมพ์ (บันทึกข้อความมีครุฑ / หัวกระดาษโรงเรียน / ตารางสรุป) — ไม่เลือก = พิมพ์ทั้งหมด ${printable.length} รายการในรายการนี้</p>` : ''}
@@ -188,12 +191,13 @@
           const ids = picked();
           const rs = ids.length ? ids.map(S.request).filter(Boolean) : printable;
           const tabName = { pending: 'รอตรวจสอบ', revise: 'ส่งกลับแก้ไข', approved: 'อนุมัติแล้ว', ontrip: 'กำลังเดินทาง', closed: 'ปิดงานแล้ว', rejected: 'ไม่อนุมัติ/ยกเลิก', all: 'ทุกสถานะ' }[f] || '';
-          C.printDialog(rs, { sub: ids.length ? 'รายการที่เลือก' : `${cf ? S.catName({ category: cf }) : 'ทุกหมวด'} · ${tabName}` });
+          C.printDialog(rs, { sub: ids.length ? 'รายการที่เลือก' : `${cf ? S.catName({ category: cf }) : 'ทุกหมวด'} · ${tabName}${df || dt ? ` · ${df ? fmt.date(df) : '…'} – ${dt ? fmt.date(dt) : '…'}` : ''}` });
         });
         $('#sg', root).addEventListener('change', e => { location.hash = qs({ sg: e.target.value }); });
         $('#daySum', root).addEventListener('click', () => dailySummary(new Date()));
         $('#q', root).addEventListener('input', UI.debounce(e => { location.hash = qs({ q: e.target.value }); }, 450));
-        $('#m', root).addEventListener('change', e => { location.hash = qs({ m: e.target.value }); });
+        $('#df', root).addEventListener('change', e => { const v = e.target.value, t = $('#dt', root).value; location.hash = qs({ m: '', df: v, dt: t && v && t < v ? v : t }); });
+        $('#dt', root).addEventListener('change', e => { location.hash = qs({ m: '', dt: e.target.value }); });
         $('#cf', root).addEventListener('change', e => { location.hash = qs({ c: e.target.value }); });
         $('#xls', root).addEventListener('click', () => UI.exportSheets('คำขอใช้รถ', [{ name: 'คำขอใช้รถ', head: ['เลขที่', 'สถานะ', 'ออกเดินทาง', 'กลับ', 'ปลายทาง', 'จังหวัด', 'หมวดงาน', 'วัตถุประสงค์', 'ผู้ขอ', 'ฝ่าย', 'ครู', 'นักเรียน', 'อื่นๆ', 'ระยะทาง(กม.)', 'รถ', 'คนขับ', 'หมายเหตุแอดมิน'], rows: list.map(r => [r.id, S.STATUS[r.status].label, fmt.dt(r.startAt), fmt.dt(r.endAt), S.destName(r), (r.destinations[0] || {}).province || '', S.catName(r), r.purpose, r.requester.name, r.requester.dept, r.teachers, r.students, r.others || 0, r.totalKm, (r.assignments || []).map(a => C.vName(a.vehicleId)).join(', '), (r.assignments || []).map(a => C.dName(a.driverId)).join(', '), r.decision ? r.decision.note : '']) }]));
       }

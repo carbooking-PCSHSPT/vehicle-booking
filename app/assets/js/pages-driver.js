@@ -301,7 +301,7 @@
       grid = `<div class="cal dcal"><div class="cal-head">${['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(d => `<div>${d}</div>`).join('')}</div><div class="cal-grid">${rows.map(d => {
         const s = daySummary(jobsOn(jobs, d), d);
         return `<a class="cal-day ${d.getMonth() !== sel.getMonth() ? 'out' : ''} ${UI.sameDay(d, new Date()) ? 'today' : ''} ${UI.sameDay(d, sel) ? 'sel' : ''} ${s.n ? 'has' : ''}" href="${link({ date: fmt.localDate(d) })}"><span class="d">${d.getDate()}</span>
-          ${s.n ? `<span class="dj ${s.live ? 'live' : ''}">${icon('van')}<b>${s.n}</b><em>งาน</em></span>${s.first ? `<small class="dt">${s.first}</small>` : ''}${s.cont ? `<small class="dc">${icon('moon')}ต่อเนื่อง</small>` : ''}` : ''}</a>`;
+          ${s.n ? `<span class="dj ${s.live ? 'live' : ''}"><b>${s.n}</b><em>งาน</em></span>` : ''}</a>`;
       }).join('')}</div></div>`;
     } else {
       const ws = weekOf(sel);
@@ -402,7 +402,7 @@
       layout: 'driver',
       html: `<div class="drv ${tab === 'list' ? 'drv-wide' : ''}">
         ${adminView ? `<a class="btn btn-ghost btn-sm back-admin" href="#/admin">${icon('arrowL')} กลับระบบหลังบ้าน</a>
-          <div class="note-box navy" style="margin-bottom:14px">${icon('shield')}<div>มุมมองแอดมิน — เลือกคนขับ: <select class="input" style="width:auto;display:inline-block;padding:6px 10px" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select> · <a class="link" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div>` : ''}
+          <div class="note-box navy adm-pick" style="margin-bottom:14px">${icon('shield')}<div><span class="nw">มุมมองแอดมิน — เลือกคนขับ</span><div class="adm-pick-row"><select class="input" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><a class="link nw" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div></div>` : ''}
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
         ${tabs}
         ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}

@@ -577,7 +577,7 @@
   // ═════════ ตารางรถ: สถานะวันนี้ / ปฏิทิน ═════════
   Pages.schedule = ({ query }) => {
     const tab = query.tab === 'calendar' ? 'calendar' : 'today';
-    const view = query.view === 'week' ? 'week' : 'month';
+    const view = ['week', 'day'].includes(query.view) ? query.view : 'month';
     const sel = dayStart(UI.dayOf(query.date));
     const vs = S.db.vehicles.filter(v => v.bookable !== false);
     const q = o => '#/schedule?' + new URLSearchParams({ tab, view, date: fmt.localDate(sel), ...o }).toString();
@@ -593,59 +593,52 @@
         <h3 style="margin:30px 0 14px;color:var(--navy);display:flex;gap:10px;align-items:center">${icon('route')} รายการเดินทาง${isToday ? 'วันนี้' : ''} <span class="pill tone-ok">${list.length} เที่ยว</span></h3>
         ${C.board(list, { hrefOf: hrefOfReq, day: sel })}`;
     } else {
-      // ── ปฏิทิน (แบบ C): ปฏิทินเล็ก + รายการเรียงตามวัน / สัปดาห์แบบแถบเวลา ──
-      const head = `<div class="row between" style="margin-bottom:16px">
-        <div class="row"><a class="icon-btn sm" href="${q({ date: fmt.localDate(shift(sel, view, -1)) })}" aria-label="ก่อนหน้า">${icon('chevL')}</a>
-          <h3 style="min-width:210px;text-align:center;color:var(--navy)">${view === 'month' ? sel.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) : `สัปดาห์ ${fmt.dayMonth(weekStart(sel))} – ${fmt.date(shift(weekStart(sel), 'day', 6))}`}</h3>
-          <a class="icon-btn sm" href="${q({ date: fmt.localDate(shift(sel, view, 1)) })}" aria-label="ถัดไป">${icon('chevR')}</a>
-          <a class="btn btn-ghost btn-sm" href="${q({ date: fmt.localDate(new Date()) })}">วันนี้</a></div>
-        <div class="seg">${[['month', 'เดือน'], ['week', 'สัปดาห์']].map(([k, l]) => `<a href="${q({ view: k })}"><button class="${k === view ? 'on' : ''}" tabindex="-1">${l}</button></a>`).join('')}</div></div>`;
+      // ── ปฏิทิน (แบบ C): ปฏิทินเล็ก + รายการเรียงตามวัน · ดูได้ทั้ง เดือน / สัปดาห์ / วัน (แบบรายการเหมือนกัน) ──
+      const title = view === 'month' ? sel.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
+        : view === 'week' ? `สัปดาห์ ${fmt.dayMonth(weekStart(sel))} – ${fmt.date(shift(weekStart(sel), 'day', 6))}`
+        : `${sel.toLocaleDateString('th-TH', { weekday: 'long' })} ${fmt.dateLong(sel).replace(/^วัน\S+ที่\s*/, '')}`;
+      const head = `<div class="row between cv-top" style="margin-bottom:16px">
+        <div class="row cv-nav"><a class="icon-btn sm" href="${q({ date: fmt.localDate(shift(sel, view, -1)) })}" aria-label="ก่อนหน้า">${icon('chevL')}</a>
+          <h3>${title}</h3>
+          <a class="icon-btn sm" href="${q({ date: fmt.localDate(shift(sel, view, 1)) })}" aria-label="ถัดไป">${icon('chevR')}</a></div>
+        <div class="seg">${[['month', 'เดือน'], ['week', 'สัปดาห์'], ['day', 'วัน']].map(([k, l]) => `<a href="${q({ view: k, ...(k === 'day' && view !== 'day' ? { date: fmt.localDate(new Date()) } : {}) })}"><button class="${k === view ? 'on' : ''}" tabindex="-1">${l}</button></a>`).join('')}</div></div>`;
       const legend = `<div class="cv-legend"><span><i class="s-done"></i>กลับแล้ว</span><span><i class="s-live"></i>กำลังเดินทาง</span><span><i class="s-ok"></i>อนุมัติแล้ว</span><span><i class="s-wait"></i>รอจัดรถ</span></div>`;
       const stCls = r => ['returned', 'closed'].includes(r.status) ? 's-done' : r.status === 'ontrip' ? 's-live' : r.status === 'pending' ? 's-wait' : 's-ok';
-      if (view === 'month') {
-        const first = new Date(sel.getFullYear(), sel.getMonth(), 1), start = shift(first, 'day', -first.getDay());
-        const cells = Array.from({ length: 42 }, (_, i) => shift(start, 'day', i));
-        const grid = cells[35].getMonth() !== sel.getMonth() ? cells.slice(0, 35) : cells;
-        const monthDays = grid.filter(d => d.getMonth() === sel.getMonth());
-        const withTrips = monthDays.map(d => ({ d, list: tripsOn(d) })).filter(x => x.list.length);
-        const total = new Set(withTrips.flatMap(x => x.list.map(r => r.id))).size;
-        body = head + `<div class="cv-split">
-          <aside class="card cv-mini">
-            <div class="cv-dow">${['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((d, i) => `<span class="${i === 0 || i === 6 ? 'we' : ''}">${d}</span>`).join('')}</div>
-            <div class="cv-mg">${grid.map(d => { const n = tripsOn(d).length; return `<a class="${d.getMonth() !== sel.getMonth() ? 'out' : ''} ${UI.sameDay(d, new Date()) ? 'today' : ''} ${n ? 'has' : ''} ${UI.sameDay(d, sel) ? 'sel' : ''}" href="${q({ date: fmt.localDate(d), pick: 1 })}" data-n="${n}">${d.getDate()}</a>`; }).join('')}</div>
-            <div class="cv-sum"><div><small>การเดินทางเดือนนี้</small><b class="num">${total}</b></div><div><small>วันที่มีการใช้รถ</small><b class="num">${withTrips.length}</b></div></div>
-            ${legend}
-          </aside>
-          <div class="card cv-agenda" id="agenda">${withTrips.map(({ d, list }) => {
-            const cars = new Set(list.flatMap(r => (r.assignments || []).map(a => a.vehicleId))).size;
-            return `<div class="cv-day" data-day="${fmt.localDate(d)}"><div class="cv-dayh ${UI.sameDay(d, new Date()) ? 'today' : ''} ${UI.sameDay(d, sel) ? 'sel' : ''}"><b class="num">${d.getDate()}</b><span>${d.toLocaleDateString('th-TH', { weekday: 'long' })}${UI.sameDay(d, new Date()) ? ' · วันนี้' : ''}</span><small>${list.length} งาน · ${cars} คัน</small></div>
-              ${list.map(r => { const href = hrefOfReq(r), dn = drvShort(r), vn = (r.assignments || []).map(a => C.vName(a.vehicleId));
-                return `<div class="cv-ag ${stCls(r)} ${href ? 'link' : ''}" ${href ? `data-href="${href}"` : ''}>
-                  <span class="t num">${UI.sameDay(r.startAt, d) ? fmt.time(r.startAt) : 'ต่อเนื่อง'}<small>ถึง ${fmt.when(r.endAt)}</small></span>
-                  <div class="w"><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)} · ${esc(r.requester.name)}</small></div>
-                  <div class="v">${vn.length ? `<b>${esc(vn.join(', '))}</b><small>${icon('wheel')} ${dn.length ? esc(dn.join(', ')) : 'ยังไม่ระบุคนขับ'}</small>` : '<span class="wt">รอแอดมินจัดรถ</span>'}</div>
-                  ${C.statusPill(r)}</div>`; }).join('')}</div>`;
-          }).join('') || `<div class="empty">${icon('calendar')}<p>เดือนนี้ยังไม่มีรายการใช้รถ</p></div>`}</div>
-        </div>`;
-      } else {
-        // สัปดาห์: แถว = วัน · แกนนอน = เวลา · งานที่เวลาทับกันซ้อนเป็นหลายแถวย่อย
-        const ws = weekStart(sel), days = Array.from({ length: 7 }, (_, i) => shift(ws, 'day', i));
-        let H0 = 6, H1 = 20;
-        days.forEach(d => tripsOn(d).forEach(r => { const s = new Date(r.startAt), e = new Date(r.endAt); if (UI.sameDay(s, d)) H0 = Math.min(H0, s.getHours()); if (UI.sameDay(e, d)) H1 = Math.max(H1, Math.min(24, e.getHours() + (e.getMinutes() ? 1 : 0))); }));
-        const pos = (t, d) => { const x = (new Date(t) - dayStart(d)) / 36e5; return Math.max(0, Math.min(100, (x - H0) / (H1 - H0) * 100)); };
-        const step = (H1 - H0) > 14 ? 3 : 2;
-        body = head + `<div class="card cv-week"><div class="cv-wk-head">${legend}</div><div class="cv-wk-scroll"><div class="cv-wk" style="--cols:${H1 - H0}">
-          <div class="cv-axis"><div></div><div class="cv-scale">${Array.from({ length: Math.floor((H1 - H0) / step) + 1 }, (_, i) => H0 + i * step).map(h => `<span style="left:${(h - H0) / (H1 - H0) * 100}%">${String(h % 24).padStart(2, '0')}:00</span>`).join('')}</div></div>
-          ${days.map(d => {
-            const list = tripsOn(d), lanes = [], items = list.map(r => { const s = Math.max(+new Date(r.startAt), +dayStart(d)), e = Math.min(+new Date(r.endAt), +dayEnd(d)); let l = lanes.findIndex(end => end <= s); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = e; return { r, l }; });
-            const n = Math.max(1, lanes.length), today = UI.sameDay(d, new Date());
-            return `<div class="cv-row ${today ? 'today' : ''}"><a class="cv-name" href="${q({ view: 'month', date: fmt.localDate(d), pick: 1 })}"><b>${d.toLocaleDateString('th-TH', { weekday: 'short' })} ${d.getDate()}</b><small>${list.length ? list.length + ' งาน' : 'ว่าง'}</small></a>
-              <div class="cv-lane" style="height:${n * 34 + 12}px">${items.map(({ r, l }) => { const href = hrefOfReq(r), left = pos(r.startAt, d), w = Math.max(4, pos(r.endAt, d) - left), vn = (r.assignments || []).map(a => C.vName(a.vehicleId)).join(', ');
-                return `<div class="cv-bar ${stCls(r)} ${href ? 'link' : ''}" ${href ? `data-href="${href}"` : ''} style="left:${left}%;width:${w}%;top:${6 + l * 34}px" title="${fmt.time(r.startAt)}–${fmt.when(r.endAt)} · ${esc(S.destName(r))} · ${esc(vn || 'รอจัดรถ')} · ${esc(r.requester.name)}">${UI.sameDay(r.startAt, d) ? fmt.time(r.startAt) : '←'} ${esc(S.destName(r))} · ${esc(vn || 'รอจัดรถ')}${new Date(r.endAt) > dayEnd(d) ? ' →' : ''}</div>`; }).join('')}
-                ${today ? `<div class="cv-now" style="left:${pos(new Date(), d)}%"></div>` : ''}</div></div>`;
-          }).join('')}
-        </div></div></div>`;
-      }
+      // ปฏิทินเล็ก (เดือนของวันที่เลือก)
+      const first = new Date(sel.getFullYear(), sel.getMonth(), 1), start = shift(first, 'day', -first.getDay());
+      const cells = Array.from({ length: 42 }, (_, i) => shift(start, 'day', i));
+      const grid = cells[35].getMonth() !== sel.getMonth() ? cells.slice(0, 35) : cells;
+      // ช่วงวันของรายการ: เดือน / สัปดาห์ / วัน
+      const days = view === 'month' ? grid.filter(d => d.getMonth() === sel.getMonth())
+        : view === 'week' ? Array.from({ length: 7 }, (_, i) => shift(weekStart(sel), 'day', i)) : [sel];
+      const withTrips = days.map(d => ({ d, list: tripsOn(d) })).filter(x => x.list.length || view === 'day');
+      const total = new Set(withTrips.flatMap(x => x.list.map(r => r.id))).size;
+      const per = { month: 'เดือนนี้', week: 'สัปดาห์นี้', day: 'วันนี้' }[view];
+      // เวลา: วันเดียวกัน "08:00–16:00" · กลับคนละวัน แยกบรรทัด "ถึง 12 พ.ย. 16:51"
+      const tcell = (r, d) => { const s = new Date(r.startAt), e = new Date(r.endAt);
+        if (!UI.sameDay(s, d)) return `<span class="t num"><b>ต่อเนื่อง</b><small>ถึง ${UI.sameDay(e, d) ? '' : fmt.dayMonth(e) + ' '}${fmt.time(e)}</small></span>`;
+        return UI.sameDay(s, e) ? `<span class="t num"><b>${fmt.time(s)}–${fmt.time(e)}</b></span>` : `<span class="t num"><b>${fmt.time(s)}</b><small>ถึง ${fmt.dayMonth(e)} ${fmt.time(e)}</small></span>`; };
+      const plate = id => { const p = String(C.vPlate(id) || ''); return /ไม่มี/.test(p) ? '' : p.replace(/\s+\S*[ก-๙]{3,}$/, ''); };
+      body = head + `<div class="cv-split">
+        <aside class="card cv-mini">
+          <div class="cv-dow">${['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((d, i) => `<span class="${i === 0 || i === 6 ? 'we' : ''}">${d}</span>`).join('')}</div>
+          <div class="cv-mg">${grid.map(d => { const n = tripsOn(d).length; return `<a class="${d.getMonth() !== sel.getMonth() ? 'out' : ''} ${UI.sameDay(d, new Date()) ? 'today' : ''} ${n ? 'has' : ''} ${UI.sameDay(d, sel) ? 'sel' : ''}" href="${q({ date: fmt.localDate(d), pick: 1, ...(view === 'day' ? {} : {}) })}" data-n="${n}">${d.getDate()}</a>`; }).join('')}</div>
+          <div class="cv-sum"><div><small>การเดินทาง${per}</small><b class="num">${total}</b></div><div><small>วันที่มีการใช้รถ</small><b class="num">${withTrips.filter(x => x.list.length).length}</b></div></div>
+          ${legend}
+        </aside>
+        <div class="card cv-agenda ${view === 'month' ? '' : 'free'}" id="agenda">${withTrips.map(({ d, list }) => {
+          const cars = new Set(list.flatMap(r => (r.assignments || []).map(a => a.vehicleId))).size;
+          return `<div class="cv-day" data-day="${fmt.localDate(d)}"><div class="cv-dayh ${UI.sameDay(d, new Date()) ? 'today' : ''} ${UI.sameDay(d, sel) ? 'sel' : ''}"><b class="num">${d.getDate()}</b><span>${d.toLocaleDateString('th-TH', { weekday: 'long' })}${UI.sameDay(d, new Date()) ? ' · วันนี้' : ''}</span><small>${list.length} งาน · ${cars} คัน</small></div>
+            ${list.map(r => { const href = hrefOfReq(r), as = r.assignments || [];
+              const vn = as.map(a => C.vName(a.vehicleId)), dn = drvShort(r);
+              const meta = [esc(r.requester.name), ...as.map(a => `${esc(C.vName(a.vehicleId))}${plate(a.vehicleId) ? ` ${esc(plate(a.vehicleId))}` : ''}${C.dName(a.driverId) ? ` · ${esc(C.firstName(C.dName(a.driverId)))}` : ''}`)].join(' · ');
+              return `<div class="cv-ag ${stCls(r)} link" data-trip="${r.id}" ${href ? `data-href="${href}"` : ''}>
+                ${tcell(r, d)}
+                <div class="w"><b>${esc(S.destName(r))}</b><small class="cv-pp">${esc(r.purpose)} · ${esc(r.requester.name)}</small><small class="cv-m">${as.length ? meta : `${esc(r.requester.name)} · รอแอดมินจัดรถ`}</small></div>
+                <div class="v">${vn.length ? `<b>${esc(vn.join(', '))}</b><small>${icon('wheel')} ${dn.length ? esc(dn.join(', ')) : 'ยังไม่ระบุคนขับ'}</small>` : '<span class="wt">รอแอดมินจัดรถ</span>'}</div>
+                ${C.statusPill(r)}</div>`; }).join('') || `<div class="empty" style="padding:22px">${icon('checkCircle')}<p>ไม่มีรายการใช้รถในวันนี้</p></div>`}</div>`;
+        }).join('') || `<div class="empty">${icon('calendar')}<p>${per}ยังไม่มีรายการใช้รถ</p></div>`}</div>
+      </div>`;
     }
     return {
       html: `<div class="page"><div class="container">
@@ -687,7 +680,7 @@
     const v = S.vehicle(params.id);
     if (!v) return { html: `<div class="page container">${UI.empty('ไม่พบรถคันนี้', 'van')}</div>` };
     const st = S.vehicleState(v), d = S.driver(v.driverId);
-    const upcoming = S.db.requests.filter(r => ['approved', 'ontrip', 'pending'].includes(r.status) && new Date(r.endAt) >= new Date() && (r.assignments || []).some(a => a.vehicleId === v.id)).sort((a, b) => a.startAt.localeCompare(b.startAt)).slice(0, 10);
+    const upcoming = S.db.requests.filter(r => ['approved', 'ontrip', 'pending'].includes(r.status) && !(r.assignments || []).some(a => a.vehicleId === v.id && a.status === 'ontrip') && new Date(r.endAt) >= new Date() && (r.assignments || []).some(a => a.vehicleId === v.id)).sort((a, b) => a.startAt.localeCompare(b.startAt)).slice(0, 10);
     const ph = v.photos || [];
     return {
       html: `<div class="page"><div class="container">
@@ -706,8 +699,14 @@
           <div class="stack" style="gap:18px">
             <div class="card"><div class="card-head"><h3>${icon('wheel')} คนขับที่รับผิดชอบ</h3></div>
               ${d ? `<div class="row" style="gap:14px">${d.photo ? `<span class="avatar lg" style="overflow:hidden;padding:0">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg')}<div><b style="font-family:var(--font-display);font-size:1.05rem">${esc(d.name)}</b><div class="hint">พนักงานขับรถ</div>${d.phone ? `<a class="btn btn-gold btn-sm" style="margin-top:8px" href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>${d.note ? `<p class="hint" style="margin-top:10px">${esc(d.note)}</p>` : ''}` : UI.empty('ยังไม่ระบุคนขับ', 'user')}</div>
+            ${(() => { const r = S.db.requests.find(x => (x.assignments || []).some(a => a.vehicleId === v.id && a.status === 'ontrip')); if (!r) return ''; const a = r.assignments.find(x => x.vehicleId === v.id);
+              return `<div class="card now-trip"><div class="card-head"><h3>${icon('navigation')} ภารกิจตอนนี้</h3>${C.statusPill(r)}</div>
+                <dl class="kv"><dt>ปลายทาง</dt><dd>${(r.destinations || []).map(x => esc(x.name) + (x.province ? ` <small>${esc(x.province)}</small>` : '')).join('<br>') || esc(S.destName(r))}</dd><dt>ภารกิจ</dt><dd>${esc(r.purpose || '-')}${r.project ? ` <small>(${esc(r.project)})</small>` : ''}</dd>
+                <dt>เวลา</dt><dd>${fmt.range(r.startAt, r.endAt)}${a.departedAt ? ` <small>· ออกจริง ${fmt.time(a.departedAt)}</small>` : ''}</dd><dt>ผู้ขอใช้รถ</dt><dd>${esc(r.requester.name)}${r.requester.dept ? ` <small>${esc(r.requester.dept)}</small>` : ''}</dd>
+                <dt>ผู้เดินทาง</dt><dd>${S.passengers(r)} คน <small>(ครู ${+r.teachers || 0} · นักเรียน ${+r.students || 0}${+r.others ? ` · อื่น ${+r.others}` : ''})</small></dd><dt>คนขับ</dt><dd>${esc(C.dName(a.driverId) || '-')}${C.dPhone(a.driverId) ? ` · <a class="link" href="tel:${esc(C.dPhone(a.driverId))}">${esc(C.dPhone(a.driverId))}</a>` : ''}</dd>
+                ${r.totalKm ? `<dt>ระยะทาง</dt><dd>${fmt.num(r.totalKm, 0)} กม. (ไป-กลับ)</dd>` : ''}${r.pickup ? `<dt>จุดขึ้นรถ</dt><dd>${esc(r.pickup)}</dd>` : ''}</dl></div>`; })()}
             <div class="card"><div class="card-head"><h3>${icon('calendar')} คิวการใช้รถคันนี้</h3></div>
-              ${upcoming.length ? `<div class="stack">${upcoming.map(r => `<div class="lot-row" style="grid-template-columns:auto 1fr auto">${icon('clock')}<div style="min-width:0"><b>${fmt.range(r.startAt, r.endAt)}</b><small>${esc(S.destName(r))} · ${esc(r.requester.name)}</small></div>${C.statusPill(r)}</div>`).join('')}</div>` : UI.empty('ยังไม่มีคิวที่จะมาถึง', 'checkCircle')}</div>
+              ${upcoming.length ? `<div class="stack">${upcoming.map(r => `<div class="lot-row link" data-trip="${r.id}" ${hrefOfReq(r) ? `data-href="${hrefOfReq(r)}"` : ''} style="grid-template-columns:auto 1fr auto;cursor:pointer">${icon('clock')}<div style="min-width:0"><b>${fmt.range(r.startAt, r.endAt)}</b><small>${esc(S.destName(r))} · ${esc(r.purpose || '')}</small><small>${esc(r.requester.name)} · ${S.passengers(r)} คน${(() => { const a = (r.assignments || []).find(x => x.vehicleId === v.id); return a && a.driverId ? ` · ${icon('wheel')} ${esc(C.dName(a.driverId))}` : ''; })()}</small></div>${C.statusPill(r)}</div>`).join('')}</div><p class="hint" style="margin-top:8px">กดรายการเพื่อดูรายละเอียดทั้งหมด</p>` : UI.empty('ยังไม่มีคิวที่จะมาถึง', 'checkCircle')}</div>
           </div>
         </div></div></div>`
     };
@@ -814,10 +813,12 @@
     const mine = r.requester.email === S.me.email;
     if (!mine && !S.isBack(S.me)) return { html: `<div class="page container">${UI.empty('ไม่มีสิทธิ์ดูคำขอนี้', 'lock')}</div>` };
     const canEdit = mine && ['pending', 'revise'].includes(r.status);
-    const canCancel = mine && ['pending', 'revise', 'approved'].includes(r.status) && (r.assignments || []).every(a => a.status === 'assigned');
+    // ถึงเวลาเดินทางแล้ว (หรือเดินทางเสร็จ) → ยกเลิก/ขอแก้ไขไม่ได้
+    const started = new Date() >= new Date(r.startAt);
+    const canCancel = mine && !started && ['pending', 'revise', 'approved'].includes(r.status) && (r.assignments || []).every(a => a.status === 'assigned');
     const rates = (r.assignments || []).map((a, i) => ({ a, i })).filter(x => x.a.status === 'returned' && !x.a.rated);
     const cr = r.changeReq, crPending = cr && cr.status === 'pending';
-    const canChange = mine && r.status === 'approved' && (r.assignments || []).every(a => a.status === 'assigned') && !crPending;
+    const canChange = mine && !started && r.status === 'approved' && (r.assignments || []).every(a => a.status === 'assigned') && !crPending;
     return {
       html: `<div class="page"><div class="container">
         <a class="crumb" href="#/my">${icon('arrowL')} การขอใช้รถของฉัน</a>
@@ -826,11 +827,11 @@
           <div class="row">${C.canMemo(r) && (mine || S.isAdmin(S.me)) ? `<button class="btn btn-primary btn-sm" id="memoPrint">${icon('printer')} พิมพ์บันทึกข้อความ</button><button class="btn btn-ghost btn-sm" id="memoPdf">${icon('download')} ดาวน์โหลด PDF</button>` : ''}${canChange ? `<button class="btn btn-gold btn-sm" id="changeBtn">${icon('edit')} ขอแก้ไขข้อมูล</button>` : ''}${mine ? `<a class="btn btn-ghost btn-sm" href="#/request?copy=${r.id}">${icon('copy')} คัดลอกเป็นคำขอใหม่</a>` : ''}${canEdit ? `<a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} ${r.status === 'revise' ? 'แก้ไขและส่งใหม่' : 'แก้ไข'}</a>` : ''}${canCancel ? `<button class="btn btn-danger btn-sm" id="cancelBtn">${icon('xCircle')} ยกเลิกคำขอ</button>` : ''}</div></div>
         <div style="margin-bottom:18px">${decisionBox(r)}</div>
         ${mine && r.status === 'pending' ? `<div class="note-box navy edit-hint" style="margin-bottom:18px">${icon('edit')}<div><b>แก้ไขได้ระหว่างรอตรวจสอบ</b> — เปลี่ยนวันเวลา สถานที่ จำนวนคน หรือแนบไฟล์ใหม่ได้ จนกว่าแอดมินจะพิจารณา<div style="margin-top:8px"><a class="btn btn-primary btn-sm" href="#/request/${r.id}">${icon('edit')} แก้ไขคำขอ</a></div></div></div>` : ''}
-        ${mine && ['approved'].includes(r.status) && !crPending ? `<p class="hint" style="margin:-8px 0 16px">${icon('info')} อนุมัติแล้ว — ถ้าต้องเปลี่ยนวันเวลา จำนวนคน หรือจุดขึ้นรถ กด <b>ขอแก้ไขข้อมูล</b> แล้วระบุเหตุผล แอดมินจะพิจารณาอีกครั้ง</p>` : ''}
+        ${mine && ['approved'].includes(r.status) && !crPending && !started ? `<p class="hint" style="margin:-8px 0 16px">${icon('info')} อนุมัติแล้ว — ถ้าต้องเปลี่ยนวันเวลา จำนวนคน หรือจุดขึ้นรถ กด <b>ขอแก้ไขข้อมูล</b> แล้วระบุเหตุผล แอดมินจะพิจารณาอีกครั้ง</p>` : ''}
         ${C.canMemo(r) && mine ? `<div class="note-box ${(r.signed || []).length ? 'green' : 'navy'}" style="margin-bottom:18px">${icon((r.signed || []).length ? 'checkCircle' : 'file')}<div>${(r.signed || []).length
           ? `<b>งานยานพาหนะเก็บบันทึกข้อความฉบับลงนามแล้ว</b><div class="thumbs" style="margin-top:6px">${r.signed.map(p => UI.thumb(p, 'sm')).join('')}</div>`
-          : (r.esign || {}).deputy ? `<b>ลงนามอิเล็กทรอนิกส์ครบแล้ว</b> (รองผู้อำนวยการฯ ${r.esign.deputy.decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'} · ${fmt.dt(r.esign.deputy.at)}) — กด "พิมพ์บันทึกข้อความ" เพื่อดู/บันทึก PDF ได้`
-          : r.createdBy === r.requester.email ? `<b>อนุมัติแล้ว</b> — ลายเซ็นของคุณลงในบันทึกข้อความให้อัตโนมัติ รอหัวหน้างานยานพาหนะและรองผู้อำนวยการฯ ลงนาม${(r.esign || {}).head ? ' (หัวหน้างานลงนามแล้ว)' : ''}`
+          : (r.esign || {}).deputy ? `<b>ลงนามอิเล็กทรอนิกส์ครบแล้ว</b> (<span class="nw">รองผู้อำนวยการฯ</span> ${r.esign.deputy.decision === 'deny' ? 'ไม่อนุญาต' : 'อนุญาต'} · ${fmt.dt(r.esign.deputy.at)}) — กด "พิมพ์บันทึกข้อความ" เพื่อดู/บันทึก PDF ได้`
+          : r.createdBy === r.requester.email ? `<b>อนุมัติแล้ว</b> — <span class="nw">ลายเซ็นของคุณ</span>ลงใน<span class="nw">บันทึกข้อความ</span>ให้อัตโนมัติ รอ<span class="nw">หัวหน้างานยานพาหนะ</span>และ<span class="nw">รองผู้อำนวยการฯ</span> ลงนาม${(r.esign || {}).head ? ' (หัวหน้างานลงนามแล้ว)' : ''}`
           : `<b>อนุมัติแล้ว</b> — กด "พิมพ์บันทึกข้อความ" ลงนามในช่องผู้ขอใช้รถ แล้วส่งที่งานยานพาหนะ`}</div></div>` : ''}
         ${S.needsMemo(r) && (mine || S.isAdmin(S.me)) ? `<div class="card memo-late" style="margin-bottom:18px"><div class="card-head"><h3>${icon('filePlus')} แนบบันทึกข้อความตามหลัง</h3><span class="pill tone-bad">ค้างบันทึกข้อความ</span></div>
           <p class="hint" style="margin-bottom:12px">คำขอนี้แอดมินบันทึกแทนให้กรณีเร่งด่วน — ${mine ? 'ต้องแนบบันทึกข้อความที่มีลายเซ็นผู้อำนวยการ (หรือผู้รักษาราชการแทน) ก่อน จึงจะขอใช้รถครั้งต่อไปได้' : 'ผู้ขอยังไม่ได้แนบ แอดมินแนบแทนได้'} · ไฟล์ต้องคมชัด อ่านออกทุกบรรทัด</p>
@@ -916,20 +917,20 @@
     const levels = [...new Set(cm.map(c => +c.level || 3))].sort();
     return {
       html: `<div class="page"><div class="container">
-        <div class="page-head"><div><div class="eyebrow">ติดต่อเรา</div><h1>คณะทำงานงานยานพาหนะ</h1><p>${esc(s.division)} · ${esc(s.schoolName)}</p></div>${S.isAdmin(S.me) ? `<a class="btn btn-ghost btn-sm" href="#/admin/settings">${icon('edit')} แก้ไขข้อมูลติดต่อ</a>` : ''}</div>
+        <div class="page-head"><div><div class="eyebrow">ติดต่อเรา</div><h1>คณะทำงานงานยานพาหนะ</h1><p class="ct-sub"><span class="nw">${esc(s.division)}</span> · <span class="nw fitw">${esc(s.schoolName)}</span></p></div>${S.isAdmin(S.me) ? `<a class="btn btn-ghost btn-sm" href="#/admin/settings">${icon('edit')} แก้ไขข้อมูลติดต่อ</a>` : ''}</div>
         <div class="org">${levels.map(lv => `<div class="org-level">${cm.filter(c => (+c.level || 3) === lv).sort((a, b) => headFirst(b) - headFirst(a)).map(c => `
           <div class="person l${lv} ${c.name ? '' : 'ph-empty'} reveal">
             <div class="ph">${c.photo ? UI.img(c.photo, c.name) : icon('user')}</div>
-            <b>${c.name ? nwName(c.name) : '(รอข้อมูล)'}</b><div class="pos">${esc(c.position)}</div>
-            <div class="ct">${c.phone ? `<a href="tel:${esc(c.phone)}">${icon('phone')} ${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${icon('mail')} ${esc(c.email)}</a>` : ''}</div>
+            <b class="pn"><span class="nw fitw">${c.name ? esc(c.name) : '(รอข้อมูล)'}</span></b><div class="pos">${esc(c.position)}</div>
+            <div class="ct">${c.email ? `<a href="mailto:${esc(c.email)}">${icon('mail')} ${esc(c.email)}</a>` : ''}</div>
           </div>`).join('')}</div>`).join('')}</div>
         <h3 class="ct-h">${icon('wheel')} พนักงานขับรถ</h3>
-        ${inn() ? `<div class="veh-grid drv-grid">${S.db.drivers.filter(d => d.active !== false).map(d => `<div class="person" style="width:auto"><div class="ph">${d.photo ? UI.img(d.photo, d.name) : icon('user')}</div><b>${nwName(d.name)}</b><div class="pos">พนักงานขับรถ · ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '-'}</div><div class="ct">${d.phone ? `<a href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>`).join('')}</div>` : `<div class="note-box navy">${icon('lock')}<div>เข้าสู่ระบบเพื่อดูรายชื่อและเบอร์โทรพนักงานขับรถ</div></div>`}
+        ${inn() ? `<div class="veh-grid drv-grid">${S.db.drivers.filter(d => d.active !== false).map(d => `<div class="person" style="width:auto"><div class="ph">${d.photo ? UI.img(d.photo, d.name) : icon('user')}</div><b class="pn"><span class="nw fitw">${esc(d.name)}</span></b><div class="pos"><span class="nw">พนักงานขับรถ</span> · ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => `<span class="nw">${esc(v.name)}</span>`).join(', ') || '-'}</div><div class="ct">${d.phone ? `<a href="tel:${esc(d.phone)}">${icon('phone')} ${esc(d.phone)}</a>` : ''}</div></div>`).join('')}</div>` : `<div class="note-box navy">${icon('lock')}<div>เข้าสู่ระบบเพื่อดูรายชื่อและเบอร์โทรพนักงานขับรถ</div></div>`}
         <h3 class="ct-h">${icon('phone')} ช่องทางติดต่อ</h3>
         <div class="ct-list">
+          ${s.contactRoom ? `<div class="ct-row"><span class="ci">${icon('pin')}</span><span><small>ห้องทำงาน</small><b>${esc(s.contactRoom)}</b></span></div>` : ''}
           ${s.contactPhone ? `<a class="ct-row" href="tel:${esc(s.contactPhone)}"><span class="ci">${icon('phone')}</span><span><small>โทรศัพท์${s.contactName ? ` · ${esc(s.contactName)}` : ''}</small><b>${esc(s.contactPhone)}</b></span></a>` : ''}
           ${s.contactEmail ? `<a class="ct-row" href="mailto:${esc(s.contactEmail)}"><span class="ci">${icon('mail')}</span><span><small>Gmail</small><b>${esc(s.contactEmail)}</b></span></a>` : s.contactLine ? `<div class="ct-row"><span class="ci">${icon('mail')}</span><span><small>ช่องทางอื่น</small><b>${esc(s.contactLine)}</b></span></div>` : ''}
-          ${s.contactRoom ? `<div class="ct-row"><span class="ci">${icon('pin')}</span><span><small>ห้องทำงาน</small><b>${esc(s.contactRoom)}</b></span></div>` : ''}
           ${!s.contactPhone && !s.contactEmail && !s.contactLine && !s.contactRoom ? `<div class="ct-row"><span class="hint">(รอข้อมูล)</span></div>` : ''}
         </div>
         ${s.contactNote ? `<div class="note-box" style="margin-top:12px">${icon('info')}<div>${esc(s.contactNote)}</div></div>` : ''}

@@ -136,7 +136,19 @@ const UI = (() => {
   }
   const isPdf = ref => /^data:application\/pdf/.test(ref) || /\.pdf$/i.test(ref) || /^drive:.*#pdf$/.test(ref);
   // เติมรูป/ไฟล์ที่เก็บใน Drive (โหลดผ่าน Apps Script เมื่อแสดงผล)
+  // ข้อความบรรทัดเดียว (ชื่อ-นามสกุล ชื่อโรงเรียน ฯลฯ): ย่อตัวอักษรให้พอดีความกว้าง (ไม่ต่ำกว่า 70%) — ไม่ตัดกลางคำ
+  function fitText(root = document) {
+    $$('.fitw', root).forEach(el => {
+      el.style.fontSize = '';
+      const box = el.parentElement; if (!box || !box.clientWidth) return;
+      const fs0 = parseFloat(getComputedStyle(el).fontSize); let fs = fs0, n = 0;
+      const avail = () => box.clientWidth - (parseFloat(getComputedStyle(box).paddingLeft) || 0) - (parseFloat(getComputedStyle(box).paddingRight) || 0);
+      while (el.scrollWidth > avail() + 1 && fs > fs0 * .7 && n++ < 40) { fs -= .5; el.style.fontSize = fs + 'px'; }
+    });
+  }
+  let fitT = 0; addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(() => fitText(), 150); });
   function hydrate(root = document) {
+    if (root.querySelector && root.querySelector('.fitw')) { fitText(root); if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitText(root)); }
     $$('img[data-file]', root).forEach(img => {
       if (img._h) return; img._h = 1;
       // ระหว่างโหลด: แสดงพื้นวิบวับแทนข้อความ alt (ไม่ให้ชื่อคนล้นวงกลมรูป)
