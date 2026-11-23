@@ -292,6 +292,40 @@
     const canReassign = ['approved', 'ontrip'].includes(r.status);
     const exp = r.expenses || [];
     const expTotal = exp.reduce((s, e) => s + (+e.amount || 0), 0);
+    const post = ['ontrip', 'returned', 'closed'].includes(r.status) && (r.assignments || []).some(a => a.status !== 'assigned');
+    const asgBtns = (a, i) => `${a.status === 'assigned' ? `<button class="btn btn-primary btn-xs" data-go="ontrip" data-i="${i}">${icon('navigation')} ออกเดินทาง</button>` : ''}
+      ${a.status === 'ontrip' ? `<button class="btn btn-ok btn-xs" data-go="returned" data-i="${i}">${icon('home')} กลับถึงแล้ว</button>` : ''}
+      ${a.status !== 'assigned' && r.status !== 'closed' ? `<button class="btn btn-ghost btn-xs" data-undo="${i}">${icon('undo')} ย้อนสถานะ</button>` : ''}
+      <button class="btn btn-ghost btn-xs" data-odo="${i}">${icon('gauge')} เลขไมล์</button>`;
+    const dur = (a, b) => { if (!a || !b) return ''; const m = Math.max(0, Math.round((new Date(b) - new Date(a)) / 6e4)); return `${Math.floor(m / 60)} ชม. ${m % 60} น.`; };
+    // สรุปการเดินทาง: รายคัน ออก → กลับ · ไมล์ · ระยะทาง · ค่าใช้จ่าย · ครูลงชื่อ
+    const tripSummary = () => {
+      const rows = (r.assignments || []).map((a, i) => { const v = S.vehicle(a.vehicleId) || {}, d = S.driver(a.driverId), km = a.odoStart != null && a.odoEnd != null ? a.odoEnd - a.odoStart : null, xs = exp.filter(e => e.vehicleId === a.vehicleId), xsum = xs.reduce((s, e) => s + (+e.amount || 0), 0); return { a, i, v, d, km, xs, xsum }; });
+      const kmAll = rows.reduce((s, x) => s + (x.km || 0), 0);
+      return `<div class="card ts-card"><div class="card-head"><h3>${icon('route')} สรุปการเดินทาง</h3>
+          <div class="ts-tot"><span>${icon('van')} ${rows.length} คัน</span><span>${icon('gauge')} ${kmAll ? fmt.num(kmAll) + ' กม.' : 'ยังไม่มีเลขไมล์'}</span><span>${icon('coins')} ${fmt.money(expTotal)} บาท</span></div></div>
+        <div class="stack" style="gap:12px">${rows.map(({ a, i, v, d, km, xs, xsum }) => `<div class="ts-row">
+          <div class="ts-veh"><div><b>${esc(v.name || '—')}</b> <small>${esc(v.plate || '')}</small><small class="ts-drv">${icon('wheel')} ${d ? esc(d.name) : 'ยังไม่ระบุคนขับ'}${d && d.phone ? ` · <a class="link" href="tel:${esc(d.phone)}">${esc(d.phone)}</a>` : ''}</small></div><span class="pill tone-${a.status === 'ontrip' ? 'live pulse' : a.status === 'returned' ? 'done' : 'ok'}">${S.ASSIGN[a.status]}</span></div>
+          <div class="ts-grid">
+            <div><small>ออกเดินทาง</small><b>${a.departedAt ? fmt.when(a.departedAt) : '—'}</b><em>ไมล์ ${a.odoStart != null ? fmt.num(a.odoStart) : '—'}</em></div>
+            <div><small>กลับถึง</small><b>${a.returnedAt ? fmt.when(a.returnedAt) : '—'}</b><em>ไมล์ ${a.odoEnd != null ? fmt.num(a.odoEnd) : '—'}</em></div>
+            <div><small>ระยะทาง</small><b>${km != null ? fmt.num(km) + ' กม.' : '—'}</b><em>${dur(a.departedAt, a.returnedAt) || 'ใช้เวลา —'}</em></div>
+            <div><small>ค่าใช้จ่าย</small><b>${fmt.money(xsum)} ฿</b><em>${xs.length} รายการ</em></div>
+          </div>
+          ${a.paxSign ? (a.paxSign.has ? `<div class="ps-show">${icon('edit')}<span>ครูผู้ร่วมเดินทางลงชื่อยืนยันกลับถึง <b>${esc(a.paxSign.name)}</b> <small>${fmt.dt(a.paxSign.at)}</small></span>${a.paxSign.img ? `<img src="${a.paxSign.img}" alt="ลายเซ็นครู">` : ''}</div>` : `<div class="ps-show none">${icon('info')}<span>ไม่มีครูไปด้วย <small>${fmt.dt(a.paxSign.at)}</small></span></div>`) : ''}
+          ${a.note ? `<div class="note">${icon('info')} ${esc(a.note)}</div>` : ''}
+          <div class="ts-act">${asgBtns(a, i)}</div></div>`).join('')}</div></div>`;
+    };
+    // ค่าใช้จ่าย: แยกตามรถ · ยอดรวมตามประเภท · รายการแบบอ่านง่าย (หัวเรื่อง+ยอดเงินบรรทัดบน)
+    const expCard = () => {
+      const vids = [...new Set([...(r.assignments || []).map(a => a.vehicleId), ...exp.map(e => e.vehicleId)])].filter(id => exp.some(e => e.vehicleId === id));
+      const byType = Object.entries(S.EXPENSE).map(([k, l]) => [l, exp.filter(e => e.type === k).reduce((s, e) => s + (+e.amount || 0), 0)]).filter(x => x[1]);
+      return `<div class="card xp-card"><div class="card-head"><h3>${icon('fuel')} ค่าน้ำมัน / ค่าใช้จ่าย</h3><button class="btn btn-gold btn-sm" id="addExp">${icon('plus')} เพิ่ม</button></div>
+        ${exp.length ? `<div class="xp-sumbar"><div class="xp-types">${byType.map(([l, v]) => `<span>${l} <b>${fmt.money(v)}</b></span>`).join('')}</div><div class="xp-total">รวม <b>${fmt.money(expTotal)}</b> บาท</div></div>
+          ${vids.map(id => `${vids.length > 1 || (r.assignments || []).length > 1 ? `<div class="xp-vh">${icon('van')} ${esc(C.vName(id))} <small>${exp.filter(e => e.vehicleId === id).length} รายการ · ${fmt.money(exp.filter(e => e.vehicleId === id).reduce((s, e) => s + (+e.amount || 0), 0))} บาท</small></div>` : ''}
+            <div class="stack" style="gap:10px">${exp.filter(e => e.vehicleId === id).sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at)).map(e => C.expItem(e, { edit: true, showVeh: false })).join('')}</div>`).join('')}`
+          : UI.empty('ยังไม่มีการบันทึกค่าใช้จ่าย', 'fuel')}</div>`;
+    };
     // บันทึกข้อความแสดงคู่กับข้อมูลคำขอ (คอม: แบ่งจอซ้าย-ขวา · แท็บเล็ต/มือถือ: ปุ่มลอยเปิดแผ่นเอกสารจากด้านล่าง)
     const docs = r.attachments || [];
     let dvOpen = true; try { dvOpen = localStorage.getItem('vb-dv') !== '0'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
@@ -325,21 +359,15 @@
             ${canDecide ? `<button class="btn btn-danger" data-dec="reject">${icon('xCircle')} ไม่อนุมัติ</button><button class="btn btn-warn" data-dec="revise">${icon('undo')} ส่งกลับให้แก้ไข</button><button class="btn btn-ok" data-dec="approve">${icon('checkCircle')} อนุมัติและมอบหมายรถ</button>` : `<button class="btn btn-primary" data-dec="approve">${icon('check')} บันทึกการเปลี่ยนแปลง</button>`}
           </div>
         </div>` : ''}
+        ${post ? `<div class="post-top">${tripSummary()}${expCard()}</div>` : ''}
         <div class="detail-grid ${canDecide || canReassign ? 'side-only' : ''}">
           ${canDecide || canReassign ? '' : Pages._requestInfo(r, { hideDocs: true })}
           <div class="stack" style="gap:18px">
-            ${(r.assignments || []).length ? `<div class="card"><div class="card-head"><h3>${icon('van')} สถานะการเดินทาง</h3></div>
+            ${!post && (r.assignments || []).length ? `<div class="card"><div class="card-head"><h3>${icon('van')} สถานะการเดินทาง</h3></div>
               ${C.assignList(r)}
-              <div class="stack" style="margin-top:12px">${r.assignments.map((a, i) => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status) ? `<div class="row" style="justify-content:flex-end"><small class="muted" style="margin-right:auto">${esc(C.vName(a.vehicleId))}</small>
-                ${a.status === 'assigned' ? `<button class="btn btn-primary btn-xs" data-go="ontrip" data-i="${i}">${icon('navigation')} ออกเดินทาง</button>` : ''}
-                ${a.status === 'ontrip' ? `<button class="btn btn-ok btn-xs" data-go="returned" data-i="${i}">${icon('home')} กลับถึงแล้ว</button>` : ''}
-                ${a.status !== 'assigned' && r.status !== 'closed' ? `<button class="btn btn-ghost btn-xs" data-undo="${i}">${icon('undo')} ย้อนสถานะ</button>` : ''}
-                <button class="btn btn-ghost btn-xs" data-odo="${i}">${icon('gauge')} เลขไมล์</button></div>` : '').join('')}</div>
+              <div class="stack" style="margin-top:12px">${r.assignments.map((a, i) => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status) ? `<div class="row" style="justify-content:flex-end"><small class="muted" style="margin-right:auto">${esc(C.vName(a.vehicleId))}</small>${asgBtns(a, i)}</div>` : '').join('')}</div>
             </div>` : ''}
-            ${['ontrip', 'returned', 'closed'].includes(r.status) || exp.length ? `<div class="card"><div class="card-head"><h3>${icon('fuel')} ค่าน้ำมัน / ค่าใช้จ่าย</h3><button class="btn btn-gold btn-sm" id="addExp">${icon('plus')} เพิ่ม</button></div>
-              <div class="stack">${exp.map(e => `<div class="exp-row"><span class="ei">${icon(e.type === 'fuel' ? 'fuel' : 'coins')}</span><div><b>${S.EXPENSE[e.type]} · ${esc(C.vName(e.vehicleId))}</b><small>${fmt.date(e.date)}${e.station ? ' · ' + esc(e.station) : ''}${e.liters ? ` · ${e.liters} ล. × ${e.pricePerL} บ.` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''} · โดย ${esc(e.byName || e.by)}</small>${(e.photos || []).length ? `<div class="thumbs" style="margin-top:6px">${e.photos.map(p => UI.thumb(p, 'sm')).join('')}</div>` : ''}</div><span class="money">${fmt.money(e.amount)} ฿</span><div class="row" style="gap:4px"><button class="icon-btn sm" data-eexp="${e.id}" aria-label="แก้ไข">${icon('edit')}</button><button class="icon-btn sm" data-dexp="${e.id}" aria-label="ลบ">${icon('trash')}</button></div></div>`).join('') || UI.empty('ยังไม่มีการบันทึกค่าใช้จ่าย', 'fuel')}</div>
-              ${exp.length ? `<div class="row between" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--navy-50)"><b>รวม</b><span class="money">${fmt.money(expTotal)} บาท</span></div>` : ''}
-            </div>` : ''}
+            ${!post && exp.length ? expCard() : ''}
             ${C.canMemo(r) ? `<div class="card memo-card"><div class="card-head"><h3>${icon('file')} บันทึกข้อความขอใช้รถ</h3><button class="btn btn-primary btn-sm" data-memo>${icon('printer')} พิมพ์ / PDF</button></div>
               ${(() => { const E = r.esign || {}, mine = r.createdBy === r.requester.email; const st = (ok, t, d) => `<li class="${ok ? 'ok' : ''}">${icon(ok ? 'checkCircle' : 'clock')}<span>${t}</span><small>${d}</small></li>`; return `<ul class="es-steps">
                 ${st(mine, 'ผู้ขอใช้รถ', mine ? 'ลงนามอิเล็กทรอนิกส์เมื่อส่งคำขอ' : 'แอดมินบันทึกแทน — ให้ผู้ขอเซ็นบนกระดาษ')}
@@ -425,8 +453,8 @@
           const od = e.target.closest('[data-odo]');
           if (od) { const i = +od.dataset.odo, a = S.request(r.id).assignments[i]; const res = await UI.modal({ title: `${icon('gauge')} เลขไมล์ · ${esc(C.vName(a.vehicleId))}`, body: `<div class="grid2"><div class="field"><label>ตอนออก</label><input id="o1" type="number" value="${a.odoStart ?? Pages._lastOdo(a.vehicleId) ?? ''}"></div><div class="field"><label>ตอนกลับ</label><input id="o2" type="number" value="${a.odoEnd ?? ''}"></div></div>`, actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: async el => { await S.setOdo(r.id, i, { odoStart: el.querySelector('#o1').value, odoEnd: el.querySelector('#o2').value }); return true; } }] }); if (res) { UI.toast('บันทึกเลขไมล์แล้ว'); App.render(); } return; }
           if (e.target.closest('#addExp')) { const res = await Pages._expenseModal(S.request(r.id), (r.assignments[0] || {}).vehicleId); if (res) App.render(); return; }
-          const ee = e.target.closest('[data-eexp]'); if (ee) { const rr = S.request(r.id); const res = await Pages._expenseModal(rr, null, rr.expenses.find(x => x.id === ee.dataset.eexp)); if (res) App.render(); return; }
-          const de = e.target.closest('[data-dexp]'); if (de) { if (await UI.confirm('ลบรายการค่าใช้จ่ายนี้?', { danger: true, ok: 'ลบ' })) S.removeExpense(r.id, de.dataset.dexp).then(App.render); return; }
+          const ee = e.target.closest('[data-xedit]'); if (ee) { const rr = S.request(r.id); const res = await Pages._expenseModal(rr, null, rr.expenses.find(x => x.id === ee.dataset.xedit)); if (res) App.render(); return; }
+          const de = e.target.closest('[data-xdel]'); if (de) { if (await UI.confirm('ลบรายการค่าใช้จ่ายนี้?', { danger: true, ok: 'ลบ' })) S.removeExpense(r.id, de.dataset.xdel).then(App.render); return; }
           if (e.target.closest('#aClose')) { const res = await UI.confirm('ปิดงานคำขอนี้? (ตรวจสอบเลขไมล์และค่าใช้จ่ายให้ครบก่อน)', { title: 'ปิดงาน', ok: 'ปิดงาน', input: { label: 'หมายเหตุ (ถ้ามี)' } }); if (res) S.closeRequest(r.id, res.value).then(() => { UI.toast('ปิดงานแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); }
           if (e.target.closest('#aReopen')) S.reopenRequest(r.id).then(App.render);
           if (e.target.closest('#aCancel')) { const res = await UI.confirm('ยกเลิกคำขอนี้? ระบบจะแจ้งผู้ขอในเว็บ', { title: 'ยกเลิกคำขอ', ok: 'ยกเลิกคำขอ', danger: true, input: { label: 'เหตุผล', required: true } }); if (res) S.cancelRequest(r.id, res.value).then(() => { UI.toast('ยกเลิกแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); }
@@ -1064,7 +1092,7 @@
     const cols = EXP_COLS.filter(c => c.fixed || (opt.cols || []).includes(c.k)), fsz = EXP_FS[opt.fs] ? opt.fs : 'm';
     try { localStorage.setItem(PSIGN, JSON.stringify({ o: opt.o, byV: opt.byV, signOn: opt.sign, sign, cols: cols.map(c => c.k), fs: fsz })); } catch (e) { /* ไม่บันทึกก็ได้ */ }
     const cell = (k, r, e, i) => ({
-      no: i + 1, date: fmt.date(e.date), veh: esc(C.vName(e.vehicleId)), plate: esc(C.vPlate(e.vehicleId) || '-'), req: r.id, dest: esc(S.destName(r)), type: S.EXPENSE[e.type],
+      no: i + 1, date: fmt.date(e.date), veh: esc(C.vName(e.vehicleId)), plate: esc(C.vPlate(e.vehicleId) || '-'), req: r.id, dest: esc(S.destName(r)), type: esc(Pages._expTitle(e)),
       detail: [e.station && esc(e.station), e.liters && `<span class="nb">${fmt.num(e.liters, 2)} ลิตร × ${fmt.num(e.pricePerL, 2)} บาท</span>`, e.odo && `<span class="nb">เลขไมล์ ${fmt.num(e.odo)}</span>`, e.note && esc(e.note)].filter(Boolean).join(' · ') || '-',
       pay: esc(S.PAY[e.pay] || '-'), amt: (+e.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })[k];
     // รวมคอลัมน์ที่เกี่ยวกันเป็นช่องเดียว 2 บรรทัด (รถ/ทะเบียน · เลขที่คำขอ/ปลายทาง · ประเภท/รายละเอียด) → ตารางแคบลง ไม่ต้องตกบรรทัดทุกช่อง
@@ -1173,7 +1201,7 @@
         </div>
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>วันที่</th><th>ประเภท</th><th>รถ</th><th>คำขอ</th><th>รายละเอียด</th><th>บิล</th><th class="r">ยอดเงิน (฿)</th></tr></thead>
-          <tbody>${rows.map(({ r, e }) => `<tr><td>${fmt.date(e.date)}</td><td>${S.EXPENSE[e.type]}</td><td>${esc(C.vName(e.vehicleId))}</td><td><a class="link" href="#/admin/requests/${r.id}">${r.id}</a><small>${esc(S.destName(r))}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td><td>${esc(e.station || '')}<small>${e.liters ? `${fmt.num(e.liters, 2)} ล. × ${fmt.num(e.pricePerL, 2)} ฿` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''}</small></td><td>${(e.photos || []).map(p => UI.thumb(p, 'sm')).join('') || '<small>—</small>'}</td><td class="r"><b>${fmt.money(e.amount)}</b></td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการในช่วงนี้', 'fuel')}</td></tr>`}</tbody>
+          <tbody>${rows.map(({ r, e }) => `<tr><td>${fmt.date(e.date)}</td><td>${esc(Pages._expTitle(e))}</td><td>${esc(C.vName(e.vehicleId))}</td><td><a class="link" href="#/admin/requests/${r.id}">${r.id}</a><small>${esc(S.destName(r))}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td><td>${esc(e.station || '')}<small>${e.liters ? `${fmt.num(e.liters, 2)} ล. × ${fmt.num(e.pricePerL, 2)} ฿` : ''}${e.odo ? ` · ไมล์ ${fmt.num(e.odo)}` : ''} · ${S.PAY[e.pay] || ''}</small></td><td>${(e.photos || []).map(p => UI.thumb(p, 'sm')).join('') || '<small>—</small>'}</td><td class="r"><b>${fmt.money(e.amount)}</b></td></tr>`).join('') || `<tr><td colspan="7">${UI.empty('ไม่มีรายการในช่วงนี้', 'fuel')}</td></tr>`}</tbody>
           ${rows.length ? `<tfoot><tr><td colspan="6">รวม</td><td class="r">${fmt.money(total)}</td></tr></tfoot>` : ''}
         </table></div></div>`}`,
       mount(root) {
@@ -1189,7 +1217,7 @@
         const pf = () => [vf && `รถ: ${C.vName(vf)}`, tf && `ประเภท: ${S.EXPENSE[tf]}`, cf && `หมวดงาน: ${cf === 'none' ? 'ไม่ระบุหมวด' : S.catName({ category: cf })}`].filter(Boolean);
         $('#pdf', root).addEventListener('click', () => printExpenses(rows, per, pf()));
         $('#pdfDl', root).addEventListener('click', () => printExpenses(rows, per, pf(), { dl: true }));
-        $('#xls', root).addEventListener('click', () => UI.exportSheets(`ค่าใช้จ่าย-${per.label}`, [{ name: 'ค่าใช้จ่าย', head: ['วันที่', 'ประเภท', 'รถ', 'ทะเบียน', 'เลขที่คำขอ', 'หมวดงาน', 'ปลายทาง', 'ปั๊ม/สถานที่', 'ลิตร', 'ราคา/ลิตร', 'เลขไมล์', 'วิธีชำระ', 'ยอดเงิน', 'บันทึกโดย'], rows: rows.map(({ r, e }) => [e.date, S.EXPENSE[e.type], C.vName(e.vehicleId), C.vPlate(e.vehicleId), r.id, S.catName(r), S.destName(r), e.station, e.liters, e.pricePerL, e.odo, S.PAY[e.pay], e.amount, e.byName || e.by]) }]));
+        $('#xls', root).addEventListener('click', () => UI.exportSheets(`ค่าใช้จ่าย-${per.label}`, [{ name: 'ค่าใช้จ่าย', head: ['วันที่', 'ประเภท', 'รถ', 'ทะเบียน', 'เลขที่คำขอ', 'หมวดงาน', 'ปลายทาง', 'ปั๊ม/สถานที่', 'ลิตร', 'ราคา/ลิตร', 'เลขไมล์', 'วิธีชำระ', 'ยอดเงิน', 'บันทึกโดย'], rows: rows.map(({ r, e }) => [e.date, Pages._expTitle(e), C.vName(e.vehicleId), C.vPlate(e.vehicleId), r.id, S.catName(r), S.destName(r), e.station, e.liters, e.pricePerL, e.odo, S.PAY[e.pay], e.amount, e.byName || e.by]) }]));
       }
     };
   };

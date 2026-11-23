@@ -649,7 +649,23 @@ const C = (() => {
     </div>`;
   }
 
-  return { teacherShort, tripMeta, hasLL, tripModal, gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
+  // ───── รายการค่าใช้จ่าย 1 รายการ (ใช้ทั้งหน้าคนขับและแอดมิน) — หัวเรื่อง+ยอดเงินบรรทัดบน · รายละเอียด/รูปบิลด้านล่าง · ปุ่มแก้/ลบท้าย ─────
+  const EXP_IC = { fuel: 'fuel', toll: 'route', parking: 'pin', other: 'coins' };
+  function expItem(e, { edit = false, showVeh = true } = {}) {
+    const title = e.type === 'other' ? (e.item || 'ค่าใช้จ่ายอื่น') : S().EXPENSE[e.type];
+    const sub = e.type === 'other' ? e.station : (e.station || [e.brand, e.branch].filter(Boolean).join(' '));
+    const meta = [fmt.date(e.date), showVeh && esc(vName(e.vehicleId)), e.liters && `${fmt.num(e.liters, 2)} ลิตร × ${fmt.num(e.pricePerL, 2)} บาท`, e.odo && `ไมล์ ${fmt.num(e.odo)}`, S().PAY[e.pay], e.note && esc(e.note)].filter(Boolean);
+    return `<div class="xp t-${e.type}">
+      <span class="xp-ic">${icon(EXP_IC[e.type] || 'coins')}</span>
+      <div class="xp-body">
+        <div class="xp-top"><b>${esc(title)}${sub ? ` <span>· ${esc(sub)}</span>` : ''}</b><span class="xp-amt">${fmt.money(e.amount)} ฿</span></div>
+        <div class="xp-meta">${meta.map(m => `<span>${m}</span>`).join('')}</div>
+        ${(e.photos || []).length ? `<div class="thumbs xp-pics">${e.photos.map(p => UI.thumb(p, 'sm')).join('')}</div>` : ''}
+        <div class="xp-foot"><small>บันทึกโดย ${esc(e.byName || e.by || '-')}${e.editedAt ? ` · แก้ไขล่าสุด ${fmt.dt(e.editedAt)}` : ''}</small>
+          ${edit ? `<span class="xp-act"><button type="button" class="btn btn-ghost btn-xs" data-xedit="${e.id}">${icon('edit')} แก้ไข</button><button type="button" class="btn btn-ghost btn-xs xp-del" data-xdel="${e.id}">${icon('trash')} ลบ</button></span>` : ''}</div>
+      </div></div>`;
+  }
+  return { expItem, teacherShort, tripMeta, hasLL, tripModal, gmapPlace, gmapRoute, thDate, downloadMemo, reportCover, reportHead, viewFiles, viewInPage, saveFile, atom, statusPill, stars, reqCard, pass, ticket, bindRail, gantt, parkBoard, board, dayPicker, firstName, lot, history, assignList, lockCard, filePicker, bindFilePicker, vName, vPlate, dName, dPhone, docSlot, mountDocViewer, printMemo, printMemos, printDialog, canMemo, memoSettings, memoHTML, sigEmails };
 })();
 
 const App = (() => {

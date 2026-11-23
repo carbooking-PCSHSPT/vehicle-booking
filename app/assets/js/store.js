@@ -1202,12 +1202,17 @@ const Store = (() => {
       // คนขับบันทึกย้อนหลังได้ภายใน 30 วันหลังปิดงาน (เลยกำหนด ให้แอดมินบันทึกแทน)
       if (!isAdmin(me) && cur.closedAt && Date.now() - new Date(cur.closedAt) > 30 * DAY) throw new Error('เลยกำหนดบันทึกย้อนหลัง 30 วันแล้ว — กรุณาส่งใบเสร็จให้แอดมินบันทึกแทน');
       const photos = await A.upload(ex.photos || [], { kind: 'receipt', ref: id, label: EXPENSE[ex.type] || 'ใบเสร็จ' });
-      const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), brand: String(ex.brand || '').trim(), branch: String(ex.branch || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), by: me.email, byName: me.name, at: nowISO() };
+      const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), brand: String(ex.brand || '').trim(), branch: String(ex.branch || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), item: String(ex.item || '').trim(), by: me.email, byName: me.name, at: nowISO() };
       return mutateReq(id, r => {
         if (!canAdd(r)) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
         r.expenses = r.expenses || [];
         const i = r.expenses.findIndex(x => x.id === e.id);
-        if (i >= 0) r.expenses[i] = e; else r.expenses.push(e);
+        // แก้รายการเดิม: คนขับแก้ได้เฉพาะที่ตัวเองบันทึก · เก็บผู้บันทึกคนแรกไว้ (แอดมินแก้แทน = บันทึกว่าใครแก้)
+        if (i >= 0) {
+          const old = r.expenses[i];
+          if (!isAdmin(me) && old.by !== me.email) throw new Error('แก้ไขได้เฉพาะรายการที่ตัวเองบันทึก');
+          r.expenses[i] = { ...e, by: old.by, byName: old.byName, at: old.at, editedBy: me.email, editedByName: me.name, editedAt: nowISO() };
+        } else r.expenses.push(e);
         return r;
       });
     },
@@ -1216,6 +1221,7 @@ const Store = (() => {
         const e = (r.expenses || []).find(x => x.id === exId);
         if (!e) return r;                       // ถูกลบจากเครื่องอื่นไปแล้ว
         if (!isAdmin(me) && e.by !== me.email) throw new Error('ไม่มีสิทธิ์ลบ');
+        if (!isAdmin(me) && r.closedAt && Date.now() - new Date(r.closedAt) > 30 * DAY) throw new Error('เลยกำหนดแก้ไข 30 วันแล้ว — กรุณาแจ้งแอดมิน');
         r.expenses = r.expenses.filter(x => x.id !== exId);
         return r;
       });
