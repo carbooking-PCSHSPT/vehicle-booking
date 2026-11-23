@@ -236,7 +236,8 @@ const Store = (() => {
   const isExec = u => has(u, 'executive');
   const isDriver = u => has(u, 'driver');
   const isBack = u => isAdmin(u) || isExec(u);
-  const driverOfUser = u => u && db.drivers.find(d => d.email && d.email === u.email);
+  // คนขับของบัญชีนี้ — ต้องมีสิทธิ์คนขับ · ยึด driverId ที่แอดมินผูกไว้ก่อน (กันรูป/ข้อมูลคนขับคนเดิมค้าง) แล้วค่อยดูจากอีเมล
+  const driverOfUser = u => { if (!u || !has(u, 'driver')) return null; return (u.driverId && db.drivers.find(d => d.id === u.driverId)) || db.drivers.find(d => d.email && d.email === u.email) || null; };
 
   // ───────── การแจ้งเตือนในเว็บ (คำนวณจากประวัติ) ─────────
   const SEEN_KEY = () => 'pcs-vehicle-seen-' + (me ? me.email : '');
@@ -828,6 +829,19 @@ const Store = (() => {
       await A.update('requests', r.id, x => ({ ...x, driverEmails: (x.assignments || []).map(emailOfA).filter(Boolean), updatedAt: nowISO() }));
     }
   }
+  // ผูกบัญชี (email) กับคนขับ (driverId) แบบหนึ่งต่อหนึ่ง: ถอดคนขับคนเดิมของบัญชีนี้ · ถอดบัญชีเดิมของคนขับคนนี้ · อัปเดต driverEmails ในงานที่ยังไม่จบ
+  async function linkDriver(email, driverId) {
+    for (const d of db.drivers.filter(d => d.email === email && d.id !== driverId)) {
+      await A.put('drivers', d.id, { ...d, email: '', updatedAt: nowISO() });
+      await syncDriverEmails(d.id, '');
+    }
+    const d = driverId && driver(driverId);
+    if (!d) return;
+    for (const o of db.users.filter(o => o.email !== email && (o.driverId === d.id || o.email === d.email) && o.driverId)) {
+      if (o.driverId === d.id) await A.put('users', o.email, { ...o, driverId: '', updatedAt: nowISO() }).catch(() => {});   // บัญชีแอดมินอื่น (ไม่ใช่ผู้ดูแลสูงสุด) แก้ไม่ได้ → ข้าม
+    }
+    if (d.email !== email) { await A.put('drivers', d.id, { ...d, email, updatedAt: nowISO() }); await syncDriverEmails(d.id, email); }
+  }
   const createReq = r => A.put('requests', r.id, finishReq(r)).then(() => r);
   // แก้คำขอที่มีอยู่: ใช้ข้อมูลล่าสุดจากฐานข้อมูลกลางเสมอ (ธุรกรรม) → หลายเครื่องกดพร้อมกันไม่ทับกัน
   // fn(r, also) แก้ r แล้วคืนค่า · ตรวจสิทธิ์/สถานะใน fn อีกครั้งเพราะข้อมูลอาจเปลี่ยนจากเครื่องอื่น
@@ -928,7 +942,9 @@ const Store = (() => {
       setTimeout(() => A.loadHistory(), 0);   // ไม่เรียกระหว่างวาดหน้า
       return true;
     },
-    myRequests: () => me ? db.requests.filter(r => r.requester && r.requester.email === me.email).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [],
+    // เรียงคำขอ: ส่งคำขอล่าสุดก่อน (ไม่มีวันที่ส่ง → ใช้วันเดินทาง)
+    byNewest: (a, b) => String(b.createdAt || b.startAt || '').localeCompare(String(a.createdAt || a.startAt || '')),
+    myRequests: () => me ? db.requests.filter(r => r.requester && r.requester.email === me.email).sort((a, b) => String(b.createdAt || b.startAt || '').localeCompare(String(a.createdAt || a.startAt || ''))) : [],
     // ── เข้าสู่ระบบ ──
     loginGoogle: email => A.loginGoogle(email),
     loginUsername: (u, p) => A.loginUsername(u, p),
@@ -1277,8 +1293,10 @@ const Store = (() => {
       if (!x.provider) x.provider = isUsernameEmail(x.email) ? 'username' : 'google';
       if (x.active == null) x.active = true;
       if (!LOCAL) delete x.password;
+      // ไม่มีสิทธิ์คนขับ = ไม่ผูกกับคนขับ
+      x.driverId = roles.includes('driver') ? (x.driverId || '') : '';
       await A.put('users', x.email, x);
-      if (x.driverId) { const d = driver(x.driverId); if (d && d.email !== x.email) { await A.put('drivers', d.id, { ...d, email: x.email }); await syncDriverEmails(d.id, x.email); } }
+      await linkDriver(x.email, x.driverId);
       return x;
     },
     async createUsernameAccount({ username, password, name, roles, driverId, phone }) {
@@ -1291,8 +1309,9 @@ const Store = (() => {
       const email = await A.createAccount({ username, password });
       const u = { email, name: String(name || '').trim(), dept: roles.includes('driver') ? 'งานยานพาหนะ' : 'ฝ่ายบริหารงานทั่วไป', phone: phone || '', position: roles.includes('driver') ? 'พนักงานขับรถ' : 'เจ้าหน้าที่', roles, active: true, provider: 'username', mustChangePassword: true, driverId: driverId || '', createdAt: nowISO(), createdBy: me.email };
       if (LOCAL) u.password = password;
+      if (!roles.includes('driver')) u.driverId = '';
       await A.put('users', email, u);
-      if (driverId) { const d = driver(driverId); if (d) { await A.put('drivers', d.id, { ...d, email }); await syncDriverEmails(d.id, email); } }
+      await linkDriver(email, u.driverId);
       return u;
     },
     async resetPassword(email, password) {
@@ -1308,6 +1327,7 @@ const Store = (() => {
       const u = user(email);
       if (u && (u.roles || []).includes('superadmin') && !isSuper(me)) throw new Error('ไม่มีสิทธิ์');
       await A.del('users', email);
+      await linkDriver(email, '');
     },
     // ── ตั้งค่า ──
     async saveSettings(s) {

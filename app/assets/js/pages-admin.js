@@ -51,7 +51,7 @@
   // ═════════ ภาพรวม ═════════
   Pages.adminHome = () => {
     const now = new Date(), rs = S.db.requests;
-    const pending = rs.filter(r => r.status === 'pending').sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const pending = rs.filter(r => r.status === 'pending').sort(S.byNewest);
     const today = rs.filter(r => !['cancelled', 'rejected', 'revise'].includes(r.status) && new Date(r.startAt) <= new Date(new Date().setHours(23, 59, 59)) && new Date(r.endAt) >= new Date(new Date().setHours(0, 0, 0, 0))).sort((a, b) => a.startAt.localeCompare(b.startAt));
     const vs = S.db.vehicles.filter(v => v.bookable !== false), st = vs.map(v => S.vehicleState(v).key);
     const alerts = [];
@@ -95,6 +95,47 @@
   };
 
   // ═════════ ตารางเวรคนขับ (รวมทุกคน) ═════════
+  // ตารางงานคนขับ (คนขับ × วัน) — ใช้ทั้งหน้าตารางงานคนขับ และหน้าต่างซ้อนตอนจัดรถ (hl = ช่วงวันของคำขอที่กำลังจัด)
+  function rosterGrid(days, view, { sel = days[0], hl = null, links = true } = {}) {
+    const ds = S.db.drivers.filter(d => d.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const rows = ds.map(d => { const jobs = Pages._driverJobs(d.id); return { d, cells: days.map(day => { const list = Pages._jobsOn(jobs, day); return { day, list, s: Pages._daySummary(list, day) }; }) }; });
+    const inHl = day => hl && new Date(hl[0]) <= new Date(day.getTime() + 864e5 - 1) && new Date(hl[1]) >= day;
+    const cls = day => `${UI.sameDay(day, new Date()) ? 'today' : ''} ${day.getDay() === 0 || day.getDay() === 6 ? 'we' : ''} ${inHl(day) ? 'hl' : ''}`;
+    return `<div class="tbl-wrap"><table class="roster r-${view}">
+          <thead><tr><th class="rn">คนขับ</th>${days.map(day => `<th class="${cls(day)}">${view === 'week' ? `${day.toLocaleDateString('th-TH', { weekday: 'short' })}<b>${day.getDate()}</b>` : `<b>${day.getDate()}</b>${day.toLocaleDateString('th-TH', { weekday: 'narrow' })}`}</th>`).join('')}<th>รวม</th></tr></thead>
+          <tbody>${rows.map(({ d, cells }) => { const nm = `<b>${esc(d.name)}</b><small>${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '—'}</small>`; return `<tr><td class="rn">${links ? `<a href="#/driver?tab=cal&d=${d.id}&view=${view}&date=${fmt.localDate(sel)}">${nm}</a>` : nm}</td>
+            ${cells.map(c => `<td class="${cls(c.day)}">${c.s.n ? `<button type="button" class="rc lv${Math.min(3, c.s.n)} ${c.s.live ? 'live' : ''}" data-cell="${d.id}|${fmt.localDate(c.day)}" title="${esc(c.list.map(j => `${fmt.time(j.r.startAt)} ${S.destName(j.r)}`).join('\n'))}">${view === 'week' ? `<span>${icon('van')}<b>${c.s.n}</b> งาน</span><small>${c.s.first || (c.s.cont ? 'ต่อเนื่อง' : '')}</small>${c.list[0] ? `<em>${esc(S.destName(c.list[0].r).slice(0, 18))}</em>` : ''}` : `<b>${c.s.n}</b>`}</button>` : '<span class="rz">·</span>'}</td>`).join('')}
+            <td class="rt"><b>${cells.reduce((s, c) => s + c.s.n, 0)}</b></td></tr>`; }).join('')}</tbody>
+        </table></div>`;
+  }
+  // กดช่องในตาราง → งานของคนขับคนนั้นในวันนั้น
+  function cellModal(cell, { calendar = true } = {}) {
+    const [dId, ds] = cell.split('|'), day = new Date(ds + 'T00:00:00'), d = S.driver(dId);
+    const list = Pages._jobsOn(Pages._driverJobs(dId), day);
+    return UI.modal({ title: `${icon('wheel')} ${esc(d.name)} · ${fmt.dateLong(day)}`, size: 'lg', body: `<div class="stack">${list.map(j => `<div>${C.pass(j.r, { href: `#/admin/requests/${j.r.id}` })}<p class="hint" style="margin:6px 4px 0">${icon('van')} คันที่ขับ: <b>${esc(C.vName(j.a.vehicleId))}</b> · ${S.ASSIGN[j.a.status]}${j.a.note ? ` · หมายเหตุ: ${esc(j.a.note)}` : ''}</p></div>`).join('')}</div>`,
+      actions: calendar ? [{ label: 'ปิด', value: null }, { label: 'เปิดปฏิทินของคนขับ', kind: 'btn-primary', icon: 'calendar', onClick: () => { location.hash = `#/driver?tab=cal&d=${dId}&view=month&date=${ds}`; return true; } }] : [{ label: 'ปิด', value: null }] });
+  }
+  // หน้าต่างซ้อน: ตารางงานคนขับรายสัปดาห์ ระหว่างจัดรถ (เลื่อนสัปดาห์ได้ · ปิดแล้วกลับมาจัดรถต่อ ข้อมูลที่เลือกไว้ไม่หาย)
+  function rosterModal(r) {
+    const addD = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); x.setHours(0, 0, 0, 0); return x; };
+    const s0 = new Date(r.startAt); let start = addD(s0, -s0.getDay());
+    const draw = el => {
+      const days = Array.from({ length: 7 }, (_, i) => addD(start, i));
+      el.querySelector('#rmT').textContent = `${fmt.dayMonth(days[0])} – ${fmt.date(days[6])}`;
+      el.querySelector('#rmG').innerHTML = rosterGrid(days, 'week', { hl: [r.startAt, r.endAt], links: false });
+    };
+    return UI.modal({ title: `${icon('calendar')} ตารางงานคนขับ`, size: 'xl',
+      body: `<div class="toolbar rm-bar"><div class="row"><button type="button" class="icon-btn sm" data-wk="-7" aria-label="สัปดาห์ก่อน">${icon('chevL')}</button><b id="rmT"></b><button type="button" class="icon-btn sm" data-wk="7" aria-label="สัปดาห์ถัดไป">${icon('chevR')}</button><button type="button" class="btn btn-ghost btn-sm" data-wk="0">สัปดาห์ของคำขอนี้</button></div>
+        <span class="hint"><i class="rm-hl"></i> วันที่ขอใช้รถ · กดช่องเพื่อดูงาน</span></div><div id="rmG"></div>`,
+      actions: [{ label: 'ปิด', value: null }],
+      onOpen(el) {
+        draw(el);
+        el.addEventListener('click', e => {
+          const w = e.target.closest('[data-wk]'); if (w) { start = +w.dataset.wk ? addD(start, +w.dataset.wk) : addD(s0, -s0.getDay()); draw(el); return; }
+          const b = e.target.closest('[data-cell]'); if (b) cellModal(b.dataset.cell, { calendar: false });
+        });
+      } });
+  }
   Pages.adminRoster = ({ query }) => {
     const view = query.view === 'month' ? 'month' : 'week';
     const sel = UI.dayOf(query.date);
@@ -104,8 +145,6 @@
     const prev = view === 'month' ? new Date(sel.getFullYear(), sel.getMonth() - 1, 1) : addD(sel, -7);
     const next = view === 'month' ? new Date(sel.getFullYear(), sel.getMonth() + 1, 1) : addD(sel, 7);
     const qs = o => '#/admin/roster?' + new URLSearchParams({ view, date: fmt.localDate(sel), ...o });
-    const ds = S.db.drivers.filter(d => d.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
-    const rows = ds.map(d => { const jobs = Pages._driverJobs(d.id); return { d, cells: days.map(day => { const list = Pages._jobsOn(jobs, day); return { day, list, s: Pages._daySummary(list, day) }; }) }; });
     // งานที่ยังไม่ได้ระบุคนขับ
     const noDriver = S.db.requests.filter(r => ['approved', 'ontrip'].includes(r.status) && (r.assignments || []).some(a => !a.driverId) && days.some(day => new Date(r.startAt) <= new Date(day.getTime() + 864e5 - 1) && new Date(r.endAt) >= day));
     return {
@@ -116,21 +155,10 @@
           <a class="icon-btn sm" href="${qs({ date: fmt.localDate(next) })}" aria-label="ถัดไป">${icon('chevR')}</a><a class="btn btn-ghost btn-sm" href="${qs({ date: fmt.localDate(new Date()) })}">วันนี้</a></div>
           <div class="seg"><a href="${qs({ view: 'week' })}"><button class="${view === 'week' ? 'on' : ''}" tabindex="-1">สัปดาห์</button></a><a href="${qs({ view: 'month' })}"><button class="${view === 'month' ? 'on' : ''}" tabindex="-1">เดือน</button></a></div></div>
         ${noDriver.length ? `<div class="note-box red" style="margin-bottom:14px">${icon('alert')}<div>มี <b>${noDriver.length}</b> งานในช่วงนี้ที่ยังไม่ได้ระบุคนขับ: ${noDriver.map(r => `<a class="link" href="#/admin/requests/${r.id}">${r.id}</a>`).join(', ')}</div></div>` : ''}
-        <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="roster r-${view}">
-          <thead><tr><th class="rn">คนขับ</th>${days.map(day => `<th class="${UI.sameDay(day, new Date()) ? 'today' : ''} ${day.getDay() === 0 || day.getDay() === 6 ? 'we' : ''}">${view === 'week' ? `${day.toLocaleDateString('th-TH', { weekday: 'short' })}<b>${day.getDate()}</b>` : `<b>${day.getDate()}</b>${day.toLocaleDateString('th-TH', { weekday: 'narrow' })}`}</th>`).join('')}<th>รวม</th></tr></thead>
-          <tbody>${rows.map(({ d, cells }) => `<tr><td class="rn"><a href="#/driver?tab=cal&d=${d.id}&view=${view}&date=${fmt.localDate(sel)}"><b>${esc(d.name)}</b><small>${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '—'}</small></a></td>
-            ${cells.map(c => `<td class="${UI.sameDay(c.day, new Date()) ? 'today' : ''} ${c.day.getDay() === 0 || c.day.getDay() === 6 ? 'we' : ''}">${c.s.n ? `<button class="rc lv${Math.min(3, c.s.n)} ${c.s.live ? 'live' : ''}" data-cell="${d.id}|${fmt.localDate(c.day)}" title="${c.list.map(j => `${fmt.time(j.r.startAt)} ${S.destName(j.r)}`).join('\n')}">${view === 'week' ? `<span>${icon('van')}<b>${c.s.n}</b> งาน</span><small>${c.s.first || (c.s.cont ? 'ต่อเนื่อง' : '')}</small>${c.list[0] ? `<em>${esc(S.destName(c.list[0].r)).slice(0, 18)}</em>` : ''}` : `<b>${c.s.n}</b>`}</button>` : '<span class="rz">·</span>'}</td>`).join('')}
-            <td class="rt"><b>${cells.reduce((s, c) => s + c.s.n, 0)}</b></td></tr>`).join('')}</tbody>
-        </table></div></div>
+        <div class="card" style="padding:8px">${rosterGrid(days, view, { sel })}</div>
         <div class="g-legend" style="display:flex;gap:16px;margin-top:10px;color:var(--muted);font-size:.82rem;flex-wrap:wrap"><span><span class="rc lv1" style="display:inline-block;width:18px;height:12px;padding:0"></span> 1 งาน</span><span><span class="rc lv2" style="display:inline-block;width:18px;height:12px;padding:0"></span> 2 งาน</span><span><span class="rc lv3" style="display:inline-block;width:18px;height:12px;padding:0"></span> 3 งานขึ้นไป</span><span><span class="rc live" style="display:inline-block;width:18px;height:12px;padding:0"></span> กำลังเดินทาง</span><span>กดชื่อคนขับ = เปิดปฏิทินของคนนั้น</span></div>`,
       mount(root) {
-        root.addEventListener('click', e => {
-          const b = e.target.closest('[data-cell]'); if (!b) return;
-          const [dId, ds] = b.dataset.cell.split('|'), day = new Date(ds + 'T00:00:00'), d = S.driver(dId);
-          const list = Pages._jobsOn(Pages._driverJobs(dId), day);
-          UI.modal({ title: `${icon('wheel')} ${esc(d.name)} · ${fmt.dateLong(day)}`, size: 'lg', body: `<div class="stack">${list.map(j => `<div>${C.pass(j.r, { href: `#/admin/requests/${j.r.id}` })}<p class="hint" style="margin:6px 4px 0">${icon('van')} คันที่ขับ: <b>${esc(C.vName(j.a.vehicleId))}</b> · ${S.ASSIGN[j.a.status]}${j.a.note ? ` · หมายเหตุ: ${esc(j.a.note)}` : ''}</p></div>`).join('')}</div>`,
-            actions: [{ label: 'ปิด', value: null }, { label: 'เปิดปฏิทินของคนขับ', kind: 'btn-primary', icon: 'calendar', onClick: () => { location.hash = `#/driver?tab=cal&d=${dId}&view=month&date=${ds}`; return true; } }] });
-        });
+        root.addEventListener('click', e => { const b = e.target.closest('[data-cell]'); if (b) cellModal(b.dataset.cell); });
       }
     };
   };
@@ -153,7 +181,7 @@
     const debtN = S.db.requests.filter(S.needsMemo).length;
     if (md) list = list.filter(S.needsMemo);
     if (q) list = list.filter(r => [r.id, r.purpose, r.requester.name, r.requester.dept, S.destName(r)].join(' ').toLowerCase().includes(q.toLowerCase()));
-    list.sort((a, b) => f === 'pending' || f === 'approved' ? a.startAt.localeCompare(b.startAt) : b.startAt.localeCompare(a.startAt));
+    list.sort(S.byNewest);   // ทุกแท็บ: ส่งคำขอล่าสุดก่อน
     const cnt = k => S.db.requests.filter(r => !G[k] || G[k].includes(r.status)).length;
     const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, df, dt, c: cf, sg, md, ...o });
     const printable = list;
@@ -247,14 +275,14 @@
     return `<select class="input" name="dcat">${sel ? '' : '<option value="">— เลือกหมวดงาน —</option>'}${cats.map(c => `<option value="${esc(c.id)}" ${c.id === sel ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ (ระบุ)' : c.name)}</option>`).join('')}</select>
       <input class="input" name="dcatOther" placeholder="ระบุหมวดงาน" value="${esc(other || '')}" ${sel === 'other' ? '' : 'hidden'} style="margin-top:8px">`;
   }
-  // คนขับในช่วงเวลาของคำขอนี้: ว่าง (เขียว) / ติดงาน (แดง + งานและเวลาแบบสั้น)
+  // คนขับที่ติดงานในช่วงเวลาของคำขอนี้ (แดง + งานและเวลาแบบสั้น) · ปุ่มเปิดตารางงานคนขับแบบหน้าต่างซ้อน
   function driverDay(r) {
     if (!r.startAt) return '';
     const ds = S.db.drivers.filter(d => d.active !== false).map(d => ({ d, c: S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) }));
     const tm = x => `${fmt.time(x.startAt)}–${UI.sameDay(x.startAt, x.endAt) ? fmt.time(x.endAt) : fmt.dayMonth(x.endAt)}`;
     const free = ds.filter(x => !x.c.length), busy = ds.filter(x => x.c.length);
-    return `<div class="drv-day"><div class="label">${icon('wheel')} คนขับช่วงเวลานี้ <span class="hint">ว่าง ${free.length} · ติดงาน ${busy.length}</span></div>
-      <div class="dd-chips">${free.map(x => `<span class="dd-chip ok">${icon('check')}${esc(C.firstName(x.d.name))}</span>`).join('')}${busy.map(x => `<span class="dd-chip bad" title="${esc(x.c.map(y => `${y.id} ${S.destName(y)}`).join(', '))}">${icon('xCircle')}${esc(C.firstName(x.d.name))} <small>${x.c.map(y => `${tm(y)} ${esc(S.destName(y))}`).join(', ')}</small></span>`).join('')}</div></div>`;
+    return `<div class="drv-day"><div class="label dd-head"><span>${icon('wheel')} คนขับที่ติดงานช่วงนี้ <span class="hint">ติดงาน ${busy.length} · ว่าง ${free.length}</span></span><button type="button" class="btn btn-ghost btn-xs" data-roster>${icon('calendar')} ดูตารางงานคนขับ</button></div>
+      <div class="dd-chips">${busy.length ? '' : '<span class="hint">ไม่มีคนขับติดงานในช่วงเวลานี้</span>'}${busy.map(x => `<span class="dd-chip bad" title="${esc(x.c.map(y => `${y.id} ${S.destName(y)}`).join(', '))}">${icon('xCircle')}${esc(C.firstName(x.d.name))} <small>${x.c.map(y => `${tm(y)} ${esc(S.destName(y))}`).join(', ')}</small></span>`).join('')}</div></div>`;
   }
   // ═════════ รายละเอียดคำขอ (แอดมิน) ═════════
   Pages.adminRequest = ({ params }) => {
@@ -328,6 +356,7 @@
       mount(root) {
         const P = (canDecide || canReassign) ? bindVehiclePicker(root, () => S.passengers(r)) : null;
         const getSig = $('#sigSave', root) ? C.bindFilePicker(root, 'sig', [], { pdf: true }) : null;
+        root.querySelectorAll('[data-roster]').forEach(b => b.addEventListener('click', () => rosterModal(S.request(r.id) || r)));
         root.querySelectorAll('[data-memo]').forEach(b => b.addEventListener('click', () => C.printDialog([S.request(r.id)], { title: 'บันทึกข้อความขอใช้รถ' })));
         root.querySelectorAll('[data-chg]').forEach(b => b.addEventListener('click', async () => {
           const ok = b.dataset.chg === '1';
@@ -506,7 +535,7 @@
     if (!roles.length) return { layout: 'admin', html: `${head('ลงนาม', 'บันทึกข้อความรอลงนาม')}<div class="note-box">${icon('info')}<div>บัญชีนี้ยังไม่ได้ถูกกำหนดเป็นผู้ลงนาม — แอดมินกำหนดได้ที่ <b>ตั้งค่า → บันทึกข้อความขอใช้รถ</b></div></div>` };
     const role = roles.includes(query.role) ? query.role : roles[0], tab = query.t === 'done' ? 'done' : 'todo';
     const all = S.db.requests.filter(C.canMemo);
-    const todo = all.filter(r => S.needsMySign(r, role)).sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const todo = all.filter(r => S.needsMySign(r, role)).sort(S.byNewest);
     const done = all.filter(r => ((r.esign || {})[role] || {}).email === me.email).sort((a, b) => b.esign[role].at.localeCompare(a.esign[role].at)).slice(0, 200);
     const list = tab === 'todo' ? todo : done;
     const qs = o => '#/admin/esign?' + new URLSearchParams({ role, t: tab, ...o });
@@ -878,8 +907,14 @@
                 <div class="field full"><label>ชื่อ-นามสกุล</label><input name="name" value="${esc(u.name || '')}"></div>
                 <div class="field"><label>ฝ่าย</label><input name="dept" value="${esc(u.dept || '')}"></div><div class="field"><label>เบอร์โทร</label><input name="phone" value="${esc(u.phone || '')}"></div>
                 <div class="field full"><label>สิทธิ์</label><div class="checks">${Object.keys(S.ROLES).map(r => `<label class="check"><input type="checkbox" name="roles" data-multi value="${r}" ${(u.roles || []).includes(r) ? 'checked' : ''} ${(r === 'admin' || r === 'superadmin') && !sup ? 'disabled' : ''}>${S.ROLES[r]}</label>`).join('')}</div></div>
-                <div class="field full"><label>ผูกกับพนักงานขับรถ (ถ้าเป็นคนขับ)</label><select name="driverId"><option value="">— ไม่ผูก —</option>${S.db.drivers.map(d => `<option value="${d.id}" ${d.email === u.email ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></div>
+                <div class="field full"><label>ผูกกับพนักงานขับรถ (ถ้าเป็นคนขับ)</label><select name="driverId" id="uDrv"><option value="">— ไม่ผูก —</option>${S.db.drivers.map(d => { const cur = (S.driverOfUser({ ...u, roles: ['driver'] }) || {}).id === d.id, other = d.email && d.email !== u.email ? S.user(d.email) : null; return `<option value="${d.id}" ${cur ? 'selected' : ''}>${esc(d.name)}${other ? ` (ผูกกับบัญชี ${esc(S.usernameOf(other.email) || other.name || other.email)} อยู่ — จะย้ายมาบัญชีนี้)` : ''}</option>`; }).join('')}</select><span class="hint">เลือกคนขับแล้ว ระบบเติมชื่อ/เบอร์โทรตามคนขับให้ · เอาสิทธิ์คนขับออก = ยกเลิกการผูกอัตโนมัติ</span></div>
                 <div class="field full"><label class="check" style="width:max-content"><input type="checkbox" name="active" ${u.active !== false ? 'checked' : ''}> เปิดใช้งานบัญชี</label></div></form>`,
+              onOpen: el => {
+                const sel = el.querySelector('#uDrv'), rd = el.querySelector('input[name=roles][value=driver]'), F = n => el.querySelector(`#uF [name=${n}]`);
+                // เลือกคนขับคนใหม่ → ชื่อ/เบอร์/สิทธิ์ตามคนขับคนนั้น (ไม่ค้างข้อมูลคนเดิม)
+                sel.addEventListener('change', () => { const d = S.driver(sel.value); if (!d) return; F('name').value = d.name || ''; if (d.phone) F('phone').value = d.phone; F('dept').value = F('dept').value || 'งานยานพาหนะ'; if (rd) rd.checked = true; });
+                if (rd) rd.addEventListener('change', () => { if (!rd.checked) sel.value = ''; });
+              },
               actions: [{ label: 'ลบผู้ใช้', kind: 'btn-danger', onClick: async () => { if (!(await UI.confirm('ลบผู้ใช้นี้ออกจากระบบ?', { danger: true, ok: 'ลบ' }))) return false; await S.removeUser(u.email); return 'del'; } }, { label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: async el => { const f = UI.formData(el.querySelector('#uF')); const roles = sup ? f.roles : [...new Set([...(f.roles || []).filter(r => r !== 'admin' && r !== 'superadmin'), ...(u.roles || []).filter(r => r === 'admin' || r === 'superadmin')])]; await S.saveUser({ ...u, name: f.name, dept: f.dept, phone: f.phone, roles, active: f.active, driverId: f.driverId }); return true; } }] });
             if (res) { UI.toast(res === 'del' ? 'ลบผู้ใช้แล้ว' : 'บันทึกแล้ว'); App.render(); }
           }

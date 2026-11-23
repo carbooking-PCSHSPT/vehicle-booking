@@ -98,13 +98,12 @@ const Maps = (() => {
           <div class="field"><label>เวลาเดินทางโดยประมาณ (นาที) <b class="req">*</b></label><input id="pkMin" type="number" min="0" inputmode="numeric" value="${cur.mins ? esc(cur.mins) : ''}"></div>
           <div class="field"><label>ระยะทางจากโรงเรียน (กม. เที่ยวเดียว) <b class="req">*</b></label><input id="pkKm" type="number" min="0" step="0.1" inputmode="decimal" value="${cur.km ? esc(cur.km) : ''}"></div>
           <div class="field"><label>ระยะทางรวม ไป + กลับ (กม.) <span class="hint">กรอกช่องไหนก็ได้</span></label><input id="pkKm2" type="number" min="0" step="0.1" inputmode="decimal" value="${cur.km ? (Math.round(cur.km * 20) / 10) : ''}"></div>
-          <div class="field full"><label>พิกัด หรือ ลิงก์ Google Maps <span class="hint">(ไม่บังคับ — วางแล้วระบบคำนวณระยะทางให้)</span></label>
-            <div class="pk-ll"><input id="pkLL" value="${cur.lat != null ? `${(+cur.lat).toFixed(5)}, ${(+cur.lng).toFixed(5)}` : ''}" placeholder="เช่น 13.75302, 100.49046 หรือวางลิงก์จาก Google Maps" autocomplete="off"><a class="btn btn-ghost btn-sm" id="pkGm" target="_blank" rel="noopener" href="https://www.google.com/maps">${icon('pin')} หาใน Google Maps</a></div></div>
+          <div class="field full pk-gm"><span class="hint">ไม่รู้ระยะทาง/เวลา? เปิดเส้นทางจากโรงเรียนใน Google Maps แล้วนำตัวเลขมากรอก</span><a class="btn btn-ghost btn-sm" id="pkGm" target="_blank" rel="noopener" href="https://www.google.com/maps">${icon('pin')} ดูระยะทางใน Google Maps</a></div>
         </div>
         <details class="pk-how"><summary>${icon('info')} ค้นหาไม่เจอ ทำอย่างไร</summary><ol>
-          <li>กรอก <b>ชื่อสถานที่</b> และ <b>จังหวัด</b> เอง (จำเป็นแค่ชื่อ)</li>
-          <li>ระยะทาง: กรอก <b>เที่ยวเดียว</b> หรือ <b>ไป + กลับ</b> ช่องใดช่องหนึ่ง ระบบคำนวณอีกช่องให้</li>
-          <li>ไม่รู้ระยะทาง: กด <b>หาใน Google Maps</b> → ค้นสถานที่ → กด <b>แชร์ → คัดลอกลิงก์</b> (หรือกดค้างบนแผนที่ แล้วคัดลอกพิกัด) → วางในช่องพิกัด ระบบคำนวณระยะทางให้อัตโนมัติ</li>
+          <li>กรอกเองได้ทุกช่อง: <b>ชื่อสถานที่ · ที่อยู่ · จังหวัด · เวลาเดินทาง · ระยะทาง</b></li>
+          <li>ระยะทาง: กรอก <b>เที่ยวเดียว</b> หรือ <b>ไป + กลับ</b> ช่องใดช่องหนึ่ง ระบบคำนวณอีกช่องให้ · ไม่รู้เวลา ระบบประมาณจากระยะทางให้</li>
+          <li>ไม่รู้ระยะทาง: พิมพ์ชื่อสถานที่ แล้วกด <b>ดูระยะทางใน Google Maps</b> → ระบบเปิดเส้นทางจากโรงเรียน → นำ <b>กม.</b> และ <b>นาที</b> มากรอก</li>
         </ol></details>
         <p class="hint" id="pkCalc"></p>
       </div>`;
@@ -112,7 +111,7 @@ const Maps = (() => {
       title: `${icon('pin')} เลือกสถานที่ปลายทาง`, size: 'lg', body,
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'ใช้สถานที่นี้', kind: 'btn-primary', icon: 'check', onClick: el => {
         const v = id => el.querySelector(id).value.trim();
-        // บังคับกรอกทุกช่อง ยกเว้นพิกัด
+        // บังคับกรอกทุกช่อง
         const need = [['#pkName', 'ชื่อสถานที่'], ['#pkAddr', 'ที่อยู่ / ตำบล อำเภอ จังหวัด'], ['#pkProv', 'จังหวัด']].find(([id]) => !v(id));
         if (need) { UI.toast(`กรุณากรอก${need[1]}`, 'error'); el.querySelector(need[0]).focus(); return false; }
         if (!(+v('#pkMin') > 0)) { UI.toast('กรุณากรอกเวลาเดินทางโดยประมาณ (นาที)', 'error'); el.querySelector('#pkMin').focus(); return false; }
@@ -129,26 +128,20 @@ const Maps = (() => {
         // ไม่รู้ระยะเวลา → ประมาณจากระยะทาง (55 กม./ชม. + 10 นาที)
         el.querySelector('#pkKm').addEventListener('change', () => { const k = +el.querySelector('#pkKm').value; const m = el.querySelector('#pkMin'); if (k && !+m.value) m.value = Math.round(k / 55 * 60 + 10); });
         el.querySelector('#pkKm2').addEventListener('change', () => el.querySelector('#pkKm').dispatchEvent(new Event('change')));
-        // ปุ่ม "หาใน Google Maps" ค้นตามชื่อที่พิมพ์ไว้
+        // ปุ่ม "ดูระยะทางใน Google Maps" — เส้นทางจากโรงเรียนไปสถานที่ที่พิมพ์ไว้ (ยังไม่พิมพ์ = เปิดแผนที่เฉย ๆ)
         const gm = el.querySelector('#pkGm');
-        const syncGm = () => { const t = [el.querySelector('#pkName').value, el.querySelector('#pkProv').value].filter(Boolean).join(' ').trim(); gm.href = t ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t)}` : 'https://www.google.com/maps'; };
-        ['#pkName', '#pkProv'].forEach(id => el.querySelector(id).addEventListener('input', syncGm)); syncGm();
-        // วางพิกัด / ลิงก์ Google Maps → อ่านพิกัด แล้วคำนวณระยะทาง
-        const ll = el.querySelector('#pkLL');
-        const readLL = async () => {
-          const t = ll.value.trim(); if (!t) { cur = { ...cur, lat: null, lng: null }; return; }
-          const p = parseLL(t);
-          if (p) { ll.value = `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`; if (!el.querySelector('#pkName').value && p.name) setF('#pkName', p.name); await setPoint({ lat: p.lat, lng: p.lng }, { fromMap: true }); }
-          else if (/goo\.gl|maps\.app/.test(t)) calc.textContent = 'ลิงก์แบบย่อ (maps.app.goo.gl) อ่านพิกัดไม่ได้ — เปิดลิงก์ในเบราว์เซอร์ให้ขึ้นแผนที่ก่อน แล้วคัดลอกลิงก์จากแถบที่อยู่ หรือคัดลอกพิกัดตัวเลขแทน';
-          else calc.textContent = 'อ่านพิกัดไม่ได้ — ใส่แบบ 13.75302, 100.49046';
+        const syncGm = () => {
+          const t = [el.querySelector('#pkName').value, el.querySelector('#pkProv').value].filter(Boolean).join(' ').trim();
+          const from = s.lat != null ? `${s.lat},${s.lng}` : (s.name || '');
+          gm.href = !t ? 'https://www.google.com/maps' : from ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(t)}&travelmode=driving` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t)}`;
         };
+        ['#pkName', '#pkProv'].forEach(id => el.querySelector(id).addEventListener('input', syncGm)); syncGm();
         ll.addEventListener('change', readLL); ll.addEventListener('paste', () => setTimeout(readLL, 30));
         async function setPoint(p, { fromMap } = {}) {
           cur = { ...cur, ...p };
           ['name', 'address', 'province'].forEach(k => { if (p[k]) setF({ name: '#pkName', address: '#pkAddr', province: '#pkProv' }[k], p[k]); });
           if (p.km != null && p.km !== '') setF('#pkKm', p.km);
           if (p.mins != null && p.mins !== '') setF('#pkMin', p.mins);
-          setF('#pkLL', cur.lat != null ? `${(+cur.lat).toFixed(5)}, ${(+cur.lng).toFixed(5)}` : '');
           if (cur.lat != null) {
             if (map && marker && !fromMap) { try { marker.location ? map.Overlays.remove(marker) : 0; } catch (e) { /* ข้าม */ } addMarker(); map.location({ lon: cur.lng, lat: cur.lat }, true); }
             if (fromMap && enabled) { try { const r = await reverse(cur.lat, cur.lng); if (!el.querySelector('#pkName').value) setF('#pkName', r.name || r.address.split(' ').slice(0, 2).join(' ')); setF('#pkAddr', r.address); setF('#pkProv', r.province); cur.address = r.address; cur.province = r.province; } catch (e) { /* ข้าม */ } }

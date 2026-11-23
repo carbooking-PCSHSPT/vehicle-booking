@@ -224,7 +224,7 @@ main { display: block; }
 .sum-box b { font-family: var(--font-display); font-weight: 600; color: var(--navy); font-size: 1.15rem; }
 
 /* ───────── ป๊อปอัป / แจ้งเตือน ───────── */
-.modal-wrap { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 18px; background: rgba(27, 31, 59, .45); backdrop-filter: blur(4px); opacity: 0; transition: opacity .25s; }
+.modal-wrap { position: fixed; inset: 0; z-index: 200; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 18px; background: rgba(27, 31, 59, .45); backdrop-filter: blur(4px); opacity: 0; transition: opacity .25s; }
 .modal-wrap.show { opacity: 1; }
 .modal { width: min(560px, 100%); max-height: calc(100vh - 36px); display: flex; flex-direction: column; border-radius: 26px; background: var(--paper); box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .5); transform: translateY(16px) scale(.98); transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
 .modal.lg { width: min(860px, 100%); } .modal.xl { width: min(1080px, 100%); }
@@ -1891,11 +1891,11 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .gm-nav { margin-top: 8px; width: 100%; justify-content: center; }
 .dh-nav { margin-top: 8px; }
 /* เลือกสถานที่: กรอกเอง */
-.pk-ll { display: flex; gap: 8px; } .pk-ll input { flex: 1; min-width: 0; } .pk-ll .btn { white-space: nowrap; flex: none; }
+.pk-gm { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; } .pk-gm .btn { white-space: nowrap; flex: none; }
 .pk-how { margin-top: 12px; padding: 10px 14px; border-radius: 14px; background: #fdfaf3; border: 1px solid var(--line); font-size: .88rem; }
 .pk-how summary { cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-weight: 600; color: var(--navy); }
 .pk-how ol { margin: 8px 0 0; padding-left: 1.3em; line-height: 1.7; color: var(--ink-2); }
-.lt640 .pk-ll { flex-direction: column; }
+.lt640 .pk-gm .btn { width: 100%; justify-content: center; }
 
 .lt420 .pk-plate { font-size: .47rem; padding: 0 2px; letter-spacing: -.02em; max-width: calc(100% + 2px); }
 
@@ -2074,3 +2074,16 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .ps-show .i { width: 16px; height: 16px; flex: none; } .ps-show small { color: var(--muted); margin-left: 4px; }
 .ps-show img { height: 44px; max-width: 160px; object-fit: contain; background: #fff; border-radius: 8px; padding: 2px 6px; margin-left: auto; }
 .ps-show.none { background: #f3f4f6; color: var(--ink-2); }
+
+/* ── จัดรถ: คนขับที่ติดงาน + ปุ่มดูตารางงานคนขับ (หน้าต่างซ้อน) ── */
+.drv-day .label.dd-head { justify-content: space-between; }
+.drv-day .label.dd-head > span { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.drv-day .dd-head .btn .i { color: inherit; }
+.rm-bar { margin-bottom: 10px; justify-content: space-between; }
+.rm-bar #rmT { font-family: var(--font-display); min-width: 190px; text-align: center; }
+.rm-hl, .roster th.hl { background: var(--navy-50); }
+.rm-hl { display: inline-block; width: 18px; height: 12px; border-radius: 3px; border: 1px solid var(--navy); vertical-align: -1px; }
+.roster th.hl { box-shadow: inset 0 -3px 0 var(--navy); }
+.roster td.hl { background: var(--navy-50); }
+.roster th.today.hl { background: var(--gold); }
+.lt640 .rm-bar #rmT { min-width: 0; }
