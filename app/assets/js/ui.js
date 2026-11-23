@@ -333,7 +333,7 @@ const UI = (() => {
   // ใช้ฟอนต์ไทยของหน้าเว็บได้ครบ ไม่ต้องใช้ไลบรารีสร้าง PDF · ชื่อไฟล์ PDF = title
   // ย่อตัวอักษรของ [data-fit] ให้อยู่บรรทัดเดียว (วัดขนาดจริงนอกจอ ที่ความกว้างเท่าเนื้อที่บนกระดาษ)
   async function fitLines(area, width) {
-    const els = $$('[data-fit]', area); if (!els.length || !width) return;
+    const els = $$('[data-fit]', area), tbls = $$('table[data-fitw]', area); if ((!els.length && !tbls.length) || !width) return;
     area.style.cssText = `display:block;position:fixed;left:-10000px;top:0;width:${width};visibility:hidden`;
     // ฟอนต์เอกสารโหลดเมื่อถูกใช้ครั้งแรก — สั่งโหลดก่อนวัด ไม่งั้นวัดด้วยฟอนต์สำรองแล้วขนาดไม่ตรง
     if (document.fonts && document.fonts.load) { try { await Promise.all([document.fonts.load('16px THSarabunNew', 'ก'), document.fonts.load('bold 16px THSarabunNew', 'ก')]); await document.fonts.ready; } catch (e) { /* ใช้ฟอนต์สำรอง */ } }
@@ -343,6 +343,12 @@ const UI = (() => {
       while (el.scrollWidth > el.clientWidth + 1 && n++ < 60 && fs > fs0 * .62) { fs -= .25; el.style.fontSize = fs + 'px'; }
       // ย่อถึง 70% แล้วยังไม่พอดี (ข้อความยาวมาก) → ใช้ขนาดเดิมแล้วตัดบรรทัดตามปกติ ดีกว่าตัวเล็กจนอ่านไม่ออก
       if (el.scrollWidth > el.clientWidth + 1) { el.style.fontSize = ''; el.style.whiteSpace = 'normal'; el.style.overflow = 'visible'; }
+    });
+    // ตารางที่มีคอลัมน์ไม่ตัดบรรทัด (data-fitw) กว้างเกินกระดาษ → ย่อตัวอักษรทั้งตารางทีละนิด (ไม่ต่ำกว่า 70%) · ยังไม่พอ → ยอมให้ตัดบรรทัด
+    tbls.forEach(t => {
+      const W = t.parentElement.clientWidth, fs0 = parseFloat(getComputedStyle(t).fontSize); let fs = fs0, n = 0;
+      while (t.scrollWidth > W + 1 && n++ < 80 && fs > fs0 * .7) { fs -= .25; t.style.fontSize = fs + 'px'; }
+      if (t.scrollWidth > W + 1) { t.style.fontSize = ''; t.classList.add('fitw-wrap'); }
     });
     area.style.cssText = '';
   }

@@ -163,10 +163,11 @@
     });
   }
 
-  // ───────── กติกาเวลา: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · กลับก่อนเวลาที่ขอ ต้องระบุเหตุผล ─────────
-  const EARLY_MIN = 30;
+  // ───────── กติกาเวลา: ออกเดินทางได้ตั้งแต่ 3 ชั่วโมงก่อนเวลาออก (DEPART_EARLY_MIN) · กลับก่อนเวลาที่ขอ ต้องระบุเหตุผล ─────────
+  const EARLY_MIN = 30;          // กลับก่อนเวลาที่ขอเกิน 30 นาที → ต้องระบุเหตุผล
+  const DEPART_EARLY_MIN = 180;  // กดออกเดินทางได้ก่อนเวลาออก 3 ชั่วโมง
   const LATE_H = 24;
-  const departFrom = r => new Date(new Date(r.startAt).getTime() - EARLY_MIN * 6e4);
+  const departFrom = r => new Date(new Date(r.startAt).getTime() - DEPART_EARLY_MIN * 6e4);
   // ใช้กับทุกคนในหน้างานคนขับ (รวมแอดมิน) · แอดมินบันทึกแทนนอกเวลาได้จากหน้าคำขอในระบบหลังบ้านเท่านั้น (ต้องใส่เหตุผล)
   function departState(r) {
     const from = departFrom(r), now = new Date();
@@ -178,7 +179,7 @@
   const earlyReturn = r => new Date() < new Date(new Date(r.endAt).getTime() - EARLY_MIN * 6e4);
   const departBtn = (r, i, cls = 'btn btn-primary full') => { const st = departState(r); return st.ok
     ? `<button class="${cls}" data-go="ontrip" data-r="${r.id}" data-i="${i}">${icon('navigation')} ออกเดินทาง</button>`
-    : `<button class="${cls} is-wait ${st.late ? 'is-late' : ''}" disabled title="${st.late ? 'เลยกำหนดออกเกิน 24 ชั่วโมง ให้แอดมินบันทึกแทน' : `กดได้ก่อนเวลาออก ${EARLY_MIN} นาที`}">${icon(st.late ? 'alert' : 'clock')} ${st.msg}</button>`; };
+    : `<button class="${cls} is-wait ${st.late ? 'is-late' : ''}" disabled title="${st.late ? 'เลยกำหนดออกเกิน 24 ชั่วโมง ให้แอดมินบันทึกแทน' : `กดได้ก่อนเวลาออก 3 ชั่วโมง`}">${icon(st.late ? 'alert' : 'clock')} ${st.msg}</button>`; };
   Pages._departState = departState;
   // ตรวจสภาพรถก่อนออกเดินทาง (คนขับต้องติ๊กครบ หรือแจ้งปัญหาที่พบ — แอดมินเห็นในหน้าภาพรวม)
   const CHECKS = ['น้ำมันเพียงพอสำหรับการเดินทาง', 'ลมยางและสภาพยางปกติ', 'ไฟหน้า ไฟเลี้ยว ไฟเบรก ใช้งานได้', 'เบรก พวงมาลัย ไม่มีไฟเตือนบนหน้าปัด', 'น้ำมันเครื่อง น้ำหล่อเย็น ระดับปกติ', 'อุปกรณ์ฉุกเฉินและเอกสารประจำรถครบ', 'ห้องโดยสารสะอาด เข็มขัดนิรภัยใช้งานได้'];
@@ -188,7 +189,7 @@
   Pages._tripAction = async (r, idx, status, { override = '' } = {}) => {
     const a = r.assignments[idx], v = S.vehicle(a.vehicleId) || {};
     const admin = S.isAdmin(S.me) && !!override, dep = status === 'ontrip';
-    if (dep && !override && !departState(r).ok) return UI.toast(departState(r).late ? departState(r).msg : `ยังไม่ถึงเวลา — ${departState(r).msg} (ก่อนเวลาออก ${EARLY_MIN} นาที)`, 'error');
+    if (dep && !override && !departState(r).ok) return UI.toast(departState(r).late ? departState(r).msg : `ยังไม่ถึงเวลา — ${departState(r).msg} (กดได้ก่อนเวลาออก 3 ชั่วโมง)`, 'error');
     if (!dep && a.status !== 'ontrip' && !override) return UI.toast(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้', 'error');
     const early = !dep && earlyReturn(r);
     const def = dep ? (a.odoStart ?? lastOdo(a.vehicleId) ?? '') : (a.odoEnd ?? '');

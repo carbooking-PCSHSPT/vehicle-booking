@@ -76,7 +76,8 @@ const Store = (() => {
   let authState = 'loading';      // loading | out | in
   let authError = '';
   const listeners = new Set();
-  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {} }; }
+  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [] }; }
+  const TRASH_DAYS = 30;   // ข้อมูลที่ล้างแล้วอยู่ในถังขยะกี่วันก่อนลบถาวร
   function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
 
   function defaultSettings() {
@@ -479,6 +480,7 @@ const Store = (() => {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
     db = saved && saved.v === 1 ? saved.db : seed();
+    if (!db.trash) db.trash = [];
     if (!db.settings.categories) db.settings.categories = defaultSettings().categories;
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, db })); } catch (e) { console.warn('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม', e); if (typeof UI !== 'undefined') UI.toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม (โหมดทดลอง) ลองลบรูปบางส่วน', 'error'); } };
     save();
@@ -488,7 +490,7 @@ const Store = (() => {
       try { const s = JSON.parse(e.newValue); if (s && s.v === 1) { db = s.db; if (me) me = user(me.email) || me; emit(); } } catch (err) { /* ข้าม */ }
     });
     const sessKey = 'pcs-vehicle-session';
-    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id' };
+    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id', trash: 'id' };
     return {
       async start() {
         // โหมดทดลองเท่านั้น: ?as=อีเมล หรือ ?as=username เพื่อเข้าเป็นบัญชีตัวอย่างทันที (ใช้สาธิต/ทดสอบ)
@@ -520,6 +522,7 @@ const Store = (() => {
         return next;
       },
       async getDoc(col, id) { return col === 'signatures' ? clone((db.signatures || {})[id] || null) : null; },
+      async list(col) { return clone(db[col] || []); },
       async del(col, id) {
         if (col === 'vprivate') delete db.vprivate[id];
         else db[col] = db[col].filter(x => x[cols[col]] !== id);
@@ -577,7 +580,7 @@ const Store = (() => {
     const auth = firebase.auth(), fs = firebase.firestore();
     try { fs.settings({ ignoreUndefinedProperties: true }); } catch (e) { /* ตั้งไว้แล้ว */ }
     fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures' };
+    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures', trash: 'trash' };
     const strip = o => JSON.parse(JSON.stringify(o));
     // แปลงข้อผิดพลาดของ Firestore เป็นข้อความที่ผู้ใช้เข้าใจ (ข้อผิดพลาดจากการตรวจข้อมูลของระบบส่งต่อตามเดิม)
     const friendly = e => {
@@ -728,6 +731,7 @@ const Store = (() => {
         return next;
       },
       async getDoc(col, id) { const s = await guard(fs.collection(colName[col]).doc(id).get()); return s.exists ? s.data() : null; },
+      async list(col) { const s = await guard(fs.collection(colName[col]).get()); return s.docs.map(d => d.data()); },
       async del(col, id) { return guard(fs.collection(colName[col]).doc(id).delete()); },
       async nextId(d) {
         const y = beYear(d || new Date());
@@ -880,8 +884,8 @@ const Store = (() => {
     for (const d of dests) {
       if (!d.name) continue;
       const ex = db.places.find(p => p.name === d.name);
-      const p = ex ? { ...ex, count: (ex.count || 0) + 1, km: d.km || ex.km, mins: d.mins || ex.mins, lat: d.lat ?? ex.lat, lng: d.lng ?? ex.lng, address: d.address || ex.address, province: d.province || ex.province }
-        : { id: uid('p'), name: d.name, address: d.address || '', province: d.province || '', lat: d.lat ?? null, lng: d.lng ?? null, km: d.km || 0, mins: d.mins || 0, count: 1 };
+      const p = ex ? { ...ex, usedAt: nowISO(), count: (ex.count || 0) + 1, km: d.km || ex.km, mins: d.mins || ex.mins, lat: d.lat ?? ex.lat, lng: d.lng ?? ex.lng, address: d.address || ex.address, province: d.province || ex.province }
+        : { id: uid('p'), name: d.name, address: d.address || '', province: d.province || '', lat: d.lat ?? null, lng: d.lng ?? null, km: d.km || 0, mins: d.mins || 0, count: 1, usedAt: nowISO() };
       await A.put('places', p.id, p).catch(e => console.warn('จำสถานที่ไม่สำเร็จ', e));
     }
   }
@@ -1146,12 +1150,12 @@ const Store = (() => {
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
     async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '', paxSign = null } = {}) {
       const when = at ? new Date(at).toISOString() : nowISO();
-      // ทุกคน: ออกเดินทางได้ตั้งแต่ 30 นาทีก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน
+      // ทุกคน: ออกเดินทางได้ตั้งแต่ 3 ชั่วโมงก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน
       // ยกเว้นแอดมินบันทึกแทนจากหน้าหลังบ้าน (override = เหตุผล) หรือการย้อนสถานะ
       const ov = isAdmin(me) && String(override || '').trim();
       if (!ov && status !== 'assigned') {
         const cur = request(id);
-        if (status === 'ontrip' && cur && Date.now() < new Date(cur.startAt).getTime() - 30 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 30 นาที)');
+        if (status === 'ontrip' && cur && Date.now() < new Date(cur.startAt).getTime() - 180 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 3 ชั่วโมงที)');
         if (status === 'ontrip' && cur && Date.now() > new Date(cur.startAt).getTime() + 24 * 36e5) throw new Error('เลยกำหนดออกเดินทางเกิน 24 ชั่วโมง — ให้แอดมินบันทึกแทน');
         if (new Date(when).getTime() > Date.now() + 5 * 6e4) throw new Error('เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน');
       }
@@ -1295,6 +1299,10 @@ const Store = (() => {
       if (!LOCAL) delete x.password;
       // ไม่มีสิทธิ์คนขับ = ไม่ผูกกับคนขับ
       x.driverId = roles.includes('driver') ? (x.driverId || '') : '';
+      // จำข้อมูลโปรไฟล์เดิมตอนเริ่มผูกคนขับ → ถอดการผูกแล้วคืนให้ (เช่น แอดมินลองเป็นคนขับแล้วเปลี่ยนกลับ)
+      const PF = ['name', 'dept', 'phone', 'position'];
+      if (x.driverId && !prev.driverId && !x.profileBefore && prev.email) x.profileBefore = Object.fromEntries(PF.map(k => [k, prev[k] || '']));
+      if (!x.driverId && x.profileBefore) { PF.forEach(k => { x[k] = x.profileBefore[k] || ''; }); delete x.profileBefore; }
       await A.put('users', x.email, x);
       await linkDriver(x.email, x.driverId);
       return x;
@@ -1338,6 +1346,57 @@ const Store = (() => {
     },
     async deletePlace(id) { needAdmin(); await A.del('places', id); },
     // ระบบจริง: นำเข้ารถ 14 คัน + คนขับ 7 คน + สถานที่ยอดนิยม (จากตารางข้อมูลรถของโรงเรียน) เมื่อฐานข้อมูลยังว่าง
+    // โหลดข้อมูลย้อนหลังให้ครบก่อน (ใช้ก่อนล้างข้อมูลตามช่วงวันที่)
+    async ensureHistory() { if (!A) return; if (A.histState() === 'none') await A.loadHistory(); for (let i = 0; i < 150 && A.histState() === 'loading'; i++) await new Promise(r => setTimeout(r, 200)); },
+    // ═══ ล้างข้อมูล (เฉพาะผู้ดูแลระบบสูงสุด) → ย้ายไปถังขยะ เก็บ 30 วัน กู้คืนได้ แล้วจึงลบถาวร ═══
+    TRASH_DAYS,
+    // หาเอกสารที่จะล้างตามตัวกรอง: kinds = ['requests','ratings','places','users'] · from/to = 'YYYY-MM-DD' · status[] · category · vehicleId
+    purgeMatch(o = {}) {
+      const inR = d => { if (!d) return !o.from && !o.to; const x = String(d).slice(0, 10); return (!o.from || x >= o.from) && (!o.to || x <= o.to); };
+      const K = new Set(o.kinds || []), out = { requests: [], ratings: [], places: [], users: [] };
+      if (K.has('requests')) out.requests = db.requests.filter(r => inR(r.startAt) && (!(o.status || []).length || o.status.includes(r.status)) && (!o.category || (r.category || '') === o.category) && (!o.vehicleId || (r.assignments || []).some(a => a.vehicleId === o.vehicleId)) && !blocking(r));
+      if (K.has('ratings')) out.ratings = db.ratings.filter(x => inR(x.at) && (!o.vehicleId || x.vehicleId === o.vehicleId));
+      if (K.has('places')) out.places = db.places.filter(p => (!o.from && !o.to) || inR(p.usedAt));
+      if (K.has('users')) out.users = db.users.filter(u => u.active === false && u.email !== me.email && !has(u, 'superadmin'));
+      return out;
+    },
+    async purgeData(match, note = '') {
+      if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
+      const batch = uid('tb'), at = nowISO(), expireAt = new Date(Date.now() + TRASH_DAYS * 864e5).toISOString();
+      const label = (kind, x) => kind === 'requests' ? `${x.id} · ${destName(x)} · ${(x.requester || {}).name || ''}` : kind === 'ratings' ? `ประเมิน ${(driver(x.driverId) || {}).name || ''} · ${String(x.at || '').slice(0, 10)}` : kind === 'places' ? x.name : `${x.name || ''} (${x.email})`;
+      const jobs = [];
+      for (const kind of ['requests', 'ratings', 'places', 'users']) for (const x of match[kind] || []) jobs.push({ kind, x });
+      let n = 0;
+      for (let i = 0; i < jobs.length; i += 20) {
+        await Promise.all(jobs.slice(i, i + 20).map(async ({ kind, x }) => {
+          const docId = kind === 'users' ? x.email : x.id, id = uid('t');
+          await A.put('trash', id, { id, batch, kind, docId, label: label(kind, x), data: x, at, by: me.email, byName: me.name || me.email, note, expireAt });
+          await A.del(kind, docId);
+          if (kind === 'users') await linkDriver(x.email, '').catch(() => {});
+          n++;
+        }));
+      }
+      return { n, batch };
+    },
+    // อ่านถังขยะ (ลบรายการที่ครบ 30 วันทิ้งถาวรไปพร้อมกัน)
+    async trashList() {
+      if (!isSuper(me)) return [];
+      const all = await A.list('trash'), now = nowISO(), keep = [];
+      for (const t of all) { if (t.expireAt && t.expireAt < now) await A.del('trash', t.id).catch(() => {}); else keep.push(t); }
+      return keep.sort((a, b) => b.at.localeCompare(a.at));
+    },
+    async restoreTrash(items) {
+      if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
+      for (const t of items) {
+        await A.put(t.kind, t.docId, t.data);
+        await A.del('trash', t.id);
+        if (t.kind === 'users' && t.data.driverId) await linkDriver(t.data.email, t.data.driverId).catch(() => {});
+      }
+    },
+    async deleteTrash(items) {
+      if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
+      for (let i = 0; i < items.length; i += 20) await Promise.all(items.slice(i, i + 20).map(t => A.del('trash', t.id)));
+    },
     async importDefaults() {
       if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
       const s = seed();

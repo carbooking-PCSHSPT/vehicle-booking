@@ -907,12 +907,12 @@
                 <div class="field full"><label>ชื่อ-นามสกุล</label><input name="name" value="${esc(u.name || '')}"></div>
                 <div class="field"><label>ฝ่าย</label><input name="dept" value="${esc(u.dept || '')}"></div><div class="field"><label>เบอร์โทร</label><input name="phone" value="${esc(u.phone || '')}"></div>
                 <div class="field full"><label>สิทธิ์</label><div class="checks">${Object.keys(S.ROLES).map(r => `<label class="check"><input type="checkbox" name="roles" data-multi value="${r}" ${(u.roles || []).includes(r) ? 'checked' : ''} ${(r === 'admin' || r === 'superadmin') && !sup ? 'disabled' : ''}>${S.ROLES[r]}</label>`).join('')}</div></div>
-                <div class="field full"><label>ผูกกับพนักงานขับรถ (ถ้าเป็นคนขับ)</label><select name="driverId" id="uDrv"><option value="">— ไม่ผูก —</option>${S.db.drivers.map(d => { const cur = (S.driverOfUser({ ...u, roles: ['driver'] }) || {}).id === d.id, other = d.email && d.email !== u.email ? S.user(d.email) : null; return `<option value="${d.id}" ${cur ? 'selected' : ''}>${esc(d.name)}${other ? ` (ผูกกับบัญชี ${esc(S.usernameOf(other.email) || other.name || other.email)} อยู่ — จะย้ายมาบัญชีนี้)` : ''}</option>`; }).join('')}</select><span class="hint">เลือกคนขับแล้ว ระบบเติมชื่อ/เบอร์โทรตามคนขับให้ · เอาสิทธิ์คนขับออก = ยกเลิกการผูกอัตโนมัติ</span></div>
+                <div class="field full"><label>ผูกกับพนักงานขับรถ (ถ้าเป็นคนขับ)</label><select name="driverId" id="uDrv"><option value="">— ไม่ผูก —</option>${S.db.drivers.map(d => { const cur = (S.driverOfUser({ ...u, roles: ['driver'] }) || {}).id === d.id, other = d.email && d.email !== u.email ? S.user(d.email) : null; return `<option value="${d.id}" ${cur ? 'selected' : ''}>${esc(d.name)}${other ? ` (ผูกกับบัญชี ${esc(S.usernameOf(other.email) || other.name || other.email)} อยู่ — จะย้ายมาบัญชีนี้)` : ''}</option>`; }).join('')}</select><span class="hint">${S.isUsernameEmail(u.email) ? 'เลือกคนขับแล้ว ระบบเติมชื่อ/เบอร์โทรตามคนขับให้ · ' : 'บัญชี Google ใช้ชื่อ/ฝ่าย/เบอร์ของเจ้าของบัญชีเหมือนเดิม · '}เอาสิทธิ์คนขับออก = ยกเลิกการผูก และคืนข้อมูลเดิม</span></div>
                 <div class="field full"><label class="check" style="width:max-content"><input type="checkbox" name="active" ${u.active !== false ? 'checked' : ''}> เปิดใช้งานบัญชี</label></div></form>`,
               onOpen: el => {
                 const sel = el.querySelector('#uDrv'), rd = el.querySelector('input[name=roles][value=driver]'), F = n => el.querySelector(`#uF [name=${n}]`);
-                // เลือกคนขับคนใหม่ → ชื่อ/เบอร์/สิทธิ์ตามคนขับคนนั้น (ไม่ค้างข้อมูลคนเดิม)
-                sel.addEventListener('change', () => { const d = S.driver(sel.value); if (!d) return; F('name').value = d.name || ''; if (d.phone) F('phone').value = d.phone; F('dept').value = F('dept').value || 'งานยานพาหนะ'; if (rd) rd.checked = true; });
+                // เลือกคนขับ → ติ๊กสิทธิ์คนขับให้ · เติมชื่อ/เบอร์ตามคนขับเฉพาะบัญชีชื่อผู้ใช้ (บัญชี Google ของครูใช้ข้อมูลของตัวเองเสมอ)
+                sel.addEventListener('change', () => { const d = S.driver(sel.value); if (!d) return; if (rd) rd.checked = true; if (!S.isUsernameEmail(u.email)) return; F('name').value = d.name || ''; if (d.phone) F('phone').value = d.phone; F('dept').value = F('dept').value || 'งานยานพาหนะ'; });
                 if (rd) rd.addEventListener('change', () => { if (!rd.checked) sel.value = ''; });
               },
               actions: [{ label: 'ลบผู้ใช้', kind: 'btn-danger', onClick: async () => { if (!(await UI.confirm('ลบผู้ใช้นี้ออกจากระบบ?', { danger: true, ok: 'ลบ' }))) return false; await S.removeUser(u.email); return 'del'; } }, { label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: async el => { const f = UI.formData(el.querySelector('#uF')); const roles = sup ? f.roles : [...new Set([...(f.roles || []).filter(r => r !== 'admin' && r !== 'superadmin'), ...(u.roles || []).filter(r => r === 'admin' || r === 'superadmin')])]; await S.saveUser({ ...u, name: f.name, dept: f.dept, phone: f.phone, roles, active: f.active, driverId: f.driverId }); return true; } }] });
@@ -922,6 +922,82 @@
       }
     };
   };
+
+  // ═════════ ล้างข้อมูล + ถังขยะ (ตั้งค่า · เฉพาะผู้ดูแลระบบสูงสุด) ═════════
+  const PURGE_KINDS = [['requests', 'คำขอใช้รถ + ค่าใช้จ่าย', 'clipboard'], ['ratings', 'ผลประเมินคนขับ', 'star'], ['places', 'สถานที่ที่เคยไป', 'pin'], ['users', 'ผู้ใช้ที่ปิดใช้งาน', 'users']];
+  const PURGE_ST = ['pending', 'revise', 'returned', 'closed', 'rejected', 'cancelled'];
+  function purgeHTML() {
+    return `<div class="card pg-card" id="purge" style="margin-top:18px"><div class="card-head"><h3>${icon('trash')} ล้างข้อมูล</h3><span class="hint">เฉพาะผู้ดูแลระบบสูงสุด · ย้ายไปถังขยะ ${S.TRASH_DAYS} วัน กู้คืนได้</span></div>
+      <form id="pgF" class="stack" style="gap:14px">
+        <div class="field"><label>ข้อมูลที่จะล้าง</label><div class="checks">${PURGE_KINDS.map(([k, l, ic]) => `<label class="check"><input type="checkbox" name="kinds" data-multi value="${k}" ${k === 'requests' ? 'checked' : ''}>${icon(ic)} ${l}</label>`).join('')}</div>
+          <button type="button" class="btn btn-ghost btn-xs" id="pgAll" style="margin-top:8px;width:max-content">${icon('list')} เลือกทั้งหมด (ล้างทั้งระบบ)</button></div>
+        <details class="pg-more" open><summary>${icon('search')} กรองแบบละเอียด <span class="hint">(ไม่กรอก = ทั้งหมด)</span></summary>
+          <div class="grid2" style="margin-top:12px">
+            <div class="field"><label>วันที่เดินทาง / วันที่ประเมิน / ใช้ล่าสุด — ตั้งแต่</label><input type="date" name="from"></div>
+            <div class="field"><label>ถึง</label><input type="date" name="to"></div>
+            <div class="field full"><label>สถานะคำขอ</label><div class="checks">${PURGE_ST.map(k => `<label class="check"><input type="checkbox" name="status" data-multi value="${k}">${esc(S.STATUS[k].label)}</label>`).join('')}</div>
+              <span class="hint">คำขอที่อนุมัติแล้วหรือกำลังเดินทาง จะไม่ถูกล้าง (กันลบงานที่ยังไม่จบ)</span></div>
+            <div class="field"><label>หมวดงาน</label><select name="category"><option value="">ทุกหมวด</option>${S.categories(true).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}<option value="other">อื่น ๆ</option></select></div>
+            <div class="field"><label>รถ</label><select name="vehicleId"><option value="">ทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select></div>
+          </div></details>
+        <div class="row" style="gap:10px;flex-wrap:wrap"><button type="button" class="btn btn-ghost" id="pgChk">${icon('search')} ตรวจจำนวนก่อนล้าง</button><button type="button" class="btn btn-danger" id="pgGo">${icon('trash')} ล้างข้อมูล</button></div>
+        <div id="pgRes"></div>
+      </form>
+      <div class="divider"></div>
+      <div class="card-head" style="padding:0;margin-bottom:10px"><h3>${icon('undo')} ถังขยะ</h3><span class="hint">ครบ ${S.TRASH_DAYS} วันระบบลบถาวรอัตโนมัติ</span></div>
+      <div id="pgTrash"><p class="hint">กำลังโหลด…</p></div></div>`;
+  }
+  function bindPurge(root) {
+    const box = $('#purge', root); if (!box) return;
+    const opts = () => { const f = UI.formData($('#pgF', box)); return { kinds: f.kinds || [], from: f.from, to: f.to, status: f.status || [], category: f.category, vehicleId: f.vehicleId }; };
+    const L = Object.fromEntries(PURGE_KINDS.map(([k, l]) => [k, l]));
+    const count = async () => {
+      const o = opts(); if (!o.kinds.length) { UI.toast('เลือกข้อมูลที่จะล้างอย่างน้อย 1 อย่าง', 'error'); return null; }
+      $('#pgRes', box).innerHTML = `<p class="hint">${icon('clock')} กำลังโหลดข้อมูลย้อนหลังให้ครบ…</p>`;
+      await S.ensureHistory();
+      const m = S.purgeMatch(o), n = Object.values(m).reduce((s, a) => s + a.length, 0);
+      $('#pgRes', box).innerHTML = `<div class="note-box ${n ? 'warn-y' : ''}">${icon(n ? 'alert' : 'info')}<div>${n ? `พบ <b>${n}</b> รายการ: ${o.kinds.map(k => `${L[k]} <b>${m[k].length}</b>`).join(' · ')}` : 'ไม่พบข้อมูลตามเงื่อนไขนี้'}</div></div>`;
+      return { m, n, o };
+    };
+    const drawTrash = async () => {
+      const el = $('#pgTrash', box);
+      let list = []; try { list = await S.trashList(); } catch (e) { el.innerHTML = `<p class="hint">โหลดถังขยะไม่สำเร็จ: ${esc(e.message)}</p>`; return; }
+      const groups = [...list.reduce((mp, t) => mp.set(t.batch, [...(mp.get(t.batch) || []), t]), new Map()).values()];
+      box._trash = groups;
+      el.innerHTML = groups.length ? `<div class="stack">${groups.map((g, i) => { const t = g[0], left = Math.max(0, Math.ceil((new Date(t.expireAt) - Date.now()) / 864e5)); const by = PURGE_KINDS.map(([k, l]) => [l, g.filter(x => x.kind === k).length]).filter(x => x[1]);
+          return `<div class="pg-batch"><div class="pg-bi">${icon('trash')}</div><div style="min-width:0;flex:1"><b>ล้างเมื่อ ${fmt.dt(t.at)}</b><small>โดย ${esc(t.byName || t.by)} · ${by.map(([l, n]) => `${l} ${n}`).join(' · ')}</small>
+            <details><summary class="hint">ดูรายการ (${g.length})</summary><ul class="pg-items">${g.slice(0, 200).map(x => `<li>${esc(x.label || x.docId)}</li>`).join('')}${g.length > 200 ? `<li>… อีก ${g.length - 200} รายการ</li>` : ''}</ul></details></div>
+            <span class="pill ${left <= 3 ? 'tone-bad' : 'tone-warn'}">ลบถาวรใน ${left} วัน</span>
+            <div class="row" style="gap:6px"><button type="button" class="btn btn-ghost btn-xs" data-rest="${i}">${icon('undo')} กู้คืน</button><button type="button" class="btn btn-ghost btn-xs pg-del" data-tdel="${i}">${icon('x')} ลบถาวร</button></div></div>`; }).join('')}</div>`
+        : `<p class="hint">ถังขยะว่าง</p>`;
+    };
+    drawTrash();
+    box.addEventListener('click', async e => {
+      if (e.target.closest('#pgAll')) { $$('input[name=kinds]', box).forEach(c => { c.checked = true; }); ['from', 'to', 'category', 'vehicleId'].forEach(n => { $(`[name=${n}]`, box).value = ''; }); $$('input[name=status]', box).forEach(c => { c.checked = false; }); UI.toast('เลือกทุกประเภท และล้างตัวกรองแล้ว — กดตรวจจำนวนก่อนล้าง'); return; }
+      if (e.target.closest('#pgChk')) { const b = e.target.closest('#pgChk'); b.disabled = true; try { await count(); } finally { b.disabled = false; } return; }
+      if (e.target.closest('#pgGo')) {
+        const b = e.target.closest('#pgGo'); b.disabled = true;
+        try {
+          const c = await count(); if (!c || !c.n) return;
+          const res = await UI.confirm(`ล้างข้อมูล <b>${c.n}</b> รายการ ออกจากฐานข้อมูล<br>${c.o.kinds.map(k => `• ${L[k]} ${c.m[k].length} รายการ`).join('<br>')}<br><br>ข้อมูลจะอยู่ในถังขยะ ${S.TRASH_DAYS} วัน กู้คืนได้ จากนั้นจะถูกลบถาวร<br>พิมพ์คำว่า <b>ลบ</b> เพื่อยืนยัน`, { title: 'ยืนยันการล้างข้อมูล', danger: true, ok: 'ล้างข้อมูล', input: { label: 'พิมพ์ ลบ', required: true } });
+          if (!res) return;
+          if (res.value !== 'ลบ') { UI.toast('พิมพ์คำว่า “ลบ” ไม่ถูกต้อง — ยกเลิกการล้างข้อมูล', 'error'); return; }
+          UI.toast('กำลังล้างข้อมูล…', 'info');
+          const r = await S.purgeData(c.m);
+          UI.toast(`ล้างข้อมูลแล้ว ${r.n} รายการ (กู้คืนได้ใน ${S.TRASH_DAYS} วัน)`);
+          $('#pgRes', box).innerHTML = ''; await drawTrash();
+        } catch (err) { UI.toast(err.message, 'error'); } finally { b.disabled = false; }
+        return;
+      }
+      const rs = e.target.closest('[data-rest]'), td = e.target.closest('[data-tdel]');
+      if (rs || td) {
+        const g = (box._trash || [])[+(rs || td).dataset[rs ? 'rest' : 'tdel']]; if (!g) return;
+        if (rs && !(await UI.confirm(`กู้คืนข้อมูล <b>${g.length}</b> รายการกลับเข้าระบบ?`, { title: 'กู้คืนข้อมูล', ok: 'กู้คืน' }))) return;
+        if (td && !(await UI.confirm(`ลบถาวร <b>${g.length}</b> รายการ — กู้คืนไม่ได้อีก`, { title: 'ลบถาวร', danger: true, ok: 'ลบถาวร' }))) return;
+        try { if (rs) await S.restoreTrash(g); else await S.deleteTrash(g); UI.toast(rs ? 'กู้คืนแล้ว' : 'ลบถาวรแล้ว'); await drawTrash(); } catch (err) { UI.toast(err.message, 'error'); }
+      }
+    });
+  }
 
   // ═════════ ช่วงเวลา (ใช้ในค่าใช้จ่าย/สถิติ) ═════════
   function periodOf(query) {
@@ -952,29 +1028,55 @@
 
   // ═════════ พิมพ์รายงานค่าใช้จ่าย (A4 · บันทึกเป็น PDF ได้) ═════════
   const PSIGN = 'vb-print-sign';
-  async function printExpenses(rows, per, filters) {
+  // คอลัมน์ตารางรายละเอียด (เลือกได้) · nw = ไม่ตัดบรรทัด (กว้างเท่าข้อความ) · ที่เหลือตัดบรรทัดได้
+  const EXP_COLS = [
+    { k: 'no', l: 'ที่', nw: 1, c: 1 }, { k: 'date', l: 'วันที่', nw: 1 }, { k: 'veh', l: 'รถ', nw: 1 }, { k: 'plate', l: 'ทะเบียน', nw: 1 },
+    { k: 'req', l: 'เลขที่คำขอ', nw: 1 }, { k: 'dest', l: 'ปลายทาง' }, { k: 'type', l: 'ประเภท', nw: 1 }, { k: 'detail', l: 'รายละเอียด' },
+    { k: 'pay', l: 'ชำระโดย', nw: 1 }, { k: 'amt', l: 'จำนวนเงิน (บาท)', nw: 1, r: 1, fixed: 1 }];
+  const EXP_FS = { s: 'เล็ก', m: 'กลาง', l: 'ใหญ่' };
+  async function printExpenses(rows, per, filters, { dl = false } = {}) {
     let saved = {}; try { saved = JSON.parse(localStorage.getItem(PSIGN) || '{}'); } catch (e) { /* ใช้ค่าเริ่มต้น */ }
+    const colOn = saved.cols || EXP_COLS.map(c => c.k), fs0 = saved.fs || 'm';
     const sg = saved.sign || [{ n: S.me.name || '', p: 'เจ้าหน้าที่งานยานพาหนะ', r: 'ผู้จัดทำ' }, { n: '', p: 'หัวหน้างานยานพาหนะ', r: 'ผู้ตรวจสอบ' }, { n: '', p: 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป', r: 'ผู้รับรอง' }];
     const hasPhotos = rows.some(x => (x.e.photos || []).length);
     const opt = await UI.modal({
-      title: `${icon('printer')} พิมพ์รายงาน / บันทึก PDF`, size: 'lg',
+      title: `${icon(dl ? 'download' : 'printer')} ${dl ? 'ดาวน์โหลด PDF' : 'พิมพ์รายงาน'} — ค่าใช้จ่ายยานพาหนะ`, size: 'lg',
       body: `<form id="po" class="stack" style="gap:14px">
-        <div class="note-box navy">${icon('info')}<div>ระบบจะเปิดหน้าต่างพิมพ์ของเบราว์เซอร์ — ถ้าต้องการไฟล์ ให้เลือกเครื่องพิมพ์เป็น <b>"บันทึกเป็น PDF" (Save as PDF)</b></div></div>
+        <div class="note-box navy">${icon('info')}<div><b>ดาวน์โหลด PDF</b> = ได้ไฟล์ลงเครื่องทันที · <b>พิมพ์</b> = เปิดหน้าต่างพิมพ์ของเบราว์เซอร์ (เลือก "บันทึกเป็น PDF" ได้ และมีเลขหน้า)</div></div>
         <div class="grid2">
+          <div class="field"><label>ขนาดตัวอักษร</label><div class="row" style="gap:16px">${Object.entries(EXP_FS).map(([k, l]) => `<label class="check"><input type="radio" name="fs" value="${k}" ${fs0 === k ? 'checked' : ''}> ${l}</label>`).join('')}</div><span class="hint">ข้อความยาว (ปลายทาง รายละเอียด) ตัดขึ้นบรรทัดใหม่ · วันที่ ทะเบียน ยอดเงิน ไม่ตกบรรทัด</span></div>
           <div class="field"><label>แนวกระดาษ</label><div class="row" style="gap:16px"><label class="check"><input type="radio" name="o" value="p" ${saved.o !== 'l' ? 'checked' : ''}> แนวตั้ง</label><label class="check"><input type="radio" name="o" value="l" ${saved.o === 'l' ? 'checked' : ''}> แนวนอน</label></div></div>
           <div class="field"><label>ส่วนที่พิมพ์</label><div class="stack" style="gap:6px">
             <label class="check"><input type="checkbox" name="byV" ${saved.byV !== false ? 'checked' : ''}> สรุปแยกตามรถแต่ละคัน</label>
             <label class="check"><input type="checkbox" name="sign" ${saved.signOn !== false ? 'checked' : ''}> ช่องลงนาม</label>
             <label class="check"><input type="checkbox" name="pics" ${hasPhotos ? '' : 'disabled'}> แนบรูปใบเสร็จท้ายรายงาน${hasPhotos ? '' : ' (ไม่มีรูป)'}</label></div></div>
+          <div class="field full"><label>คอลัมน์ในตารางรายละเอียด</label><div class="checks">${EXP_COLS.map(c => `<label class="check"><input type="checkbox" name="cols" data-multi value="${c.k}" ${c.fixed || colOn.includes(c.k) ? 'checked' : ''} ${c.fixed ? 'disabled' : ''}>${c.l}</label>`).join('')}</div></div>
         </div>
         <div class="field"><label>ผู้ลงนาม <span class="hint" style="font-weight:400">(ระบบจำไว้ใช้ครั้งต่อไป · เว้นชื่อว่างได้ เพื่อเขียนด้วยมือ)</span></label>
           <div class="stack" style="gap:8px">${sg.map((x, i) => `<div class="grid3" style="gap:8px"><input class="input" name="r${i}" value="${esc(x.r)}" placeholder="บทบาท"><input class="input" name="n${i}" value="${esc(x.n)}" placeholder="ชื่อ-นามสกุล"><input class="input" name="p${i}" value="${esc(x.p)}" placeholder="ตำแหน่ง"></div>`).join('')}</div></div>
       </form>`,
-      actions: [{ label: 'ยกเลิก', value: null }, { label: 'พิมพ์ / PDF', kind: 'btn-primary', icon: 'printer', onClick: el => UI.formData($('#po', el)) }]
+      actions: [{ label: 'ยกเลิก', value: null },
+        { label: 'พิมพ์', kind: dl ? 'btn-ghost' : 'btn-primary', icon: 'printer', onClick: el => ({ ...UI.formData($('#po', el)), mode: 'print' }) },
+        { label: 'ดาวน์โหลด PDF', kind: dl ? 'btn-primary' : 'btn-ghost', icon: 'download', onClick: el => ({ ...UI.formData($('#po', el)), mode: 'pdf' }) }]
     });
     if (!opt) return;
     const sign = [0, 1, 2].map(i => ({ r: opt['r' + i].trim(), n: opt['n' + i].trim(), p: opt['p' + i].trim() }));
-    try { localStorage.setItem(PSIGN, JSON.stringify({ o: opt.o, byV: opt.byV, signOn: opt.sign, sign })); } catch (e) { /* ไม่บันทึกก็ได้ */ }
+    const cols = EXP_COLS.filter(c => c.fixed || (opt.cols || []).includes(c.k)), fsz = EXP_FS[opt.fs] ? opt.fs : 'm';
+    try { localStorage.setItem(PSIGN, JSON.stringify({ o: opt.o, byV: opt.byV, signOn: opt.sign, sign, cols: cols.map(c => c.k), fs: fsz })); } catch (e) { /* ไม่บันทึกก็ได้ */ }
+    const cell = (k, r, e, i) => ({
+      no: i + 1, date: fmt.date(e.date), veh: esc(C.vName(e.vehicleId)), plate: esc(C.vPlate(e.vehicleId) || '-'), req: r.id, dest: esc(S.destName(r)), type: S.EXPENSE[e.type],
+      detail: [e.station && esc(e.station), e.liters && `<span class="nb">${fmt.num(e.liters, 2)} ลิตร × ${fmt.num(e.pricePerL, 2)} บาท</span>`, e.odo && `<span class="nb">เลขไมล์ ${fmt.num(e.odo)}</span>`, e.note && esc(e.note)].filter(Boolean).join(' · ') || '-',
+      pay: esc(S.PAY[e.pay] || '-'), amt: (+e.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })[k];
+    // รวมคอลัมน์ที่เกี่ยวกันเป็นช่องเดียว 2 บรรทัด (รถ/ทะเบียน · เลขที่คำขอ/ปลายทาง · ประเภท/รายละเอียด) → ตารางแคบลง ไม่ต้องตกบรรทัดทุกช่อง
+    const GROUPS = [['no'], ['date'], ['veh', 'plate'], ['req', 'dest'], ['type', 'detail'], ['pay'], ['amt']];
+    const on = new Set(cols.map(c => c.k)), CK = Object.fromEntries(EXP_COLS.map(c => [c.k, c]));
+    const gcols = GROUPS.map(g => g.filter(k => on.has(k))).filter(g => g.length).map(g => {
+      const main = CK[g[0]];
+      // บรรทัดแรกไม่ตัด · บรรทัดรอง (ปลายทาง/รายละเอียด) ตัดบรรทัดได้ → ช่องที่มีบรรทัดรองยาวให้ยืดได้
+      const wraps = g.some(k => !CK[k].nw);
+      return { keys: g, l: g.map(k => CK[k].l).join(' / '), cls: [wraps ? 'wr' : 'nw', main.r ? 'r' : '', main.c ? 'c' : ''].filter(Boolean).join(' ') };
+    });
+    const gcell = (g, r, e, i) => { const [a, b] = g.keys; const va = cell(a, r, e, i); return b ? (CK[a].nw ? `<span class="nw1">${va}</span>` : va) + `<small>${cell(b, r, e, i)}</small>` : va; };
 
     const st = S.db.settings, m2 = n => (+n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const total = rows.reduce((s, x) => s + x.e.amount, 0);
@@ -987,7 +1089,7 @@
     const vids = [...new Set(rows.map(x => x.e.vehicleId))];
     const byVeh = vids.map(id => { const rs = rows.filter(x => x.e.vehicleId === id), sum = k => rs.filter(x => x.e.type === k).reduce((s, x) => s + x.e.amount, 0); return { id, n: rs.length, lit: rs.reduce((s, x) => s + (+x.e.liters || 0), 0), fuel: sum('fuel'), toll: sum('toll'), oth: sum('parking') + sum('other'), amt: rs.reduce((s, x) => s + x.e.amount, 0) }; }).sort((a, b) => b.amt - a.amt);
     const pics = opt.pics ? asc.flatMap(({ r, e }) => (e.photos || []).filter(p => !UI.isPdf(p)).map(p => ({ p, r, e }))) : [];
-    const html = `
+    const html = `<div class="pd-fs pd-fs-${fsz}">
       <header class="pd-head"><img src="images/logo.png" alt=""><div><b>${esc(st.schoolName || '')}</b><span>${esc(st.division || '')} · ${esc(st.unit || 'งานยานพาหนะ')}</span></div></header>
       <h1 class="pd-title">รายงานค่าน้ำมันและค่าใช้จ่ายยานพาหนะ</h1>
       <p class="pd-sub">${esc(per.k === 'custom' ? 'ช่วงวันที่กำหนดเอง' : per.label)} · ตั้งแต่ ${fmt.dateLong(from)} ถึง ${fmt.dateLong(to)}${filters.length ? `<br>เงื่อนไข: ${esc(filters.join(' · '))}` : ''}</p>
@@ -997,18 +1099,19 @@
         <tfoot><tr><td>รวมทั้งสิ้น</td><td class="r">${rows.length}</td><td class="r">${fmt.num(byType.reduce((s, x) => s + x.lit, 0), 2)}</td><td class="r">${m2(total)}</td></tr></tfoot></table>
       <p class="pd-words">(${UI.bahtText(total)})</p>
       ${opt.byV ? `<h2>2. สรุปแยกตามรถ</h2>
-      <table class="pd-tbl"><thead><tr><th>รถ</th><th>ทะเบียน</th><th class="r">รายการ</th><th class="r">ลิตร</th><th class="r">ค่าน้ำมัน</th><th class="r">ทางด่วน</th><th class="r">อื่น ๆ</th><th class="r">รวม (บาท)</th></tr></thead>
-        <tbody>${byVeh.map(x => `<tr><td>${esc(C.vName(x.id))}</td><td>${esc(C.vPlate(x.id) || '')}</td><td class="r">${x.n}</td><td class="r">${x.lit ? fmt.num(x.lit, 2) : '-'}</td><td class="r">${m2(x.fuel)}</td><td class="r">${m2(x.toll)}</td><td class="r">${m2(x.oth)}</td><td class="r">${m2(x.amt)}</td></tr>`).join('')}</tbody></table>` : ''}
+      <table class="pd-tbl" data-fitw><thead><tr><th class="nw">รถ</th><th class="nw">ทะเบียน</th><th class="r">รายการ</th><th class="r">ลิตร</th><th class="r">ค่าน้ำมัน</th><th class="r">ทางด่วน</th><th class="r">อื่น ๆ</th><th class="r">รวม (บาท)</th></tr></thead>
+        <tbody>${byVeh.map(x => `<tr><td class="nw">${esc(C.vName(x.id))}</td><td class="nw">${esc(C.vPlate(x.id) || '')}</td><td class="r">${x.n}</td><td class="r">${x.lit ? fmt.num(x.lit, 2) : '-'}</td><td class="r">${m2(x.fuel)}</td><td class="r">${m2(x.toll)}</td><td class="r">${m2(x.oth)}</td><td class="r">${m2(x.amt)}</td></tr>`).join('')}</tbody></table>` : ''}
       <h2>${opt.byV ? 3 : 2}. รายละเอียดรายการ</h2>
-      <table class="pd-tbl pd-list"><colgroup><col style="width:5%"><col style="width:10%"><col style="width:15%"><col style="width:22%"><col style="width:28%"><col style="width:9%"><col style="width:11%"></colgroup><thead><tr><th class="c">ที่</th><th>วันที่</th><th>รถ</th><th>เลขที่คำขอ / ปลายทาง</th><th>ประเภท / รายละเอียด</th><th>ชำระโดย</th><th class="r">จำนวนเงิน</th></tr></thead>
-        <tbody>${asc.map(({ r, e }, i) => `<tr><td class="c">${i + 1}</td><td class="nw">${fmt.date(e.date)}</td><td><span class="one" data-fit>${esc(C.vName(e.vehicleId))}</span><small class="one" data-fit>${esc(C.vPlate(e.vehicleId) || '')}</small></td><td>${r.id}<small>${esc(S.destName(r))}</small></td><td>${S.EXPENSE[e.type]}${e.station ? ` · ${esc(e.station)}` : ''}<small>${e.liters ? `${fmt.num(e.liters, 2)} ลิตร × ${fmt.num(e.pricePerL, 2)} บาท` : ''}${e.odo ? `${e.liters ? ' · ' : ''}เลขไมล์ ${fmt.num(e.odo)}` : ''}</small></td><td>${esc(S.PAY[e.pay] || '-')}</td><td class="r">${m2(e.amount)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td colspan="6">รวมทั้งสิ้น ${rows.length} รายการ</td><td class="r">${m2(total)}</td></tr></tfoot></table>
+      <table class="pd-tbl pd-exp" data-fitw><thead><tr>${gcols.map(g => `<th class="${g.cls}">${g.l}</th>`).join('')}</tr></thead>
+        <tbody>${asc.map(({ r, e }, i) => `<tr>${gcols.map(g => `<td class="${g.cls}">${gcell(g, r, e, i)}</td>`).join('')}</tr>`).join('')}</tbody>
+        <tfoot><tr>${gcols.length > 1 ? `<td colspan="${gcols.length - 1}">รวมทั้งสิ้น ${rows.length} รายการ</td>` : ''}<td class="r nw">${m2(total)}</td></tr></tfoot></table>
       <p class="pd-words">จำนวนเงินรวม ${m2(total)} บาท (${UI.bahtText(total)})</p>
       ${opt.sign ? `<div class="pd-sign">${sign.map(x => `<div>${x.r ? `<p class="pd-role">${esc(x.r)}</p>` : ''}<p class="pd-line">ลงชื่อ ....................................</p><p>(${x.n ? esc(x.n) : '....................................'})</p><p>${x.p ? `ตำแหน่ง ${esc(x.p)}` : 'ตำแหน่ง ..............................'}</p><p>วันที่ ....... / ....... / .......</p></div>`).join('')}</div>` : ''}
       <p class="pd-foot">พิมพ์จากระบบยานพาหนะ เมื่อ ${fmt.dt(new Date().toISOString())} โดย ${esc(S.me.name || S.me.email)}</p>
-      ${pics.length ? `<section class="pd-pics"><h2>ภาคผนวก: รูปใบเสร็จ (${pics.length} รูป)</h2><div class="pd-grid">${pics.map(({ p, r, e }) => `<figure>${UI.img(p, 'ใบเสร็จ')}<figcaption>${fmt.date(e.date)} · ${esc(C.vName(e.vehicleId))} · ${S.EXPENSE[e.type]} ${m2(e.amount)} บาท · ${r.id}</figcaption></figure>`).join('')}</div></section>` : ''}`;
+      ${pics.length ? `<section class="pd-pics"><h2>ภาคผนวก: รูปใบเสร็จ (${pics.length} รูป)</h2><div class="pd-grid">${pics.map(({ p, r, e }) => `<figure>${UI.img(p, 'ใบเสร็จ')}<figcaption>${fmt.date(e.date)} · ${esc(C.vName(e.vehicleId))} · ${S.EXPENSE[e.type]} ${m2(e.amount)} บาท · ${r.id}</figcaption></figure>`).join('')}</div></section>` : ''}</div>`;
     const nm = `รายงานค่าใช้จ่ายยานพาหนะ ${fmt.localDate(from)} ถึง ${fmt.localDate(to)}`;
-    UI.printDoc(html, { title: nm, landscape: opt.o === 'l', fitWidth: opt.o === 'l' ? '273mm' : '186mm' });
+    const po = { title: nm, landscape: opt.o === 'l', fitWidth: opt.o === 'l' ? '273mm' : '186mm' };
+    if (opt.mode === 'pdf') await UI.savePdf(html, po); else UI.printDoc(html, po);
   }
 
   // ═════════ ค่าน้ำมัน / ค่าใช้จ่าย ═════════
@@ -1055,7 +1158,7 @@
             <p class="hint" style="margin-top:8px">${icon('info')} สี กม./ลิตร: <span class="pill tone-ok">9 ขึ้นไป</span> ปกติ · <span class="pill tone-warn">6–9</span> ควรสังเกต · <span class="pill tone-bad">ต่ำกว่า 6</span> ตรวจสอบรถ/การกรอกเลขไมล์</p>` : UI.empty('ไม่มีข้อมูลในช่วงนี้', 'van')}</div>`;
     return {
       layout: 'admin',
-      html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="pdf" ${rows.length ? '' : 'disabled'}>${icon('printer')} พิมพ์ / PDF</button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
+      html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="pdfDl" ${rows.length ? '' : 'disabled'}>${icon('download')} ดาวน์โหลด PDF</button><button class="btn btn-ghost btn-sm" id="pdf" ${rows.length ? '' : 'disabled'}>${icon('printer')} พิมพ์</button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
         ${periodBar('#/admin/expenses', per, query)}${histNote(hist)}
         <div class="toolbar"><div class="seg"><a href="${qs({ view: 'list' })}"><button class="${view === 'list' ? 'on' : ''}" tabindex="-1">${icon('clipboard')} รายการ</button></a><a href="${qs({ view: 'stats' })}"><button class="${view === 'stats' ? 'on' : ''}" tabindex="-1">${icon('chart')} สรุปสถิติค่าน้ำมัน</button></a></div></div>
         <div class="toolbar"><select class="input" id="vf" style="width:auto"><option value="">รถทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}" ${v.id === vf ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
@@ -1083,14 +1186,52 @@
         $('#vf', root).addEventListener('change', e => { location.hash = qs({ v: e.target.value }); });
         $('#tf', root).addEventListener('change', e => { location.hash = qs({ t: e.target.value }); });
         $('#cf', root).addEventListener('change', e => { location.hash = qs({ c: e.target.value }); });
-        $('#pdf', root).addEventListener('click', () => printExpenses(rows, per, [
-          vf && `รถ: ${C.vName(vf)}`, tf && `ประเภท: ${S.EXPENSE[tf]}`, cf && `หมวดงาน: ${cf === 'none' ? 'ไม่ระบุหมวด' : S.catName({ category: cf })}`].filter(Boolean)));
+        const pf = () => [vf && `รถ: ${C.vName(vf)}`, tf && `ประเภท: ${S.EXPENSE[tf]}`, cf && `หมวดงาน: ${cf === 'none' ? 'ไม่ระบุหมวด' : S.catName({ category: cf })}`].filter(Boolean);
+        $('#pdf', root).addEventListener('click', () => printExpenses(rows, per, pf()));
+        $('#pdfDl', root).addEventListener('click', () => printExpenses(rows, per, pf(), { dl: true }));
         $('#xls', root).addEventListener('click', () => UI.exportSheets(`ค่าใช้จ่าย-${per.label}`, [{ name: 'ค่าใช้จ่าย', head: ['วันที่', 'ประเภท', 'รถ', 'ทะเบียน', 'เลขที่คำขอ', 'หมวดงาน', 'ปลายทาง', 'ปั๊ม/สถานที่', 'ลิตร', 'ราคา/ลิตร', 'เลขไมล์', 'วิธีชำระ', 'ยอดเงิน', 'บันทึกโดย'], rows: rows.map(({ r, e }) => [e.date, S.EXPENSE[e.type], C.vName(e.vehicleId), C.vPlate(e.vehicleId), r.id, S.catName(r), S.destName(r), e.station, e.liters, e.pricePerL, e.odo, S.PAY[e.pay], e.amount, e.byName || e.by]) }]));
       }
     };
   };
 
   // ═════════ ประเมินคนขับ ═════════
+  // ═════════ PDF สรุปผลประเมินคนขับ: หน้า 1 สรุปรวม · ต่อด้วยหน้าละ 1 คนขับ (ไว้แจ้งผลรายคน) ═════════
+  function ratingsDoc(list, per, df) {
+    const st = S.db.settings, K = Object.entries(S.RATE_KEYS);
+    const avgOf = (arr, k) => arr.length ? arr.reduce((s, x) => s + (k ? x.scores[k] : Object.values(x.scores).reduce((a, b) => a + b, 0) / 4), 0) / arr.length : 0;
+    const lv = v => v >= 4.5 ? ['ดีมาก', 'g'] : v >= 3.5 ? ['ดี', 'b'] : v >= 2.5 ? ['พอใช้', 'y'] : ['ควรปรับปรุง', 'r'];
+    const bar = v => `<span class="rt-bar"><i style="width:${Math.max(0, Math.min(100, v / 5 * 100)).toFixed(1)}%"></i></span>`;
+    const f2 = v => v ? v.toFixed(2) : '-';
+    const to = per.to > new Date(2900, 0) ? new Date() : per.to;
+    const from = per.k === 'all' && list.length ? new Date(list[list.length - 1].at) : per.from;
+    const ds = S.db.drivers.filter(d => !df || d.id === df).map(d => ({ d, rs: list.filter(x => x.driverId === d.id) })).filter(x => x.rs.length || !df).sort((a, b) => avgOf(b.rs) - avgOf(a.rs) || b.rs.length - a.rs.length);
+    const all = avgOf(list), withC = list.filter(x => x.comment);
+    const head = `<header class="pd-head"><img src="images/logo.png" alt=""><div><b>${esc(st.schoolName || '')}</b><span>${esc(st.division || '')} · ${esc(st.unit || 'งานยานพาหนะ')}</span></div></header>`;
+    const sub = `${esc(per.k === 'custom' ? 'ช่วงวันที่กำหนดเอง' : per.label)} · ตั้งแต่ ${fmt.dateLong(from)} ถึง ${fmt.dateLong(to)}`;
+    const kpis = arr => `<div class="rt-kpis"><div class="rt-k main"><b>${f2(avgOf(arr))}</b><span>เฉลี่ยรวม (เต็ม 5)</span><em class="rt-lv ${arr.length ? lv(avgOf(arr))[1] : ''}">${arr.length ? lv(avgOf(arr))[0] : 'ยังไม่มีผลประเมิน'}</em></div>
+      <div class="rt-k"><b>${arr.length}</b><span>ครั้งที่ประเมิน</span></div>
+      <div class="rt-asp">${K.map(([k, l]) => `<div><span>${l}</span>${bar(avgOf(arr, k))}<b>${f2(avgOf(arr, k))}</b></div>`).join('')}</div></div>`;
+    const comments = arr => arr.length ? `<ol class="rt-cm">${arr.map(x => `<li><p>“${esc(x.comment)}”</p><small>${fmt.date(x.at)} · ${esc(C.vName(x.vehicleId))}${df ? '' : ` · ${esc(C.dName(x.driverId))}`} · คะแนน ${f2(avgOf([x]))}</small></li>`).join('')}</ol>` : '<p class="rt-none">ไม่มีความคิดเห็น</p>';
+    const summary = `<section class="rt-page">${head}
+      <h1 class="pd-title">รายงานผลการประเมินพนักงานขับรถ</h1>
+      <p class="pd-sub">${sub}<br>ประเมินโดยผู้ใช้รถหลังเดินทางกลับ · ไม่เปิดเผยชื่อผู้ประเมิน</p>
+      ${kpis(list)}
+      <h2>1. คะแนนรายคน</h2>
+      <table class="pd-tbl rt-tbl" data-fitw><thead><tr><th class="c">ที่</th><th class="nw">พนักงานขับรถ</th><th class="r">ครั้ง</th>${K.map(([, l]) => `<th class="r">${l.replace('มารยาทและการบริการ', 'มารยาท/บริการ').replace('ความสะอาดของรถ', 'ความสะอาดรถ')}</th>`).join('')}<th class="r">เฉลี่ย</th><th class="nw">ระดับ</th></tr></thead>
+        <tbody>${ds.map(({ d, rs }, i) => `<tr><td class="c">${i + 1}</td><td class="nw">${esc(d.name)}</td><td class="r">${rs.length}</td>${K.map(([k]) => `<td class="r">${rs.length ? f2(avgOf(rs, k)) : '-'}</td>`).join('')}<td class="r"><b>${rs.length ? f2(avgOf(rs)) : '-'}</b></td><td class="nw">${rs.length ? `<span class="rt-lv ${lv(avgOf(rs))[1]}">${lv(avgOf(rs))[0]}</span>` : '-'}</td></tr>`).join('')}</tbody></table>
+      <p class="rt-note">เกณฑ์: 4.50–5.00 ดีมาก · 3.50–4.49 ดี · 2.50–3.49 พอใช้ · ต่ำกว่า 2.50 ควรปรับปรุง</p>
+      <h2>2. ความคิดเห็นจากผู้ใช้รถ (${withC.length})</h2>${comments(withC)}
+      <p class="pd-foot">พิมพ์จากระบบยานพาหนะ เมื่อ ${fmt.dt(new Date().toISOString())} โดย ${esc(S.me.name || S.me.email)}</p></section>`;
+    const pages = ds.filter(x => x.rs.length).map(({ d, rs }) => `<section class="rt-page rt-break">${head}
+      <div class="rt-who">${d.photo ? UI.img(d.photo, d.name) : `<span class="rt-av">${esc((d.name || '?').replace(/^(นาย|นาง|นางสาว)/, '').trim().charAt(0))}</span>`}<div><h1>${esc(d.name)}</h1><p>พนักงานขับรถ · รถที่รับผิดชอบ: ${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '-'}</p><p>${sub}</p></div></div>
+      ${kpis(rs)}
+      <h2>ผลการประเมินแต่ละครั้ง (${rs.length})</h2>
+      <table class="pd-tbl rt-tbl" data-fitw><thead><tr><th class="c">ที่</th><th class="nw">วันที่</th><th class="nw">รถ</th>${K.map(([, l]) => `<th class="r">${l.replace('มารยาทและการบริการ', 'มารยาท/บริการ').replace('ความสะอาดของรถ', 'ความสะอาดรถ')}</th>`).join('')}<th class="r">เฉลี่ย</th></tr></thead>
+        <tbody>${rs.map((x, i) => `<tr><td class="c">${i + 1}</td><td class="nw">${fmt.date(x.at)}</td><td class="nw">${esc(C.vName(x.vehicleId))}</td>${K.map(([k]) => `<td class="r">${x.scores[k]}</td>`).join('')}<td class="r"><b>${f2(avgOf([x]))}</b></td></tr>`).join('')}</tbody></table>
+      <h2>ความคิดเห็นถึง ${esc(C.firstName ? C.firstName(d.name) : d.name)}</h2>${comments(rs.filter(x => x.comment))}
+      <div class="rt-sign"><div><p>ลงชื่อ ....................................... ผู้แจ้งผล</p><p>(.......................................)</p></div><div><p>ลงชื่อ ....................................... ผู้รับทราบ</p><p>(${esc(d.name)})</p></div></div></section>`).join('');
+    return { html: summary + pages, title: `รายงานผลการประเมินคนขับ ${df ? C.dName(df) + ' ' : ''}${fmt.localDate(from)} ถึง ${fmt.localDate(to)}` };
+  }
   Pages.adminRatings = ({ query }) => {
     const per = periodOf(query), df = query.d || '';
     const hist = S.needHistory(per.from);
@@ -1099,7 +1240,7 @@
     const drivers = S.db.drivers.map(d => ({ d, rs: list.filter(x => x.driverId === d.id) })).filter(x => x.rs.length || !df).sort((a, b) => avgOf(b.rs) - avgOf(a.rs));
     return {
       layout: 'admin',
-      html: `${head('รายงาน', 'ผลการประเมินคนขับ', `${per.label} · ${list.length} ครั้ง · ไม่แสดงชื่อผู้ประเมิน`, `<select class="input" id="df" style="width:auto"><option value="">คนขับทุกคน</option>${S.db.drivers.map(d => `<option value="${d.id}" ${d.id === df ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`)}
+      html: `${head('รายงาน', 'ผลการประเมินคนขับ', `${per.label} · ${list.length} ครั้ง · ไม่แสดงชื่อผู้ประเมิน`, `<button class="btn btn-primary btn-sm" id="rtPdf" ${list.length ? '' : 'disabled'}>${icon('download')} ดาวน์โหลด PDF</button><button class="btn btn-ghost btn-sm" id="rtPrint" ${list.length ? '' : 'disabled'}>${icon('printer')} พิมพ์</button><select class="input" id="df" style="width:auto"><option value="">คนขับทุกคน</option>${S.db.drivers.map(d => `<option value="${d.id}" ${d.id === df ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`)}
         ${periodBar('#/admin/ratings', per, query)}${histNote(hist)}
         <div class="kpis" style="margin-bottom:16px">${Object.entries(S.RATE_KEYS).map(([k, l]) => `<div class="kpi" style="--kb:#fef3c7;--kc:#d97706"><span class="k-ic">${icon('star')}</span><b class="num">${avgOf(list, k).toFixed(2)}<em>/ 5</em></b><span class="l">${l}</span></div>`).join('')}</div>
         <div class="split">
@@ -1107,7 +1248,12 @@
             <tbody>${drivers.map(({ d, rs }) => `<tr><td class="nw"><b>${esc(d.name)}</b></td><td>${rs.length}</td>${Object.keys(S.RATE_KEYS).map(k => `<td>${rs.length ? avgOf(rs, k).toFixed(2) : '-'}</td>`).join('')}<td class="nw"><b>${rs.length ? avgOf(rs).toFixed(2) : '-'}</b>${rs.length ? `<div class="rt-st">${C.stars(avgOf(rs))}</div>` : ''}</td></tr>`).join('')}</tbody></table></div></div>
           <div class="card"><div class="card-head"><h3>${icon('mail')} ความคิดเห็น</h3></div><div class="stack">${list.filter(x => x.comment).slice(0, 40).map(x => `<div class="assign"><div class="assign-top"><b>${esc(C.dName(x.driverId))}</b>${C.stars(avgOf([x]))}</div><p style="font-size:.92rem">“${esc(x.comment)}”</p><small class="muted">${fmt.date(x.at)} · ${esc(C.vName(x.vehicleId))}</small></div>`).join('') || UI.empty('ยังไม่มีความคิดเห็น', 'mail')}</div></div>
         </div>`,
-      mount(root) { bindPeriod(root, '#/admin/ratings', query); $('#df', root).addEventListener('change', e => { location.hash = '#/admin/ratings?' + new URLSearchParams({ ...query, d: e.target.value }); }); }
+      mount(root) {
+        bindPeriod(root, '#/admin/ratings', query); $('#df', root).addEventListener('change', e => { location.hash = '#/admin/ratings?' + new URLSearchParams({ ...query, d: e.target.value }); });
+        const doc = () => ratingsDoc(list, per, df), po = t => ({ title: t, fitWidth: '186mm' });
+        $('#rtPdf', root).addEventListener('click', e => { const d = doc(); UI.busy(e.currentTarget, () => UI.savePdf(d.html, po(d.title))); });
+        $('#rtPrint', root).addEventListener('click', () => { const d = doc(); UI.printDoc(d.html, { ...po(d.title), footLeft: d.title }); });
+      }
     };
   };
 
@@ -1312,8 +1458,10 @@
             <div class="stack">${S.db.places.slice().sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 40).map(p => `<div class="lot-row">${icon('pin')}<div style="min-width:0"><b>${esc(p.name)}</b><small>${esc(p.address || p.province || '')} · ${p.km || '?'} กม. · ${p.count || 0} ครั้ง</small></div><button type="button" class="icon-btn sm" data-dpl="${p.id}">${icon('trash')}</button></div>`).join('') || '<p class="hint">ยังไม่มี</p>'}</div></div>
           <div class="form-actions"><button class="btn btn-primary" type="submit">${icon('check')} บันทึกการตั้งค่า</button></div>
         </form>
+        ${S.isSuper(S.me) ? purgeHTML() : ''}
         ${S.LOCAL ? `<div class="card" style="margin-top:18px"><div class="card-head"><h3>${icon('flask')} โหมดทดลอง</h3></div><p class="hint" style="margin-bottom:12px">ข้อมูลเก็บในเบราว์เซอร์นี้เท่านั้น ล้างแล้วจะสร้างข้อมูลตัวอย่างใหม่</p><button class="btn btn-danger btn-sm" data-reset>${icon('refresh')} ล้างข้อมูลตัวอย่าง</button></div>` : ''}`,
       mount(root) {
+        if (S.isSuper(S.me)) bindPurge(root);
         const photoGetters = cm.map((c, i) => C.bindFilePicker(root, 'cph' + i, c.photo ? [c.photo] : [], { multiple: false }));
         const collect = () => {
           const f = UI.formData($('#sf', root));

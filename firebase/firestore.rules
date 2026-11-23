@@ -134,6 +134,9 @@ service cloud.firestore {
       allow delete: if sup();
     }
 
+    // ───── ถังขยะ (ข้อมูลที่ล้างจากหน้าตั้งค่า · เก็บ 30 วัน กู้คืนได้) — เฉพาะผู้ดูแลระบบสูงสุด ─────
+    match /trash/{id} { allow read, write: if sup(); }
+
     // ───── ผลประเมินคนขับ (ไม่เก็บชื่อผู้ประเมิน) ─────
     match /ratings/{id} {
       allow read: if back();
