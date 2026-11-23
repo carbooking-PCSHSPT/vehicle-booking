@@ -632,7 +632,7 @@
             ${list.map(r => { const href = hrefOfReq(r), as = r.assignments || [];
               const vn = as.map(a => C.vName(a.vehicleId)), dn = drvShort(r);
               const meta = [esc(r.requester.name), ...as.map(a => `${esc(C.vName(a.vehicleId))}${plate(a.vehicleId) ? ` ${esc(plate(a.vehicleId))}` : ''}${C.dName(a.driverId) ? ` · ${esc(C.firstName(C.dName(a.driverId)))}` : ''}`)].join(' · ');
-              return `<div class="cv-ag ${stCls(r)} link" data-trip="${r.id}" ${href ? `data-href="${href}"` : ''}>
+              return `<div class="cv-ag ${stCls(r)} link" data-tcard="${r.id}" ${href ? `data-href="${href}"` : ''}>
                 ${tcell(r, d)}
                 <div class="w"><b>${esc(S.destName(r))}</b><small class="cv-pp">${esc(r.purpose)} · ${esc(r.requester.name)}</small><small class="cv-m">${C.tripMeta(r)}${as.length ? '' : ' · รอจัดรถ'}</small></div>
                 <div class="v">${vn.length ? `<b>${esc(vn.join(', '))}</b><small>${icon('wheel')} ${dn.length ? esc(dn.join(', ')) : 'ยังไม่ระบุคนขับ'}</small>` : '<span class="wt">รอแอดมินจัดรถ</span>'}</div>
@@ -706,7 +706,7 @@
                 <dt>ผู้เดินทาง</dt><dd>${S.passengers(r)} คน <small>(ครู ${+r.teachers || 0} · นักเรียน ${+r.students || 0}${+r.others ? ` · อื่น ${+r.others}` : ''})</small></dd><dt>คนขับ</dt><dd>${esc(C.dName(a.driverId) || '-')}${C.dPhone(a.driverId) ? ` · <a class="link" href="tel:${esc(C.dPhone(a.driverId))}">${esc(C.dPhone(a.driverId))}</a>` : ''}</dd>
                 ${r.totalKm ? `<dt>ระยะทาง</dt><dd>${fmt.num(r.totalKm, 0)} กม. (ไป-กลับ)</dd>` : ''}${r.pickup ? `<dt>จุดขึ้นรถ</dt><dd>${esc(r.pickup)}</dd>` : ''}</dl></div>`; })()}
             <div class="card"><div class="card-head"><h3>${icon('calendar')} คิวการใช้รถคันนี้</h3></div>
-              ${upcoming.length ? `<div class="stack">${upcoming.map(r => `<div class="lot-row link" data-trip="${r.id}" ${hrefOfReq(r) ? `data-href="${hrefOfReq(r)}"` : ''} style="grid-template-columns:auto 1fr auto;cursor:pointer">${icon('clock')}<div style="min-width:0"><b>${fmt.range(r.startAt, r.endAt)}</b><small>${esc(S.destName(r))} · ${esc(r.purpose || '')}</small><small>${esc(r.requester.name)} · ${S.passengers(r)} คน${(() => { const a = (r.assignments || []).find(x => x.vehicleId === v.id); return a && a.driverId ? ` · ${icon('wheel')} ${esc(C.dName(a.driverId))}` : ''; })()}</small></div>${C.statusPill(r)}</div>`).join('')}</div><p class="hint" style="margin-top:8px">กดรายการเพื่อดูรายละเอียดทั้งหมด</p>` : UI.empty('ยังไม่มีคิวที่จะมาถึง', 'checkCircle')}</div>
+              ${upcoming.length ? `<div class="stack">${upcoming.map(r => `<div class="lot-row link" data-tcard="${r.id}" ${hrefOfReq(r) ? `data-href="${hrefOfReq(r)}"` : ''} style="grid-template-columns:auto 1fr auto;cursor:pointer">${icon('clock')}<div style="min-width:0"><b>${fmt.range(r.startAt, r.endAt)}</b><small>${esc(S.destName(r))} · ${esc(r.purpose || '')}</small><small>${esc(r.requester.name)} · ${S.passengers(r)} คน${(() => { const a = (r.assignments || []).find(x => x.vehicleId === v.id); return a && a.driverId ? ` · ${icon('wheel')} ${esc(C.dName(a.driverId))}` : ''; })()}</small></div>${C.statusPill(r)}</div>`).join('')}</div><p class="hint" style="margin-top:8px">กดรายการเพื่อดูรายละเอียดทั้งหมด</p>` : UI.empty('ยังไม่มีคิวที่จะมาถึง', 'checkCircle')}</div>
           </div>
         </div></div></div>`
     };

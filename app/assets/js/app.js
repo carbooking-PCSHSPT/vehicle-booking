@@ -157,7 +157,7 @@ const C = (() => {
     const bar = (r, extra = '') => {
       const l = pos(r.startAt), w = Math.max(3, pos(r.endAt) - l), href = hrefOf(r);
       const cont = new Date(r.startAt) < d0 ? '← ' : '', more = new Date(r.endAt) > d1 ? ' →' : '';
-      return `<div class="g-bar s-${r.status} link" data-trip="${r.id}" style="left:${l}%;width:${w}%" ${href ? `data-href="${href}"` : ''} title="${esc(S().destName(r))} · ${fmt.time(r.startAt)}–${fmt.when(r.endAt)} · ${esc(r.requester.name)}${extra}">${icon(r.status === 'pending' ? 'clock' : 'pin')}<span>${cont}${esc(S().destName(r))}${r.overnight ? ' · ค้างคืน' : ''}${more}</span></div>`;
+      return `<div class="g-bar s-${r.status} link" data-tcard="${r.id}" style="left:${l}%;width:${w}%" ${href ? `data-href="${href}"` : ''} title="${esc(S().destName(r))} · ${fmt.time(r.startAt)}–${fmt.when(r.endAt)} · ${esc(r.requester.name)}${extra}">${icon(r.status === 'pending' ? 'clock' : 'pin')}<span>${cont}${esc(S().destName(r))}${r.overnight ? ' · ค้างคืน' : ''}${more}</span></div>`;
     };
     const rows = vehicles.map(v => {
       const mine = list.filter(r => (r.assignments || []).some(a => a.vehicleId === v.id));
@@ -217,7 +217,7 @@ const C = (() => {
       const st0 = new Date(r.startAt), en = new Date(r.endAt);
       let pre = '';
       if (!placed && st0 > now) { placed = true; pre = `<tr class="bd-now"><td colspan="8"><span>ตอนนี้ ${fmt.time(now)} น.</span></td></tr>`; }
-      return pre + `<tr class="bd-row ${st[0]} link" data-trip="${r.id}" ${href ? `data-href="${href}"` : ''}>
+      return pre + `<tr class="bd-row ${st[0]} link" data-tcard="${r.id}" ${href ? `data-href="${href}"` : ''}>
         <td><span class="flip">${flip(st0, k)}</span>${UI.sameDay(st0, day) ? '' : `<small>${fmt.dayMonth(st0)}</small>`}</td>
         <td><span class="flip">${flip(en, k)}</span>${UI.sameDay(en, day) ? '' : `<small>${fmt.dayMonth(en)}</small>`}</td>
         <td class="dst"><b>${esc(S().destName(r))}</b><small>${esc((r.destinations[0] || {}).province || '')}${r.totalKm ? ` · ${fmt.num(r.totalKm, 0)} กม.` : ''}${S().tripTag(r) ? ` · ${S().tripTag(r).text}` : ''}</small><small>${esc(r.purpose)}</small><small class="bd-m">${tripMeta(r)}${as.length ? '' : ' · รอจัดรถ'}</small>${r.status === 'ontrip' ? `<span class="bd-prog"><i style="width:${Math.max(0, Math.min(1, (now - st0) / (en - st0))) * 100}%"></i></span>` : ''}</td>
@@ -921,10 +921,10 @@ const App = (() => {
         return;
       }
       // เที่ยวรถในกระดาน/แกนเวลา/ปฏิทิน: มือถือ-แท็บเล็ต (หรือไม่มีสิทธิ์เปิดคำขอ) → การ์ดรายละเอียด · คอมที่มีสิทธิ์ → เปิดคำขอ
-      const tr = e.target.closest('[data-trip]');
+      const tr = e.target.closest('[data-tcard]');
       if (tr && !e.target.closest('a,button,input,select')) {
         const href = tr.dataset.href || '';
-        if (!href || document.documentElement.classList.contains('lt1060')) { e.preventDefault(); C.tripModal(tr.dataset.trip, href); return; }
+        if (!href || document.documentElement.classList.contains('lt1060')) { e.preventDefault(); C.tripModal(tr.dataset.tcard, href); return; }
       }
       // การ์ดที่กดได้ทั้งใบ (ไม่ใช้ <a> ซ้อน <a>)
       const card = e.target.closest('[data-href]');
