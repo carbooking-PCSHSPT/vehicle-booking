@@ -2202,3 +2202,41 @@ a.ct-row:hover { border-color: rgba(36, 48, 122, .3); }
 .rq-split.dv-open .rq-main .detail-grid { grid-template-columns: minmax(0, 1fr); }
 .rq-split.dv-open .ts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .xh-items { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
+
+/* ═════ แอนิเมชันระหว่างโหลด (แบบ AB2: วงแหวนทอง + รถตู้วิ่ง) ═════ */
+/* เปิด/รีโหลดหน้าเว็บ: วงแหวนเปอร์เซ็นต์รอบโลโก้ มีรถตู้วิ่งตามวงแหวน */
+.boot .bt-ring { position: relative; width: 150px; height: 150px; display: grid; place-items: center; }
+.boot .bt-ring img { height: 80px; animation: none; }
+.boot .bt-r { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.boot .bt-r circle { fill: none; stroke-width: 5; }
+.boot .bt-r .bg { stroke: #ece6d8; }
+.boot .bt-r .fg { stroke: var(--gold); stroke-linecap: round; stroke-dasharray: 371; stroke-dashoffset: 371; transition: stroke-dashoffset .3s ease; }
+.boot .bt-orbit { position: absolute; inset: 0; transition: transform .3s ease; }
+.boot .bt-van { position: absolute; left: 50%; top: -8px; transform: translateX(-50%); color: var(--navy); }
+.bt-van svg, .ld-van svg { display: block; width: 32px; height: 20px; }
+.bt-van .wh, .ld-van .wh { transform-box: fill-box; transform-origin: center; animation: spin .45s linear infinite; }
+.boot .bt-pct { font: 700 1.05rem var(--font-display); color: var(--navy); margin-top: -4px; }
+.boot p { font-family: var(--font-display); color: var(--navy); }
+/* โหลดข้อมูลในหน้า: ถนนเส้นประใต้แถบเมนู + รถวิ่งไป-กลับ */
+.ld-road { position: fixed; left: 0; right: 0; top: var(--nav-h); height: 24px; z-index: 90; pointer-events: none; opacity: 0; transition: opacity .3s; overflow: hidden; }
+html.is-loading .ld-road { opacity: 1; }
+.ld-road::before { content: ""; position: absolute; left: 0; right: 0; bottom: 3px; height: 2px; background: repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 18px); animation: ld-dash .5s linear infinite; }
+.ld-road .ld-van { position: absolute; bottom: 5px; color: var(--navy); animation: ld-drive 2.6s ease-in-out infinite; }
+.ld-road .ld-van svg { width: 28px; height: 18px; }
+@keyframes ld-dash { to { background-position: -18px 0; } }
+@keyframes ld-drive { 0% { left: -40px; } 50% { left: calc(100% - 4px); } 50.01% { transform: scaleX(-1); } 100% { left: -40px; transform: scaleX(-1); } }
+/* ข้อมูลชุดแรกหลังเข้าสู่ระบบ: โครงร่างรายการ (หายเองเมื่อข้อมูลมาครบ) */
+.ld-skel { position: fixed; left: 0; right: 0; bottom: 0; top: calc(var(--nav-h) + 24px); z-index: 80; background: var(--cream, #faf6ee); padding-top: 18px; transition: opacity .35s; overflow: hidden; }
+.ld-skel.out { opacity: 0; }
+.ld-skel .container { display: grid; gap: 12px; }
+.ld-skel .sk, .ld-skel .sk-lines .sk { border-radius: 10px; background: linear-gradient(100deg, #ece6d8 30%, #f8f4ea 50%, #ece6d8 70%); background-size: 300% 100%; animation: ld-sh 1.3s ease-in-out infinite; }
+.ld-skel .sk-card { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 16px; background: #fff; border: 1px solid var(--line); }
+.ld-skel .sk.ph { width: 48px; height: 48px; border-radius: 12px; flex: none; }
+.ld-skel .sk-lines { flex: 1; display: grid; gap: 8px; } .ld-skel .sk-lines .sk { height: 12px; display: block; } .ld-skel .sk-lines .sk:last-child { width: 55%; }
+@keyframes ld-sh { from { background-position: 100% 0; } to { background-position: 0 0; } }
+/* ปุ่มระหว่างบันทึก: วงล้อหมุน + "กำลังบันทึก…" */
+.btn.loading::after { content: none; }
+.btn.loading > .bt-busy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; font-size: .92em; white-space: nowrap; }
+.btn-ghost.loading > .bt-busy, .btn-gold.loading > .bt-busy { color: var(--navy); }
+.bt-wheel { width: 18px; height: 18px; flex: none; animation: spin .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .ld-road .ld-van, .bt-van .wh, .ld-van .wh { animation-duration: 4s; } }

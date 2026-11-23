@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แอนิเมชันโหลด A+B — 3 แบบ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --navy: #24307a; --navy-50: #eef0fb; --gold: #c9962b; --gold-2: #f2c14e; --cream: #faf6ee; --ink: #1b2147; --muted: #6e6a7c; --line: #e8e1d2; --sk: #ece6d8; --sk2: #f8f4ea; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e6e1d5; color: var(--ink); font-family: 'IBM Plex Sans Thai', Prompt, sans-serif; overflow-x: hidden; }
+.top { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(250, 246, 238, .95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font: 600 1rem Prompt; color: var(--navy); flex: 1 1 220px; }
+.top p { margin: 0; flex-basis: 100%; font-size: .84rem; color: var(--muted); }
+button { font: inherit; }
+.btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: 500 .9rem Prompt; cursor: pointer; }
+.btn.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn:disabled { cursor: default; opacity: .95; }
+main { padding: 24px 12px 70px; display: grid; gap: 48px; max-width: 1200px; margin: 0 auto; }
+.opt-h { display: flex; align-items: center; gap: 10px; margin: 0 4px 12px; flex-wrap: wrap; }
+.opt-h .tag { display: inline-grid; place-items: center; min-width: 46px; height: 34px; padding: 0 8px; border-radius: 10px; background: var(--navy); color: #fff; font: 700 .95rem Prompt; }
+.opt-h h2 { margin: 0; font: 600 1.15rem Prompt; color: var(--navy); flex: 1 1 200px; }
+.opt-h p { margin: 0; flex-basis: 100%; color: var(--muted); font-size: .88rem; }
+.scenes { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; }
+.scene { background: #fff; border-radius: 20px; box-shadow: 0 30px 60px -38px rgba(40, 30, 10, .6); overflow: hidden; display: flex; flex-direction: column; }
+.scene > .cap { padding: 10px 14px; font: 500 .82rem Prompt; color: var(--muted); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
+.scene > .cap b { color: var(--ink); }
+.screen { position: relative; flex: 1; min-height: 300px; background: var(--cream); overflow: hidden; cursor: pointer; }
+.scene.btns { grid-column: 1 / -1; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 12px; padding: 18px; align-items: center; }
+.btn-row small { color: var(--muted); }
+.real { padding: 18px; display: grid; gap: 10px; opacity: 0; transform: translateY(6px); transition: .35s; }
+.screen.done .real { opacity: 1; transform: none; }
+.row-card { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 14px; background: #fff; border: 1px solid var(--line); }
+.row-card .ph { width: 44px; height: 44px; border-radius: 12px; background: var(--navy-50); display: grid; place-items: center; color: var(--navy); font: 600 .8rem Prompt; flex: none; }
+.row-card b { display: block; font: 600 .92rem Prompt; } .row-card small { color: var(--muted); font-size: .8rem; }
+.row-card .pill { margin-left: auto; padding: 3px 10px; border-radius: 99px; font: 500 .74rem Prompt; background: #ecfbf3; color: #047857; white-space: nowrap; }
+.real h4 { margin: 0 0 2px; font: 600 1rem Prompt; color: var(--navy); }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 14px; text-align: center; color: var(--muted); font-size: .88rem; transition: opacity .35s; }
+.screen.done .overlay, .screen.done .fade-out { opacity: 0; pointer-events: none; transition: opacity .35s; }
+.logo { height: 70px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── ของใช้ร่วม: รถตู้ (A) · แถบทอง + โครงร่าง (B) ── */
+.van svg { display: block; } .van .wh { transform-box: fill-box; transform-origin: center; animation: spin .45s linear infinite; }
+.gbar { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: rgba(201, 150, 43, .15); z-index: 3; overflow: hidden; }
+.gbar::before { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--gold-2), var(--gold), transparent); animation: run 1.15s ease-in-out infinite; }
+@keyframes run { from { left: -40%; } to { left: 100%; } }
+.skel { position: absolute; inset: 0; padding: 18px; display: grid; gap: 10px; align-content: start; }
+.sk { border-radius: 10px; background: linear-gradient(100deg, var(--sk) 30%, var(--sk2) 50%, var(--sk) 70%); background-size: 300% 100%; animation: sh 1.3s ease-in-out infinite; }
+@keyframes sh { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.sk-card { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 14px; background: #fff; border: 1px solid var(--line); }
+.sk-card .sk.ph { width: 44px; height: 44px; border-radius: 12px; flex: none; }
+.sk-lines { flex: 1; display: grid; gap: 7px; } .sk-lines .sk { height: 11px; } .sk-lines .sk:last-child { width: 55%; }
+.dots { display: inline-flex; gap: 4px; } .dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: dot 1s infinite; } .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes dot { 0%, 80%, 100% { transform: scale(.5); opacity: .4; } 40% { transform: none; opacity: 1; } }
+.msg { font: 500 .9rem Prompt; color: var(--navy); min-height: 1.4em; }
+.pct { font: 700 1rem Prompt; color: var(--navy); }
+
+/* ═════════ AB1 — รถตู้วิ่งบนแถบทอง ═════════ */
+.ab1-track { position: relative; width: min(280px, 82%); height: 40px; }
+.ab1-track .rail { position: absolute; left: 0; right: 0; bottom: 6px; height: 6px; border-radius: 6px; background: var(--sk); overflow: hidden; }
+.ab1-track .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 6px; background: linear-gradient(90deg, var(--gold-2), var(--gold)); transition: width .45s ease; }
+.ab1-track .van { position: absolute; bottom: 10px; left: 0; margin-left: -17px; color: var(--navy); transition: left .45s ease; }
+.ab1-track .van svg { width: 36px; height: 23px; }
+.ab1-top { position: absolute; top: 0; left: 0; right: 0; height: 30px; z-index: 4; }
+.ab1-top .rail { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: rgba(201, 150, 43, .15); }
+.ab1-top .fill { position: absolute; left: 0; top: 0; height: 3px; width: 0; background: linear-gradient(90deg, var(--gold-2), var(--gold)); transition: width .3s ease; }
+.ab1-top .van { position: absolute; top: 3px; left: 0; margin-left: -26px; color: var(--navy); transition: left .3s ease; }
+.ab1-top .van svg { width: 26px; height: 17px; }
+.btn .bfill { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--gold-2); transition: width 1.7s linear; }
+
+/* ═════════ AB2 — วงแหวนทอง + รถตู้วิ่งรอบโลโก้ ═════════ */
+.ab2-ring { position: relative; width: 130px; height: 130px; display: grid; place-items: center; }
+.ab2-ring svg.r { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ab2-ring circle { fill: none; stroke-width: 5; }
+.ab2-ring .bg { stroke: var(--sk); }
+.ab2-ring .fg { stroke: var(--gold); stroke-linecap: round; stroke-dasharray: 371; stroke-dashoffset: 371; transition: stroke-dashoffset .45s ease; }
+.ab2-ring .orbit { position: absolute; inset: 0; transition: transform .45s ease; }
+.ab2-ring .orbit .van { position: absolute; left: 50%; top: -9px; transform: translateX(-50%); color: var(--navy); }
+.ab2-ring .orbit .van svg { width: 30px; height: 19px; }
+.ab2-ring img { height: 66px; }
+.ab2-road { position: absolute; left: 0; right: 0; top: 0; height: 26px; z-index: 4; overflow: hidden; }
+.ab2-road::before { content: ""; position: absolute; left: 0; right: 0; bottom: 4px; height: 2px; background: repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 18px); animation: dash .5s linear infinite; }
+.ab2-road .van { position: absolute; bottom: 6px; color: var(--navy); animation: drive 2.4s ease-in-out infinite; }
+.ab2-road .van svg { width: 28px; height: 18px; }
+@keyframes dash { to { background-position: -18px 0; } }
+@keyframes drive { 0% { left: -6%; } 50% { left: calc(100% - 26px); } 100% { left: -6%; } }
+.ab2-road ~ .skel { padding-top: 30px; }
+.wheel-sp { width: 18px; height: 18px; animation: spin .8s linear infinite; }
+
+/* ═════════ AB3 — เส้นทางสู่โรงเรียน ═════════ */
+.ab3-route { position: relative; width: min(320px, 88%); height: 74px; }
+.ab3-route .path { position: absolute; left: 26px; right: 44px; top: 38px; height: 4px; border-radius: 4px; background: repeating-linear-gradient(90deg, #d8cfbb 0 10px, transparent 10px 16px); }
+.ab3-route .done { position: absolute; left: 26px; top: 38px; height: 4px; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--gold-2), var(--gold)); transition: width .45s ease; }
+.ab3-route .pin { position: absolute; left: 8px; top: 26px; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid var(--navy); display: grid; place-items: center; font: 600 .62rem Prompt; color: var(--navy); }
+.ab3-route .sch { position: absolute; right: 0; top: 14px; width: 48px; height: 48px; border-radius: 50%; background: #fff; border: 2px solid var(--gold); display: grid; place-items: center; transition: transform .3s; }
+.ab3-route .sch img { height: 34px; }
+.ab3-route .sch.arrive { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(201, 150, 43, .2); }
+.ab3-route .van { position: absolute; top: 16px; left: 26px; margin-left: -16px; color: var(--navy); transition: left .45s ease; }
+.ab3-route .van svg { width: 34px; height: 22px; }
+.ab3-route .lb { position: absolute; top: 56px; font-size: .72rem; color: var(--muted); } .ab3-route .lb.l { left: 0; } .ab3-route .lb.r { right: 0; }
+.sk-card .sk-van { width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center; background: var(--sk); color: #b9ad94; }
+.sk-card .sk-van svg { width: 30px; height: 19px; }
+.btn .bline { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; }
+.btn .bline::before { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; background: var(--gold-2); animation: run 1s ease-in-out infinite; }
+
+@media (max-width: 760px) { .scenes { grid-template-columns: 1fr; } .screen { min-height: 270px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 2.5s !important; } }
+</style>
+</head>
+<body>
+<div class="top"><h1>แอนิเมชันโหลด — ผสม A (รถตู้) + B (แถบทอง/โครงร่าง) · เลือก 1 แบบ</h1><button class="btn pri" id="replayAll">▶ เล่นใหม่ทั้งหมด</button>
+  <p>แต่ละแบบมี 3 จังหวะ: <b>เปิด/รีโหลดหน้าเว็บ</b> · <b>โหลดข้อมูลในหน้า</b> · <b>กดปุ่มบันทึก/ส่ง</b> — แตะที่จอเพื่อเล่นซ้ำ</p></div>
+<main>
+
+<!-- ═════════ AB1 ═════════ -->
+<section>
+  <div class="opt-h"><span class="tag">AB1</span><h2>รถตู้วิ่งบนแถบทอง</h2><p>แถบความคืบหน้าสีทอง (B) มีรถตู้ (A) วิ่งนำหน้า เติมทองไปถึงไหนรถอยู่ตรงนั้น บอกเปอร์เซ็นต์ + ข้อความ · โหลดในหน้า: แถบทองบางด้านบนมีรถคันเล็กวิ่งนำ + โครงร่างรายการ · ปุ่ม: จุดกระพริบ + แถบทองไหลใต้ปุ่ม</p></div>
+  <div class="scenes">
+    <div class="scene"><div class="cap"><b>เปิด / รีโหลดหน้าเว็บ</b><span>แตะเพื่อเล่นซ้ำ</span></div>
+      <div class="screen" data-play="boot" data-k="1">
+        <div class="overlay"><img class="logo" src="../app/images/logo.png" alt=""><div class="ab1-track"><div class="rail"><div class="fill"></div></div><div class="van">__VAN__</div></div><div class="msg"><span data-msg>กำลังโหลดข้อมูลรถ…</span> <span class="pct"><span data-pct>0</span>%</span></div></div>
+        __REAL__
+      </div></div>
+    <div class="scene"><div class="cap"><b>โหลดข้อมูลในหน้า</b><span>แตะเพื่อเล่นซ้ำ</span></div>
+      <div class="screen" data-play="page" data-k="1">
+        <div class="ab1-top fade-out"><div class="rail"></div><div class="fill"></div><div class="van">__VAN__</div></div>
+        <div class="skel fade-out"><div class="sk" style="height:16px;width:40%"></div>__SK__</div>
+        __REAL__
+      </div></div>
+    <div class="scene btns"><div class="cap"><b>กดปุ่มบันทึก / ส่งคำขอ</b><span>กดปุ่มเพื่อลอง</span></div>
+      <div class="btn-row"><button class="btn pri" data-busy="1">ส่งคำขอใช้รถ</button><button class="btn" data-busy="1">บันทึก</button><small>จุดกระพริบ + แถบทองเติมใต้ปุ่ม</small></div></div>
+  </div>
+</section>
+
+<!-- ═════════ AB2 ═════════ -->
+<section>
+  <div class="opt-h"><span class="tag">AB2</span><h2>วงแหวนทอง + รถตู้วิ่งรอบโลโก้</h2><p>วงแหวนเปอร์เซ็นต์ของ B มีรถตู้คันเล็กวิ่งไปตามวงแหวน · โหลดในหน้า: ถนนเส้นประพร้อมรถวิ่งไป-กลับด้านบน (A) + โครงร่างรายการ (B) · ปุ่ม: วงล้อหมุน + ข้อความ “กำลังบันทึก…”</p></div>
+  <div class="scenes">
+    <div class="scene"><div class="cap"><b>เปิด / รีโหลดหน้าเว็บ</b><span>แตะเพื่อเล่นซ้ำ</span></div>
+      <div class="screen" data-play="boot" data-k="2">
+        <div class="overlay"><div class="ab2-ring"><svg class="r" viewBox="0 0 130 130"><circle class="bg" cx="65" cy="65" r="59"/><circle class="fg" cx="65" cy="65" r="59"/></svg><div class="orbit"><div class="van">__VAN__</div></div><img src="../app/images/logo.png" alt=""></div><div class="pct"><span data-pct>0</span>%</div><div class="msg"><span data-msg>ระบบยานพาหนะ</span></div></div>
+        __REAL__
+      </div></div>
+    <div class="scene"><div class="cap"><b>โหลดข้อมูลในหน้า</b><span>แตะเพื่อเล่นซ้ำ</span></div>
+      <div class="screen" data-play="page" data-k="2">
+        <div class="ab2-road fade-out"><div class="van">__VAN__</div></div>
+        <div class="skel fade-out"><div class="sk" style="height:16px;width:40%"></div>__SK__</div>
+        __REAL__
+      </div></div>
+    <div class="scene btns"><div class="cap"><b>กดปุ่มบันทึก / ส่งคำขอ</b><span>กดปุ่มเพื่อลอง</span></div>
+      <div class="btn-row"><button class="btn pri" data-busy="2">ส่งคำขอใช้รถ</button><button class="btn" data-busy="2">บันทึก</button><small>วงล้อหมุน + “กำลังบันทึก…”</small></div></div>
+  </div>
+</section>
+
+<!-- ═════════ AB3 ═════════ -->
+<section>
+  <div class="opt-h"><span class="tag">AB3</span><h2>เส้นทางสู่โรงเรียน</h2><p>รถตู้วิ่งจากจุดเริ่มไปถึงโลโก้โรงเรียน เส้นทางเติมสีทองตามความคืบหน้า ถึงแล้วโลโก้เด้งรับ · โหลดในหน้า: แถบทองวิ่งด้านบน (B) + โครงร่างที่มีรูปรถตู้เป็นช่องรูป · ปุ่ม: จุดกระพริบ + แถบทองวิ่งใต้ปุ่ม</p></div>
+  <div class="scenes">
+    <div class="scene"><div class="cap"><b>เปิด / รีโหลดหน้าเว็บ</b><span>แตะเพื่อเล่นซ้ำ</span></div>
+      <div class="screen" data-play="boot" data-k="3">
+        <div class="overlay"><div class="ab3-route"><div class="path"></div><div class="done"></div><div class="pin">เริ่ม</div><div class="sch"><img src="../app/images/logo.png" alt=""></div><div class="van">__VAN__</div><span class="lb l">ออกเดินทาง</span><span class="lb r">ถึงแล้ว</span></div><div class="msg"><span data-msg>กำลังเชื่อมต่อ…</span></div></div>
+        __REAL__
+      </div></div>
+    <div class="scene"><div class="cap"><b>โหลดข้อมูลในหน้า</b><span>แตะเพื่อเล่นซ้ำ</span></div>
+      <div class="screen" data-play="page" data-k="3">
+        <div class="gbar fade-out"></div>
+        <div class="skel fade-out"><div class="sk" style="height:16px;width:40%"></div>__SKV__</div>
+        __REAL__
+      </div></div>
+    <div class="scene btns"><div class="cap"><b>กดปุ่มบันทึก / ส่งคำขอ</b><span>กดปุ่มเพื่อลอง</span></div>
+      <div class="btn-row"><button class="btn pri" data-busy="3">ส่งคำขอใช้รถ</button><button class="btn" data-busy="3">บันทึก</button><small>จุดกระพริบ + แถบทองวิ่งใต้ปุ่ม</small></div></div>
+  </div>
+</section>
+</main>
+
+<template id="tReal"><div class="real"><h4>คำขอใช้รถล่าสุด</h4>
+  <div class="row-card"><span class="ph">ตู้ 1</span><div><b>สพม.ปทุมธานี</b><small>24 พ.ย. · 08:30–12:00 · ครูสมศรี</small></div><span class="pill">อนุมัติ</span></div>
+  <div class="row-card"><span class="ph">ตู้ 3</span><div><b>มหาวิทยาลัยเกษตรศาสตร์</b><small>25 พ.ย. · 07:00–17:00 · ครูวิชัย</small></div><span class="pill">อนุมัติ</span></div>
+  <div class="row-card"><span class="ph">บัส</span><div><b>อุทยานวิทยาศาสตร์ประเทศไทย</b><small>27 พ.ย. · 08:00–16:00 · ครูมาลี</small></div><span class="pill">อนุมัติ</span></div>
+</div></template>
+
+<script>
+const VAN = '<svg viewBox="0 0 38 24"><path d="M3 17V7a3 3 0 0 1 3-3h17l6 5h4a2 2 0 0 1 2 2v6z" fill="currentColor"/><path d="M8 6h6v4H6V8a2 2 0 0 1 2-2zm8 0h6l4 4H16z" fill="#fff" opacity=".85"/><g class="wh"><circle cx="10" cy="18" r="3.4" fill="#1b2147"/><circle cx="10" cy="18" r="1.2" fill="#f2c14e"/></g><g class="wh"><circle cx="28" cy="18" r="3.4" fill="#1b2147"/><circle cx="28" cy="18" r="1.2" fill="#f2c14e"/></g></svg>';
+const VANG = VAN.replace('fill="currentColor"', 'fill="#cfc4ac"').replace(/class="wh"/g, '');
+const SPIN = '<svg class="wheel-sp" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4" opacity=".3"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="14 60" stroke-linecap="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>';
+const real = document.getElementById('tReal').innerHTML;
+const SK = '<div class="sk-card"><span class="sk ph"></span><div class="sk-lines"><span class="sk"></span><span class="sk"></span></div></div>'.repeat(3);
+const SKV = `<div class="sk-card"><span class="sk-van">${VANG}</span><div class="sk-lines"><span class="sk"></span><span class="sk"></span></div></div>`.repeat(3);
+document.querySelectorAll('.screen').forEach(s => { s.innerHTML = s.innerHTML.replaceAll('__VAN__', VAN).replace('__REAL__', real).replace('__SKV__', SKV).replace('__SK__', SK); });
+
+const STEPS = [8, 22, 41, 58, 74, 88, 100];
+const MSGS = ['กำลังเชื่อมต่อ…', 'กำลังโหลดข้อมูลรถ…', 'กำลังโหลดตารางงาน…', 'เกือบเสร็จแล้ว…'];
+const timers = new WeakMap();
+function play(s) {
+  (timers.get(s) || []).forEach(clearTimeout);
+  const T = []; const at = (ms, f) => T.push(setTimeout(f, ms)); timers.set(s, T);
+  s.classList.remove('done');
+  const k = s.dataset.k, boot = s.dataset.play === 'boot', q = sel => s.querySelector(sel);
+  const msg = q('[data-msg]'), pct = q('[data-pct]');
+  if (boot) {
+    const set = v => {
+      if (pct) pct.textContent = v;
+      if (k === '1') { q('.ab1-track .fill').style.width = v + '%'; q('.ab1-track .van').style.left = v + '%'; }
+      if (k === '2') { q('.fg').style.strokeDashoffset = 371 * (1 - v / 100); q('.orbit').style.transform = `rotate(${v * 3.6}deg)`; }
+      if (k === '3') { const w = q('.ab3-route').clientWidth - 70; q('.ab3-route .done').style.width = (w * v / 100) + 'px'; q('.ab3-route .van').style.left = (26 + w * v / 100) + 'px'; q('.sch').classList.toggle('arrive', v >= 100); }
+    };
+    // รีเซ็ตแบบไม่มีทรานซิชัน
+    s.querySelectorAll('.fill,.van,.fg,.orbit,.done').forEach(e => { e.style.transition = 'none'; });
+    set(0); if (msg && k !== '2') msg.textContent = MSGS[0];
+    requestAnimationFrame(() => requestAnimationFrame(() => s.querySelectorAll('.fill,.van,.fg,.orbit,.done').forEach(e => { e.style.transition = ''; })));
+    STEPS.forEach((v, i) => at(250 + i * 420, () => { set(v); if (msg && k !== '2') msg.textContent = MSGS[Math.min(MSGS.length - 1, Math.floor(i / 2))]; if (msg && k === '2') msg.textContent = v >= 100 ? 'พร้อมใช้งาน' : 'ระบบยานพาหนะ'; }));
+    at(250 + STEPS.length * 420 + 300, () => s.classList.add('done'));
+  } else {
+    if (k === '1') {
+      const f = q('.ab1-top .fill'), v = q('.ab1-top .van');
+      [f, v].forEach(e => { e.style.transition = 'none'; }); f.style.width = '0%'; v.style.left = '0%';
+      requestAnimationFrame(() => requestAnimationFrame(() => [f, v].forEach(e => { e.style.transition = ''; })));
+      [18, 35, 52, 66, 79, 90, 100].forEach((x, i) => at(120 + i * 260, () => { f.style.width = x + '%'; v.style.left = x + '%'; }));
+    }
+    at(2000, () => s.classList.add('done'));
+  }
+}
+document.querySelectorAll('.screen').forEach(s => { s.addEventListener('click', () => play(s)); play(s); });
+document.getElementById('replayAll').onclick = () => document.querySelectorAll('.screen').forEach(play);
+
+const BUSY = {
+  1: () => `<span class="dots"><i></i><i></i><i></i></span><span>กำลังบันทึก</span><span class="bfill"></span>`,
+  2: () => `${SPIN}<span>กำลังบันทึก…</span>`,
+  3: () => `<span class="dots"><i></i><i></i><i></i></span><span>กำลังบันทึก</span><span class="bline"></span>`
+};
+document.querySelectorAll('[data-busy]').forEach(b => b.addEventListener('click', () => {
+  if (b.disabled) return;
+  const k = b.dataset.busy, html = b.innerHTML, w = b.offsetWidth;
+  b.disabled = true; b.style.minWidth = w + 'px'; b.innerHTML = BUSY[k]();
+  const bf = b.querySelector('.bfill'); if (bf) requestAnimationFrame(() => requestAnimationFrame(() => { bf.style.width = '100%'; }));
+  setTimeout(() => { b.disabled = false; b.innerHTML = '✓ เรียบร้อย'; setTimeout(() => { b.innerHTML = html; b.style.minWidth = ''; }, 1100); }, 1800);
+}));
+</script>
+</body>
+</html>

@@ -775,10 +775,26 @@ const App = (() => {
   }
   const localBadge = () => Store.LOCAL ? `<div class="local-badge no-print">${icon('flask')} โหมดทดลอง — ข้อมูลเก็บในเบราว์เซอร์นี้ <button data-reset>ล้างข้อมูลตัวอย่าง</button></div>` : '';
 
+  // ───────── แอนิเมชันระหว่างโหลด (AB2) ─────────
+  const VAN_SVG = '<svg viewBox="0 0 38 24" aria-hidden="true"><path d="M3 17V7a3 3 0 0 1 3-3h17l6 5h4a2 2 0 0 1 2 2v6z" fill="currentColor"/><path d="M8 6h6v4H6V8a2 2 0 0 1 2-2zm8 0h6l4 4H16z" fill="#fff" opacity=".85"/><g class="wh"><circle cx="10" cy="18" r="3.4" fill="#1b2147"/><circle cx="10" cy="18" r="1.2" fill="#f2c14e"/></g><g class="wh"><circle cx="28" cy="18" r="3.4" fill="#1b2147"/><circle cx="28" cy="18" r="1.2" fill="#f2c14e"/></g></svg>';
+  const bootHTML = () => `<div class="boot" role="status"><div class="bt-ring"><svg class="bt-r" viewBox="0 0 130 130"><circle class="bg" cx="65" cy="65" r="59"/><circle class="fg" cx="65" cy="65" r="59"/></svg><div class="bt-orbit"><span class="bt-van">${VAN_SVG}</span></div><img src="images/logo.png" alt=""></div><b class="bt-pct">0%</b><p>กำลังโหลดระบบยานพาหนะ…</p></div>`;
+  // โหลดข้อมูลในหน้า: ถนนเส้นประ + รถวิ่งไป-กลับใต้แถบเมนู · หน้าแรกหลังเข้าสู่ระบบมีโครงร่างรายการระหว่างรอข้อมูลชุดแรก
+  const skelHTML = () => `<div class="ld-skel" aria-hidden="true"><div class="container"><div class="sk" style="height:18px;width:30%;margin-bottom:6px"></div>${'<div class="sk-card"><span class="sk ph"></span><div class="sk-lines"><span class="sk"></span><span class="sk"></span></div></div>'.repeat(4)}</div></div>`;
+  let loadingSince = 0;
+  function syncLoading() {
+    const busy = Store.authState === 'in' && (Store.dataLoading() || Store.histLoading());
+    document.documentElement.classList.toggle('is-loading', busy);
+    let road = document.getElementById('ldRoad');
+    if (!road) { road = document.createElement('div'); road.id = 'ldRoad'; road.className = 'ld-road no-print'; road.setAttribute('aria-hidden', 'true'); road.innerHTML = `<span class="ld-van">${VAN_SVG}</span>`; document.body.appendChild(road); }
+    // โครงร่างหายเมื่อข้อมูลชุดแรกมาครบ (หรือรอเกิน 10 วินาที — เน็ตช้า/สิทธิ์ไม่พอ ก็ให้เห็นหน้าจริง)
+    if (Store.dataLoading()) { if (!loadingSince) loadingSince = Date.now(); } else loadingSince = 0;
+    if (!Store.dataLoading() || Date.now() - loadingSince > 10000) document.querySelectorAll('.ld-skel').forEach(el => { el.classList.add('out'); setTimeout(() => el.remove(), 350); });
+  }
   // ───────── แสดงผล ─────────
   async function render() {
     const { path, query } = parseHash();
-    if (Store.authState === 'loading') { app().innerHTML = `<div class="boot" role="status"><img src="images/logo.png" alt=""><p>กำลังโหลดระบบยานพาหนะ…</p></div>`; return; }
+    // หน้าเปิดระบบ (วงแหวน + รถตู้วิ่งรอบโลโก้) — มีอยู่แล้วจาก index.html ไม่วาดใหม่ ให้เปอร์เซ็นต์เดินต่อ
+    if (Store.authState === 'loading') { if (!document.querySelector('#app > .boot .bt-ring')) app().innerHTML = bootHTML(); return; }
     const m = match(path);
     if (!m) return go('#/');
     const me = Store.me, inn = Store.authState === 'in';
@@ -841,6 +857,10 @@ const App = (() => {
     if (view.mount) { try { view.mount(root, ctx); } catch (e) { console.error(e); } }
     UI.hydrate(root); UI.animate(root, { quiet: same }); if ($('#nav')) UI.hydrate($('#nav'));
     if (view.tick) view.tick();   // นาฬิกาแสดงทันที ไม่ว่างรอ 1 วินาที
+    // ข้อมูลชุดแรกยังมาไม่ครบ → โครงร่างรายการทับหน้าไว้ก่อน (ไม่ให้เห็นหน้าว่าง "ไม่มีข้อมูล" แวบหนึ่ง)
+    // (วางเป็นชั้นลอยใต้แถบเมนู ไม่แทรกใน #view เพราะหน้าแบบ patch เทียบ DOM ทีละโหนด)
+    if (Store.authState === 'in' && Store.dataLoading() && layout !== 'bare' && !document.querySelector('.ld-skel')) document.body.insertAdjacentHTML('beforeend', skelHTML());
+    syncLoading();
     // ครั้งแรกหลังเข้าสู่ระบบ: โหลดรูปรถ/คนขับ/คณะทำงานไว้ล่วงหน้าตอนว่าง
     if (Store.authState === 'in' && !render._warm) { render._warm = true; setTimeout(() => Store.warmImages && Store.warmImages(), 2500); }
     if (Store.authState === 'in') popNews();
@@ -880,6 +900,7 @@ const App = (() => {
 
   // เมื่อข้อมูลเปลี่ยน → วาดหน้าใหม่ (ยกเว้นหน้าที่กำลังกรอกฟอร์ม)
   function onData() {
+    syncLoading();
     clearTimeout(rerenderTimer);
     rerenderTimer = setTimeout(() => {
       if (document.querySelector('.modal-wrap')) { pendingRender = true; const nav = $('#nav'); if (nav) refreshNav(); return; }

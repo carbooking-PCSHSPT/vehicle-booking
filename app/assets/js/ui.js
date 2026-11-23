@@ -239,10 +239,17 @@ const UI = (() => {
 
   // ปุ่มกดแล้วแสดงสถานะกำลังทำงาน
   async function busy(btn, fn) {
-    if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+    // ปุ่มระหว่างทำงาน: วงล้อหมุน + ข้อความ (ปุ่มแคบแสดงแค่วงล้อ) · กำหนดข้อความเองได้ด้วย data-busy-text
+    if (btn) {
+      const t = btn.offsetWidth >= 140 ? (btn.dataset.busyText || 'กำลังบันทึก…') : '';
+      btn.disabled = true; btn.classList.add('loading');
+      const s = document.createElement('span'); s.className = 'bt-busy';
+      s.innerHTML = '<svg class="bt-wheel" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.3" fill="none" stroke="currentColor" stroke-width="2.6"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 3.5v6.2M12 14.3v6.2M3.5 12h6.2M14.3 12h6.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' + (t ? `<span>${esc(t)}</span>` : '');
+      btn.appendChild(s);
+    }
     try { return await fn(); }
     catch (e) { toast(e.message || String(e), 'error'); throw e; }
-    finally { if (btn) { btn.disabled = false; btn.classList.remove('loading'); } }
+    finally { if (btn) { btn.disabled = false; btn.classList.remove('loading'); btn.querySelectorAll('.bt-busy').forEach(x => x.parentNode.removeChild(x)); } }
   }
 
   // ดาวน์โหลด Excel (ใช้ SheetJS ถ้ามี ถ้าไม่มีส่งออก CSV)

@@ -559,6 +559,7 @@ const Store = (() => {
       async changeOwnPassword(password) { const u = user(me.email); u.password = password; u.mustChangePassword = false; save(); me = u; emit(); },
       async upload(files) { return files; },          // เก็บ dataURL ในเบราว์เซอร์
       async fileUrl(ref) { return ref; },
+      dataLoading: () => false,
       histState: () => 'done',                         // โหมดทดลองมีข้อมูลครบในเครื่องอยู่แล้ว
       async loadHistory() {},
       reset() { localStorage.removeItem(KEY); localStorage.removeItem(sessKey); location.reload(); }
@@ -595,7 +596,10 @@ const Store = (() => {
     // ประหยัดโควตาอ่าน: แอดมิน/ผู้บริหารฟังเรียลไทม์เฉพาะคำขอ/ผลประเมิน ~13 เดือนล่าสุด
     // ข้อมูลเก่ากว่านั้นโหลดครั้งเดียวเมื่อหน้าที่ต้องใช้ขอ (needHistory) — histState: none | loading | done
     let histState = 'none', dataGen = 0;
-    const stopAll = () => { unsubs.forEach(u => { try { u(); } catch (e) { /* ข้าม */ } }); unsubs = []; reqMaps = {}; rateMaps = {}; histState = 'none'; dataGen++; };
+    // ตัวรับฟังที่ยังไม่ได้ข้อมูลชุดแรก (หลังเข้าสู่ระบบ) — ว่าง = ข้อมูลพร้อมแสดง
+    let pend = new Set();
+    const first = n => { pend.add(n); return () => { if (pend.delete(n)) emit(); }; };
+    const stopAll = () => { unsubs.forEach(u => { try { u(); } catch (e) { /* ข้าม */ } }); unsubs = []; reqMaps = {}; rateMaps = {}; histState = 'none'; pend = new Set(); dataGen++; };
     const stopProfile = () => { if (profileUnsub) { try { profileUnsub(); } catch (e) { /* ข้าม */ } } profileUnsub = null; };
     // ตัวรับฟังเรียลไทม์หลุด → แจ้งผู้ใช้ครั้งเดียว (ไม่ให้เห็นข้อมูลว่างโดยไม่รู้สาเหตุ)
     const onErr = name => e => {
@@ -640,14 +644,14 @@ const Store = (() => {
       mergeReq();
     }
     function listenReq(name, q) {
-      reqMaps[name] = new Map();
-      unsubs.push(q.onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); reqMaps[name] = mp; mergeReq(); }, onErr('requests/' + name)));
+      reqMaps[name] = new Map(); const f = first('req-' + name);
+      unsubs.push(q.onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); reqMaps[name] = mp; f(); mergeReq(); }, e => { f(); onErr('requests/' + name)(e); }));
     }
     function startData() {
       stopAll(); warned = false;
       const col = n => fs.collection(n);
       unsubs.push(fs.collection('config').doc('settings').onSnapshot(s => { db = { ...db, settings: { ...defaultSettings(), ...(s.data() || {}) } }; emit(); }, onErr('config')));
-      ['vehicles', 'drivers'].forEach(n => unsubs.push(col(n).onSnapshot(s => { db = { ...db, [n]: s.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0)) }; emit(); }, onErr(n))));
+      ['vehicles', 'drivers'].forEach(n => { const f = first(n); unsubs.push(col(n).onSnapshot(s => { db = { ...db, [n]: s.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0)) }; f(); emit(); }, e => { f(); onErr(n)(e); })); });
       unsubs.push(col('places').orderBy('count', 'desc').limit(400).onSnapshot(s => { db = { ...db, places: s.docs.map(d => d.data()) }; emit(); }, onErr('places')));
       if (isBack(me)) listenReq('recent', col('requests').where('endAt', '>=', historyCutoff().toISOString()));
       else listenReq('window', col('requests').where('endAt', '>=', new Date(Date.now() - 45 * DAY).toISOString()));
@@ -707,6 +711,7 @@ const Store = (() => {
         });
       },
       histState: () => histState,
+      dataLoading: () => pend.size > 0,
       loadHistory,
       async put(col, id, data) {
         if (col === 'settings') return guard(fs.collection('config').doc('settings').set(strip(data)));
@@ -937,6 +942,9 @@ const Store = (() => {
     notifications, markSeen, pendingRatings,
     // ข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน): หน้าที่ต้องใช้ข้อมูลตั้งแต่วันที่ from เรียกฟังก์ชันนี้ตอนสร้างหน้า
     // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง
+    // กำลังรอข้อมูล: ชุดแรกหลังเข้าสู่ระบบ · ข้อมูลย้อนหลัง
+    dataLoading: () => !!(A && A.dataLoading && A.dataLoading()),
+    histLoading: () => !!(A && A.histState() === 'loading'),
     needHistory(from) {
       if (!A || !me || !isBack(me)) return false;
       const st = A.histState();
