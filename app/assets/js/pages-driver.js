@@ -188,14 +188,15 @@
     : `<button class="${cls} is-wait ${st.late ? 'is-late' : ''}" disabled title="${st.late ? 'เลยกำหนดออกเกิน 24 ชั่วโมง ให้แอดมินบันทึกแทน' : `กดได้ก่อนเวลาออก 3 ชั่วโมง`}">${icon(st.late ? 'alert' : 'clock')} ${st.msg}</button>`; };
   Pages._departState = departState;
   // ───────── ออกงานฉุกเฉิน (นำส่งผู้ป่วย): คนขับกดเองทันที · แอดมินบันทึกแทนได้ (เลือกคนขับ + เวลาออก/กลับ) ─────────
-  Pages._medicalModal = async ({ admin = false } = {}) => {
+  Pages._medicalModal = async ({ admin = false, driverId = '' } = {}) => {
     const me = S.me, myD = S.driverOfUser(me);
     const mem = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
     const onTrip = id => S.db.requests.some(r => (r.assignments || []).some(a => a.vehicleId === id && a.status === 'ontrip'));
     const soon = id => { const t = Date.now(), u = t + 6 * 36e5; const r = S.db.requests.filter(x => ['approved', 'ontrip'].includes(x.status) && new Date(x.startAt).getTime() < u && new Date(x.endAt).getTime() > t && (x.assignments || []).some(a => a.vehicleId === id && a.status === 'assigned')).sort((a, b) => a.startAt.localeCompare(b.startAt))[0]; return r ? `มีงาน ${fmt.time(r.startAt)}` : ''; };
     // เฉพาะรถรับส่งคน (รถตู้ก่อน) — ไม่แสดงรถบรรทุก/รถขนขยะ/รถกอล์ฟ
     const vs = S.db.vehicles.filter(v => v.bookable !== false && S.PASSENGER_KINDS.includes(v.kind)).sort((a, b) => (S.PASSENGER_KINDS.indexOf(a.kind) < 0) - (S.PASSENGER_KINDS.indexOf(b.kind) < 0) || (a.kind === 'van' ? -1 : 0) - (b.kind === 'van' ? -1 : 0) || (+a.no || 0) - (+b.no || 0));
-    const mine = myD && (S.db.vehicles.find(v => v.driverId === myD.id) || {}).id;
+    const forD = driverId || (myD && myD.id);
+    const mine = forD && (S.db.vehicles.find(v => v.driverId === forD) || {}).id;
     const defV = [mem('vb-med-v', ''), mine].find(id => id && vs.some(v => v.id === id) && !onTrip(id)) || (vs.find(v => !onTrip(v.id) && v.kind === 'van') || {}).id || '';
     // รายชื่อครูให้เลือก: แอดมินเห็นผู้ใช้ทั้งหมด · คนขับใช้ชื่อผู้ขอใช้รถที่เคยเห็นในระบบ (พิมพ์ชื่อเองได้เสมอ)
     const names = [...new Set([...S.db.users.filter(u => u.active !== false && (u.roles || []).includes('teacher')).map(u => u.name), ...S.db.requests.map(r => (r.requester || {}).name), ...((S.db.settings.committee || []).map(c => c.name))].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
@@ -206,7 +207,7 @@
       title: `<span class="em-ttl">${icon('alert')} ออกงานฉุกเฉิน · นำส่งผู้ป่วย</span>`, size: 'lg',
       body: `<form id="emF" class="stack em-form">
         <div class="note-box red">${icon('alert')}<div>ใช้เมื่อ<b>นำส่งผู้ป่วย/ผู้บาดเจ็บกรณีฉุกเฉิน</b>เท่านั้น · ไม่ต้องขออนุญาตล่วงหน้า ระบบแจ้งแอดมินทันที · กลับถึงแล้วให้ผู้ดูแลลงชื่อ</div></div>
-        ${admin ? `<div class="field"><label>คนขับ <b class="req">*</b></label><select name="driverId"><option value="">— เลือกคนขับ —</option>${drivers.map(d => `<option value="${d.id}">${esc(d.name)}${d.standby ? ' (สำรอง)' : ''}</option>`).join('')}</select></div>` : ''}
+        ${admin ? `<div class="field"><label>คนขับ <b class="req">*</b></label><select name="driverId"><option value="">— เลือกคนขับ —</option>${drivers.map(d => `<option value="${d.id}" ${d.id === driverId ? 'selected' : ''}>${esc(d.name)}${d.standby ? ' (สำรอง)' : ''}</option>`).join('')}</select></div>` : ''}
         <div class="field"><label>รถที่ใช้ <b class="req">*</b> <span class="hint">(เลือกคันไหนก็ได้ที่ว่าง)</span></label>
           <div class="em-veh">${vs.map(v => { const busy = onTrip(v.id) && !admin, s = soon(v.id); return `<label class="em-v ${busy ? 'is-busy' : ''}"><input type="radio" name="vehicleId" value="${v.id}" ${v.id === defV ? 'checked' : ''} ${busy ? 'disabled' : ''}><span><b>${esc(v.name)}</b><small>${esc(v.plate || '')}</small>${busy ? '<em class="bad">กำลังเดินทาง</em>' : s ? `<em>${s}</em>` : ''}</span></label>`; }).join('')}</div></div>
         <div class="field"><label>สถานพยาบาล <b class="req">*</b></label>
@@ -349,7 +350,7 @@
   }
   function bindJobs(root) {
     root.addEventListener('click', async e => {
-      if (e.target.closest('[data-emgo]')) { const r = await Pages._medicalModal(); if (r) App.render(); return; }
+      const em = e.target.closest('[data-emgo]'); if (em) { const r = await Pages._medicalModal(em.dataset.drv ? { admin: true, driverId: em.dataset.drv } : {}); if (r) App.render(); return; }
       const g = e.target.closest('[data-go]');
       if (g) { const r = S.request(g.dataset.r); return Pages._tripAction(r, +g.dataset.i, g.dataset.go); }
       const f = e.target.closest('[data-fuel]');
@@ -496,7 +497,7 @@
         ${adminView ? `<a class="btn btn-ghost btn-sm back-admin" href="#/admin">${icon('arrowL')} กลับระบบหลังบ้าน</a>
           <div class="note-box navy adm-pick" style="margin-bottom:14px">${icon('shield')}<div><span class="nw">มุมมองแอดมิน — เลือกคนขับ</span><div class="adm-pick-row"><select class="input" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><a class="link nw" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div></div>` : ''}
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
-        ${!adminView ? `<button type="button" class="em-go" data-emgo>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ</small></span>${icon('chevR')}</button>` : ''}
+        <button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
         ${tabs}
         ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
       </div>`,
