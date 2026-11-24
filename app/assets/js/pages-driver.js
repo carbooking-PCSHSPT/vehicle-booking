@@ -499,6 +499,7 @@
           <div class="note-box navy adm-pick" style="margin-bottom:14px">${icon('shield')}<div><span class="nw">มุมมองแอดมิน — เลือกคนขับ</span><div class="adm-pick-row"><select class="input" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><a class="link nw" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div></div>` : ''}
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
         <button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
+        ${(() => { const t = Pages._todayDuty && Pages._todayDuty(d.id); return t ? `<div class="note-box navy duty-today">${icon('clock')}<div><b>${t}</b></div></div>` : ''; })()}
         ${tabs}
         ${tab === 'ot' ? Pages._otDriver(d, query, adminView) : tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
       </div>`,

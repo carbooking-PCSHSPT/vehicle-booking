@@ -6,8 +6,10 @@
      ได้ช่วงเดียวต่อวัน (ช่วงที่ได้มากกว่า) · ชม.ละ 50 บาท · ไม่เกิน 3 ชม./วัน (รวมทุกเที่ยว) = 150 บาท
      เศษชั่วโมง ตั้งแต่ 40 นาทีปัดขึ้น ต่ำกว่าปัดลง
    - เสาร์: ขับรถวันนั้น เหมา 200 บาท
-   - งานฉุกเฉินนำส่งผู้ป่วย (ทุกวัน รวมวันเสาร์): ออกตั้งแต่ 18.00 (ถึง 05.00) เหมา 150 บาท · ออกก่อน 18.00 นับตั้งแต่ 18.00 ถึงเวลากลับถึง
-     ไม่เกิน 3 ชม. (กลับก่อน 18.00 = 0) · วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า (ไม่รวมกัน)
+   - งานฉุกเฉินนำส่งผู้ป่วย: คนขับหอพัก (ติ๊กไว้ในหน้าพนักงานขับรถ) จ.–ศ. ออกหลัง 18.00 หรือหลังเที่ยงคืน และ ส.–อา. ทั้งวัน เหมา 150 บาท/วัน
+     คนขับทั่วไป นับตั้งแต่ 18.00 (หรือตั้งแต่เวลาออกถ้าออกหลัง 18.00/หลังเที่ยงคืน) ถึงเวลากลับถึง ไม่เกิน 3 ชม. (กลับก่อน 18.00 = 0)
+     วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า (ไม่รวมกัน)
+   - เวรเย็น จ.–ศ. (สัปดาห์ละ 1 คน อยู่ถึง 18.00) และเวรวันอาทิตย์ (อยู่ถึง 16.30): เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร
    - งานค้างคืน/หลายวัน: ไม่คิด (เจ้าของงานเบิกเบี้ยเลี้ยงคนขับเอง) · ไม่มีวันหยุดนักขัตฤกษ์พิเศษ
    ═══════════════════════════════════════════════════════════ */
 (() => {
@@ -23,7 +25,9 @@
   const hoursOf = m => Math.floor(m / 60) + (m % 60 >= 40 ? 1 : 0);
   const hm = m => `${Math.floor(m / 60)} ชม. ${m % 60} นาที`;
   const money = n => (+n || 0).toLocaleString('th-TH');
-  const isMedNight = t => t.med && (minOfDay(t.dep) >= MED_NIGHT_FROM || minOfDay(t.dep) < MORN_END);
+  const isNightDep = t => minOfDay(t.dep) >= MED_NIGHT_FROM || minOfDay(t.dep) < MORN_END;
+  // งานฉุกเฉินที่ได้เหมา 150: คนขับหอพัก · จ.–ศ. ออกหลัง 18.00/หลังเที่ยงคืน · ส.–อา. ทั้งวัน
+  const isMedFlat = (t, dorm) => t.med && dorm && (isNightDep(t) || [0, 6].includes(t.dep.getDay()));
   // รวมช่วงเวลาที่ซ้อนกัน (หลายเที่ยวในวันเดียว ไม่นับซ้ำ) → นาที
   const unionMin = iv => {
     const xs = iv.filter(x => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
@@ -48,8 +52,8 @@
     return out.sort((x, y) => x.dep - y.dep);
   }
   // ── คำนวณ 1 วัน ──
-  function calcDay(date, trips) {
-    const d = dayStart(date), wd = d.getDay();
+  function calcDay(date, trips, drv = {}) {
+    const d = dayStart(date), wd = d.getDay(), dorm = !!drv.dorm;
     const use = trips.filter(t => !t.multi);
     const base = { date, wd, trips, skipped: trips.filter(t => t.multi), morning: 0, evening: 0, medEve: 0, basis: '', mins: 0, hours: 0, amount: 0 };
     if (!use.length) return base;
@@ -63,12 +67,12 @@
       const mins = Math.max(evening, morning), hours = Math.min(CAP_H, hoursOf(mins));
       N = { amount: hours * RATE, basis: !mins ? '' : evening >= morning ? 'evening' : 'morning', mins, hours, morning, evening };
     }
-    // ฝั่งงานฉุกเฉิน (ทุกวัน): ออกตั้งแต่ 18.00–05.00 เหมา 150 · ออกก่อน 18.00 นับจาก 18.00 ถึงกลับถึง
+    // ฝั่งงานฉุกเฉิน: คนขับหอพักเหมา 150 (จ.–ศ. หลัง 18.00/หลังเที่ยงคืน · ส.–อา. ทั้งวัน) · นอกนั้นนับตั้งแต่ 18.00 (หรือเวลาออกถ้าออกหลัง 18.00/หลังเที่ยงคืน) ถึงกลับถึง
     let M = { amount: 0, basis: '', mins: 0, hours: 0, medEve: 0 };
     if (med.length) {
-      const medEve = unionMin(med.filter(t => !isMedNight(t)).map(t => [Math.max(t.dep.getTime(), t0 + MED_EVE_START * 6e4), t.ret.getTime()]));
+      const medEve = unionMin(med.filter(t => !isMedFlat(t, dorm)).map(t => [isNightDep(t) ? t.dep.getTime() : Math.max(t.dep.getTime(), t0 + MED_EVE_START * 6e4), t.ret.getTime()]));
       const hours = Math.min(CAP_H, hoursOf(medEve));
-      M = med.some(isMedNight) ? { amount: MED_NIGHT, basis: 'mednight', mins: 0, hours: 0, medEve } : { amount: hours * RATE, basis: medEve ? 'medevening' : '', mins: medEve, hours, medEve };
+      M = med.some(t => isMedFlat(t, dorm)) ? { amount: MED_NIGHT, basis: 'mednight', mins: 0, hours: 0, medEve } : { amount: hours * RATE, basis: medEve ? 'medevening' : '', mins: medEve, hours, medEve };
     }
     const W = M.amount > N.amount ? M : N;
     return { ...base, morning: N.morning, evening: N.evening, medEve: M.medEve, mins: W.mins, basis: W.basis, hours: W.hours, amount: W.basis === 'sat' ? SAT_FLAT : Math.min(W.amount, CAP_H * RATE) };
@@ -79,7 +83,7 @@
     tripsOf(driverId).forEach(x => { if (x.day < f || x.day > t) return; if (!by.has(x.day)) by.set(x.day, []); by.get(x.day).push(x); });
     (S.db.ot || []).forEach(o => { if (o.driverId === driverId && o.date >= f && o.date <= t && !by.has(o.date)) by.set(o.date, []); });
     return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, trips]) => {
-      const c = calcDay(date, trips), ov = (S.db.ot || []).find(o => o.id === `${driverId}_${date}`);
+      const c = calcDay(date, trips, S.driver(driverId) || {}), ov = (S.db.ot || []).find(o => o.id === `${driverId}_${date}`);
       return ov ? { ...c, auto: { hours: c.hours, amount: c.amount }, hours: +ov.hours || 0, amount: +ov.amount || 0, ov } : c;
     }).filter(x => x.amount > 0 || x.ov);
   }
@@ -90,7 +94,7 @@
   const basisText = x => {
     if (x.ov) return `แอดมินปรับ${x.ov.note ? `: ${x.ov.note}` : ''}`;
     if (x.basis === 'sat') return 'วันเสาร์ เหมาจ่าย';
-    if (x.basis === 'mednight') return 'งานฉุกเฉินออกหลัง 18.00 เหมาจ่าย';
+    if (x.basis === 'mednight') return 'งานฉุกเฉิน (คนขับหอพัก) เหมาจ่าย';
     if (x.basis === 'medevening') return `งานฉุกเฉิน หลัง 18.00 · ${hm(x.medEve)}`;
     if (x.basis === 'evening') return `ช่วงเย็น หลัง 16.30 · ${hm(x.evening)}`;
     if (x.basis === 'morning') return `ช่วงเช้า ก่อน 05.00 · ${hm(x.morning)}`;
@@ -99,44 +103,63 @@
   const tripText = t => `${t.r.id} · ${S.destName(t.r)} · ${fmt.time(t.dep)}–${fmt.dayMonth(t.dep) === fmt.dayMonth(t.ret) ? fmt.time(t.ret) : fmt.dayMonth(t.ret) + ' ' + fmt.time(t.ret)}${t.med ? ' · ฉุกเฉิน' : ''}`;
   const dLabel = date => { const d = dayStart(date); return `${WD[d.getDay()].replace('พฤหัสบดี', 'พฤหัสฯ')} ${fmt.date(d)}`; };
 
-  // ── เวรวันอาทิตย์ ──
-  const nextSunday = from => { const d = new Date(from); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); return d; };
-  function roster() {
-    const R = S.db.settings.dutyRoster;
-    if (R && (R.order || []).length) return { order: R.order, start: R.start || ROSTER_ANCHOR, swaps: R.swaps || {} };
+  // ── ตารางเวร: วันอาทิตย์ (อยู่ถึง 16.30) · เวรเย็น จ.–ศ. (สัปดาห์ละ 1 คน อยู่ถึง 18.00) — หมุนเวียนตามลำดับ สลับรายสัปดาห์ได้ ──
+  const ROSTERS = {
+    dutyRoster: { title: 'เวรวันอาทิตย์', note: 'วันอาทิตย์มีเวรมาทำงาน 1 คน (ถึง 16.30)', startLabel: 'วันอาทิตย์ที่คนลำดับ 1 เข้าเวร', anchor: ROSTER_ANCHOR, dow: 0 },
+    eveRoster: { title: 'เวรเย็น จันทร์–ศุกร์', note: 'สัปดาห์ละ 1 คน อยู่ถึง 18.00 รอส่งต่อคนขับหอพัก', startLabel: 'วันจันทร์ที่คนลำดับ 1 เริ่มเวร', anchor: '2026-11-30', dow: 1 }
+  };
+  // วันแรกของสัปดาห์เวร (อาทิตย์ / จันทร์) ตั้งแต่ from
+  const nextDow = (from, dow) => { const d = new Date(from); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((dow - d.getDay() + 7) % 7)); return d; };
+  const weekStart = (date, dow) => { const d = dayStart(date); d.setDate(d.getDate() - ((d.getDay() - dow + 7) % 7)); return fmt.localDate(d); };
+  function roster(key = 'dutyRoster') {
+    const R = S.db.settings[key], K = ROSTERS[key];
+    if (R && (R.order || []).length) return { order: R.order, start: R.start || K.anchor, swaps: R.swaps || {} };
     const order = ['สวง', 'บุญทัน', 'พัลลภ'].map(n => (S.db.drivers.find(d => !d.standby && d.active !== false && (d.name || '').includes(n)) || {}).id).filter(Boolean);
-    return { order, start: ROSTER_ANCHOR, swaps: {} };
+    return { order, start: K.anchor, swaps: {} };
   }
+  // ใครเข้าเวร (date = วันแรกของสัปดาห์เวร)
   function dutyOf(date, R = roster()) {
     if (R.swaps && R.swaps[date]) return R.swaps[date];
     if (!R.order.length) return '';
     const wk = Math.round((dayStart(date) - dayStart(R.start)) / (7 * 864e5)), n = R.order.length;
     return R.order[((wk % n) + n) % n];
   }
-  const sundays = (from, n) => Array.from({ length: n }, (_, i) => { const d = nextSunday(from); d.setDate(d.getDate() + i * 7); return fmt.localDate(d); });
+  const weeks = (from, n, dow) => Array.from({ length: n }, (_, i) => { const d = nextDow(from, dow); d.setDate(d.getDate() + i * 7); return fmt.localDate(d); });
+  const sundays = (from, n) => weeks(from, n, 0);
+  const eveWeeks = (from, n) => weeks(dayStart(weekStart(fmt.localDate(from), 1)), n, 1);   // รวมสัปดาห์ปัจจุบัน
+  const weekLabel = (date, key) => key === 'eveRoster' ? (() => { const a = dayStart(date), b = new Date(a); b.setDate(b.getDate() + 4); return `${fmt.dayMonth(a)}–${fmt.date(b)}`; })() : fmt.date(dayStart(date));
   Pages._dutyOf = dutyOf;
+  // เวรวันนี้ของคนขับ (ใช้หน้าแรกคนขับ)
+  Pages._todayDuty = driverId => {
+    const now = new Date(), wd = now.getDay(), today = fmt.localDate(now);
+    if (wd === 0 && dutyOf(today, roster('dutyRoster')) === driverId) return 'วันนี้คุณเป็นเวรวันอาทิตย์ (ถึง 16.30 น.)';
+    if (wd >= 1 && wd <= 5 && dutyOf(weekStart(today, 1), roster('eveRoster')) === driverId) return 'สัปดาห์นี้คุณอยู่เวรเย็น — อยู่ถึง 18.00 น.';
+    return '';
+  };
 
-  function rosterModal() {
-    const R = roster(), ds = S.db.drivers.filter(d => d.active !== false && !d.standby);
+  function rosterModal(key = 'dutyRoster') {
+    const K = ROSTERS[key], R = roster(key), ds = S.db.drivers.filter(d => d.active !== false && !d.standby);
     const opt = (sel, blank) => `${blank ? `<option value="">${blank}</option>` : ''}${ds.map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}`;
-    const list = sundays(new Date(), 12);
+    const list = key === 'eveRoster' ? eveWeeks(new Date(), 12) : sundays(new Date(), 12);
     return UI.modal({
-      title: `${icon('calendar')} ตารางเวรวันอาทิตย์`, size: 'lg',
+      title: `${icon('calendar')} ${K.title}`, size: 'lg',
       body: `<form id="rsF" class="stack">
-        <p class="hint">วันอาทิตย์มีเวรมาทำงาน 1 คน หมุนเวียนตามลำดับด้านล่าง · ถ้าบางสัปดาห์สลับเวร เลือกชื่อในตารางได้ (ว่าง = ตามลำดับ)</p>
+        <div class="seg rs-tabs">${Object.entries(ROSTERS).map(([k, x]) => `<button type="button" class="${k === key ? 'on' : ''}" data-rk="${k}">${x.title}</button>`).join('')}</div>
+        <p class="hint">${K.note} · หมุนเวียนตามลำดับด้านล่าง · ถ้าบางสัปดาห์สลับเวร เลือกชื่อในตารางได้ (ว่าง = ตามลำดับ) · เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร</p>
         <div class="field"><label>ลำดับเวร</label><div class="stack rs-order" style="gap:6px">${[0, 1, 2, 3, 4].map(i => `<div class="row" style="gap:8px"><b style="width:22px">${i + 1}.</b><select class="input" name="o${i}">${opt(R.order[i], i < 1 ? '' : '— ไม่มี —')}</select></div>`).join('')}</div></div>
-        <div class="field"><label>วันอาทิตย์ที่คนลำดับ 1 เข้าเวร</label><input type="date" name="start" value="${esc(R.start)}"></div>
-        <div class="field"><label>12 สัปดาห์ข้างหน้า</label><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>วันอาทิตย์</th><th>ตามลำดับ</th><th>สลับเวร</th></tr></thead>
-          <tbody>${list.map(s => `<tr><td class="nw">${fmt.date(dayStart(s))}</td><td>${esc(C.dName(dutyOf(s, { ...R, swaps: {} })))}</td><td><select class="input" data-sw="${s}">${opt((R.swaps || {})[s], '— ตามลำดับ —')}</select></td></tr>`).join('')}</tbody></table></div></div>
+        <div class="field"><label>${K.startLabel}</label><input type="date" name="start" value="${esc(R.start)}"></div>
+        <div class="field"><label>12 สัปดาห์ข้างหน้า</label><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>${key === 'eveRoster' ? 'สัปดาห์' : 'วันอาทิตย์'}</th><th>ตามลำดับ</th><th>สลับเวร</th></tr></thead>
+          <tbody>${list.map(s => `<tr><td class="nw">${weekLabel(s, key)}</td><td>${esc(C.dName(dutyOf(s, { ...R, swaps: {} })))}</td><td><select class="input" data-sw="${s}">${opt((R.swaps || {})[s], '— ตามลำดับ —')}</select></td></tr>`).join('')}</tbody></table></div></div>
       </form>`,
+      onOpen(el, close) { el.querySelectorAll('[data-rk]').forEach(b => b.addEventListener('click', () => { if (b.dataset.rk === key) return; close(null); setTimeout(() => rosterModal(b.dataset.rk).then(r => { if (r) App.render(); }), 280); })); },
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกตารางเวร', kind: 'btn-primary', icon: 'check', onClick: async el => {
         const f = UI.formData(el.querySelector('#rsF'));
         const order = [0, 1, 2, 3, 4].map(i => f['o' + i]).filter(Boolean);
         if (!order.length) { UI.toast('เลือกคนเข้าเวรอย่างน้อย 1 คน', 'error'); return false; }
-        if (!f.start || dayStart(f.start).getDay() !== 0) { UI.toast('วันเริ่มต้องเป็นวันอาทิตย์', 'error'); return false; }
-        const swaps = {}; Object.entries(R.swaps || {}).forEach(([k, v]) => { if (k < fmt.localDate(new Date())) swaps[k] = v; });   // เก็บการสลับเวรในอดีตไว้
-        $$('[data-sw]', el).forEach(s => { if (s.value) swaps[s.dataset.sw] = s.value; });
-        await S.saveRoster({ order, start: f.start, swaps });
+        if (!f.start || dayStart(f.start).getDay() !== K.dow) { UI.toast(`วันเริ่มต้องเป็นวัน${K.dow ? 'จันทร์' : 'อาทิตย์'}`, 'error'); return false; }
+        const swaps = {}; Object.entries(R.swaps || {}).forEach(([k, v]) => { if (k < list[0]) swaps[k] = v; });   // เก็บการสลับเวรในอดีตไว้
+        $$('[data-sw]', el).forEach(x => { if (x.value) swaps[x.dataset.sw] = x.value; });
+        await S.saveRoster({ order, start: f.start, swaps }, key);
         UI.toast('บันทึกตารางเวรแล้ว'); return true;
       } }]
     });
@@ -146,7 +169,7 @@
   async function editModal({ driverId = '', date = '' } = {}) {
     const manual = !driverId || !date;
     const ds = S.db.drivers.filter(d => d.active !== false);
-    const day = !manual ? (daysOf(driverId, dayStart(date), new Date(dayStart(date).getTime() + 864e5 - 1))[0] || calcDay(date, tripsOf(driverId).filter(t => t.day === date))) : null;
+    const day = !manual ? (daysOf(driverId, dayStart(date), new Date(dayStart(date).getTime() + 864e5 - 1))[0] || calcDay(date, tripsOf(driverId).filter(t => t.day === date), S.driver(driverId) || {})) : null;
     const auto = day ? (day.auto || { hours: day.hours, amount: day.amount }) : { hours: 0, amount: 0 };
     const res = await UI.modal({
       title: `${icon('edit')} ${manual ? 'เพิ่มรายการค่าล่วงเวลา' : `ค่าล่วงเวลา · ${esc(C.dName(driverId))}`}`, size: 'lg',
@@ -201,11 +224,11 @@
     const summary = `<section class="ot-page">${top}
       <h1 class="pd-title">หลักฐานการเบิกค่าตอบแทนการปฏิบัติงานนอกเวลา (พนักงานขับรถ)</h1>
       <p class="pd-sub">ประจำเดือน${mn}</p>
-      <table class="pd-tbl ot-tbl" data-fitw><thead><tr><th class="c">ที่</th><th class="nw">ชื่อ-สกุล</th><th class="r">จำนวนวัน</th><th class="r">ชั่วโมง</th><th class="r">วันเสาร์ (วัน)</th><th class="r">ฉุกเฉินหลัง 18.00 (ครั้ง)</th><th class="r nw">จำนวนเงิน (บาท)</th></tr></thead>
+      <table class="pd-tbl ot-tbl" data-fitw><thead><tr><th class="c">ที่</th><th class="nw">ชื่อ-สกุล</th><th class="r">จำนวนวัน</th><th class="r">ชั่วโมง</th><th class="r">วันเสาร์ (วัน)</th><th class="r">ฉุกเฉินเหมา (วัน)</th><th class="r nw">จำนวนเงิน (บาท)</th></tr></thead>
         <tbody>${rows.length ? rows.map((x, i) => { const s = sumOf(x.days); return `<tr><td class="c">${i + 1}</td><td class="nw">${esc(x.d.name)}</td><td class="r">${s.days}</td><td class="r">${s.hours}</td><td class="r">${s.sat}</td><td class="r">${s.med}</td><td class="r nw">${money(s.amount)}</td></tr>`; }).join('') : '<tr><td colspan="7" class="c">ไม่มีค่าล่วงเวลาในเดือนนี้</td></tr>'}</tbody>
         <tfoot><tr><td colspan="6">รวมทั้งสิ้น</td><td class="r nw">${money(tot)}</td></tr></tfoot></table>
       <p class="pd-words">จำนวนเงินรวม ${money(tot)} บาท (${UI.bahtText(tot)})</p>
-      <p class="ot-rule">หลักเกณฑ์: วันจันทร์–ศุกร์และวันอาทิตย์ ชั่วโมงละ ${RATE} บาท ไม่เกิน ${CAP_H} ชั่วโมงต่อวัน (ช่วง 00.00–05.00 หรือหลัง 16.30 อย่างใดอย่างหนึ่ง · เศษตั้งแต่ 40 นาทีนับเป็น 1 ชั่วโมง) · วันเสาร์เหมาจ่าย ${SAT_FLAT} บาท · งานฉุกเฉินนำส่งผู้ป่วย ออกหลัง 18.00 เหมาจ่าย ${MED_NIGHT} บาท ออกก่อน 18.00 นับตั้งแต่ 18.00 ไม่เกิน ${CAP_H} ชั่วโมง</p>
+      <p class="ot-rule">หลักเกณฑ์: วันจันทร์–ศุกร์และวันอาทิตย์ ชั่วโมงละ ${RATE} บาท ไม่เกิน ${CAP_H} ชั่วโมงต่อวัน (ช่วง 00.00–05.00 หรือหลัง 16.30 อย่างใดอย่างหนึ่ง · เศษตั้งแต่ 40 นาทีนับเป็น 1 ชั่วโมง) · วันเสาร์เหมาจ่าย ${SAT_FLAT} บาท · งานฉุกเฉินนำส่งผู้ป่วย คนขับหอพัก (จ.–ศ. หลัง 18.00, ส.–อา. ทั้งวัน) เหมาจ่าย ${MED_NIGHT} บาท คนขับทั่วไปนับตั้งแต่ 18.00 ไม่เกิน ${CAP_H} ชั่วโมง</p>
       <div class="pd-sign ot-sign"><div><p class="pd-line">ลงชื่อ ....................................</p><p>(${esc(S.me.name || '....................................')})</p><p>ผู้จัดทำ</p></div>${headSign}</div></section>`;
     const pages = rows.map(({ d, days }) => { const s = sumOf(days); return `<section class="ot-page ot-break">${top}
       <h1 class="pd-title">รายละเอียดการปฏิบัติงานนอกเวลา</h1>
@@ -231,13 +254,13 @@
     const T = sums.reduce((t, x) => ({ amount: t.amount + x.s.amount, hours: t.hours + x.s.hours, days: t.days + x.s.days, sat: t.sat + x.s.sat, med: t.med + x.s.med }), { amount: 0, hours: 0, days: 0, sat: 0, med: 0 });
     const qs = o => '#/admin/expenses?' + new URLSearchParams({ ...q, ...o });
     const list = sums.filter(x => !od || x.d.id === od);
-    const R = roster(), next = sundays(new Date(), 6);
+    const R = roster('dutyRoster'), RE = roster('eveRoster'), next = sundays(new Date(), 4), nextE = eveWeeks(new Date(), 4);
     // รายเดือน (ช่วงยาวกว่า 1 เดือน)
     const ms = monthsIn(from, to).reverse();
     const byMonth = ms.length > 1 ? ms.map(m => { const m1 = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59); return { m, v: S.db.drivers.map(d => sumOf(daysOf(d.id, m, m1)).amount) }; }) : [];
     return {
       layout: 'admin',
-      html: `${A.head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="otPdf">${icon('download')} ดาวน์โหลด PDF ส่งเบิก</button><button class="btn btn-ghost btn-sm" id="otPrint">${icon('printer')} พิมพ์</button><button class="btn btn-ghost btn-sm" id="otRoster">${icon('calendar')} เวรวันอาทิตย์</button>`)}
+      html: `${A.head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="otPdf">${icon('download')} ดาวน์โหลด PDF ส่งเบิก</button><button class="btn btn-ghost btn-sm" id="otPrint">${icon('printer')} พิมพ์</button><button class="btn btn-ghost btn-sm" id="otRoster">${icon('calendar')} ตารางเวร</button>`)}
         ${A.periodBar('#/admin/expenses', per, q)}
         ${hist ? `<div class="note-box" style="margin-bottom:14px">${icon('clock')}<div>กำลังโหลดข้อมูลย้อนหลัง… ตัวเลขจะครบเมื่อโหลดเสร็จ</div></div>` : ''}
         <div class="toolbar"><div class="seg"><a href="${qs({ view: 'list' })}"><button tabindex="-1">${icon('clipboard')} รายการ</button></a><a href="${qs({ view: 'stats' })}"><button tabindex="-1">${icon('chart')} สรุปสถิติค่าน้ำมัน</button></a><a href="${qs({})}"><button class="on" tabindex="-1">${icon('clock')} ค่าล่วงเวลา</button></a></div></div>
@@ -245,20 +268,24 @@
           <li>จันทร์–ศุกร์ และอาทิตย์: ช่วงเช้า <b>00.00–05.00</b> (นับจากเวลากดออกเดินทาง) หรือช่วงเย็น <b>หลัง 16.30</b> (นับถึงเวลากดกลับถึง) — ได้ช่วงเดียวต่อวัน (ช่วงที่มากกว่า)</li>
           <li>ชั่วโมงละ <b>${RATE} บาท</b> ไม่เกิน <b>${CAP_H} ชม./วัน</b> (${CAP_H * RATE} บาท) รวมทุกเที่ยว · เศษตั้งแต่ 40 นาทีปัดขึ้น ต่ำกว่าปัดลง</li>
           <li>วันเสาร์: ขับงานปกติวันนั้น เหมา <b>${SAT_FLAT} บาท</b></li>
-          <li>งานฉุกเฉินนำส่งผู้ป่วย (ทุกวัน รวมวันเสาร์): ออกตั้งแต่ 18.00 เหมา <b>${MED_NIGHT} บาท</b> · ออกก่อน 18.00 นับตั้งแต่ <b>18.00</b> ถึงเวลากลับถึง ไม่เกิน ${CAP_H} ชม. (กลับก่อน 18.00 ไม่ได้) · วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า</li>
+          <li>งานฉุกเฉินนำส่งผู้ป่วย: <b>คนขับหอพัก</b> จ.–ศ. ออกหลัง 18.00/หลังเที่ยงคืน และ ส.–อา. ทั้งวัน เหมา <b>${MED_NIGHT} บาท</b> · คนขับทั่วไปนับตั้งแต่ <b>18.00</b> ถึงเวลากลับถึง ไม่เกิน ${CAP_H} ชม. (กลับก่อน 18.00 ไม่ได้) · วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า</li>
+          <li>เวรเย็น จ.–ศ. (ถึง 18.00) และเวรวันอาทิตย์ (ถึง 16.30) เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร</li>
           <li>งานค้างคืน/หลายวัน ไม่คิดค่าล่วงเวลา (เจ้าของงานเบิกเบี้ยเลี้ยงคนขับ) · แอดมินปรับ/เพิ่มรายการได้ คนขับดูได้อย่างเดียว</li></ul></details>
         <div class="kpis" style="margin-bottom:16px">
           <div class="kpi" style="--kb:var(--navy-50)"><span class="k-ic">${icon('coins')}</span><b class="num">${money(T.amount)}<em>฿</em></b><span class="l">ค่าล่วงเวลารวม</span></div>
           <div class="kpi" style="--kb:var(--gold-50);--kc:var(--gold-700)"><span class="k-ic">${icon('clock')}</span><b class="num">${T.hours}<em>ชม.</em></b><span class="l">ชั่วโมงรวม · ${T.days} วัน</span></div>
           <div class="kpi" style="--kb:#ecfbf3;--kc:#047857"><span class="k-ic">${icon('calendar')}</span><b class="num">${T.sat}<em>วัน</em></b><span class="l">วันเสาร์ (เหมา ${SAT_FLAT})</span></div>
-          <div class="kpi" style="--kb:#fff1f1;--kc:#b91c1c"><span class="k-ic">${icon('alert')}</span><b class="num">${T.med}<em>ครั้ง</em></b><span class="l">ฉุกเฉินหลัง 18.00</span></div>
+          <div class="kpi" style="--kb:#fff1f1;--kc:#b91c1c"><span class="k-ic">${icon('alert')}</span><b class="num">${T.med}<em>ครั้ง</em></b><span class="l">ฉุกเฉินเหมา ${MED_NIGHT} (หอพัก)</span></div>
         </div>
         <div class="split ot-split">
           <div class="card"><div class="card-head"><h3>${icon('users')} สรุปรายคน</h3></div><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>คนขับ</th><th class="r">วัน</th><th class="r">ชม.</th><th class="r">เสาร์</th><th class="r">ฉุกเฉิน</th><th class="r">เงิน (฿)</th></tr></thead>
             <tbody>${sums.map(x => `<tr class="${od === x.d.id ? 'on' : ''}"><td class="nw"><a class="link" href="${qs({ od: od === x.d.id ? '' : x.d.id })}">${esc(x.d.name)}</a>${x.d.standby ? ' <small>(สำรอง)</small>' : ''}${x.d.dorm ? ' <span class="tag dorm-tag">หอพัก</span>' : ''}${x.s.ov ? `<small>ปรับ ${x.s.ov} วัน</small>` : ''}</td><td class="r">${x.s.days}</td><td class="r">${x.s.hours}</td><td class="r">${x.s.sat}</td><td class="r">${x.s.med}</td><td class="r"><b>${money(x.s.amount)}</b></td></tr>`).join('')}</tbody>
             <tfoot><tr><td>รวม</td><td class="r">${T.days}</td><td class="r">${T.hours}</td><td class="r">${T.sat}</td><td class="r">${T.med}</td><td class="r"><b>${money(T.amount)}</b></td></tr></tfoot></table></div></div>
-          <div class="card"><div class="card-head"><h3>${icon('calendar')} เวรวันอาทิตย์</h3><button class="btn btn-ghost btn-xs" id="otRoster2">${icon('edit')} จัดเวร</button></div>
-            ${R.order.length ? `<div class="stack" style="gap:6px">${next.map((s, i) => `<div class="ot-duty ${i === 0 ? 'next' : ''}"><span>${fmt.date(dayStart(s))}</span><b>${esc(C.dName(dutyOf(s, R)))}</b>${(R.swaps || {})[s] ? '<small>สลับเวร</small>' : ''}</div>`).join('')}</div>` : UI.empty('ยังไม่ได้ตั้งตารางเวร', 'calendar')}</div>
+          <div class="card"><div class="card-head"><h3>${icon('calendar')} ตารางเวร</h3><button class="btn btn-ghost btn-xs" id="otRoster2">${icon('edit')} จัดเวร</button></div>
+            <div class="ot-dlabel">เวรเย็น จ.–ศ. <small>อยู่ถึง 18.00</small></div>
+            ${RE.order.length ? `<div class="stack" style="gap:6px">${nextE.map((s, i) => `<div class="ot-duty ${i === 0 ? 'next' : ''}"><span>${weekLabel(s, 'eveRoster')}</span><b>${esc(C.dName(dutyOf(s, RE)))}</b>${(RE.swaps || {})[s] ? '<small>สลับเวร</small>' : ''}</div>`).join('')}</div>` : '<p class="hint">ยังไม่ได้ตั้ง</p>'}
+            <div class="ot-dlabel" style="margin-top:12px">เวรวันอาทิตย์ <small>อยู่ถึง 16.30</small></div>
+            ${R.order.length ? `<div class="stack" style="gap:6px">${next.map((s, i) => `<div class="ot-duty ${i === 0 ? 'next' : ''}"><span>${fmt.date(dayStart(s))}</span><b>${esc(C.dName(dutyOf(s, R)))}</b>${(R.swaps || {})[s] ? '<small>สลับเวร</small>' : ''}</div>`).join('')}</div>` : '<p class="hint">ยังไม่ได้ตั้ง</p>'}</div>
         </div>
         ${byMonth.length ? `<div class="card" style="margin-top:16px"><div class="card-head"><h3>${icon('chart')} รายเดือน (บาท)</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>เดือน</th>${S.db.drivers.map(d => `<th class="r">${esc(C.firstName(d.name))}</th>`).join('')}<th class="r">รวม</th></tr></thead>
           <tbody>${byMonth.map(x => `<tr><td class="nw">${monthName(x.m)}</td>${x.v.map(v => `<td class="r">${v ? money(v) : '-'}</td>`).join('')}<td class="r"><b>${money(x.v.reduce((a, b) => a + b, 0))}</b></td></tr>`).join('')}</tbody></table></div></div>` : ''}
@@ -272,7 +299,7 @@
         root.addEventListener('click', async e => {
           if (e.target.closest('#otPdf')) return claimDialog(per, { dl: true });
           if (e.target.closest('#otPrint')) return claimDialog(per);
-          if (e.target.closest('#otRoster') || e.target.closest('#otRoster2')) { if (await rosterModal()) App.render(); return; }
+          if (e.target.closest('#otRoster') || e.target.closest('#otRoster2')) { if (await rosterModal('eveRoster')) App.render(); return; }
           if (e.target.closest('#otAdd')) return editModal({});
           const ed = e.target.closest('[data-oted]'); if (ed) { const [dId, dt] = ed.dataset.oted.split('|'); return editModal({ driverId: dId, date: dt }); }
         });
@@ -290,17 +317,18 @@
     const prev = new Date(m.getFullYear(), m.getMonth() - 1, 1), nxt = new Date(m.getFullYear(), m.getMonth() + 1, 1);
     // คนขับเห็นข้อมูลย้อนหลังได้ประมาณ 1 เดือน (ตามข้อมูลที่โหลดมาในเครื่อง)
     const minM = adminView ? new Date(2020, 0, 1) : new Date(cur.getFullYear(), cur.getMonth() - 1, 1);
-    const R = roster(), myDuty = sundays(now, 12).filter(x => dutyOf(x, R) === d.id).slice(0, 3);
+    const R = roster('dutyRoster'), RE = roster('eveRoster');
+    const myDuty = sundays(now, 12).filter(x => dutyOf(x, R) === d.id).slice(0, 3), myEve = eveWeeks(now, 12).filter(x => dutyOf(x, RE) === d.id).slice(0, 2);
     return `<div class="ot-drv">
       <div class="ot-mnav"><a class="icon-btn sm ${prev < minM ? 'disabled' : ''}" ${prev < minM ? 'aria-disabled="true"' : `href="${link({ om: fmt.localDate(prev).slice(0, 7) })}"`} aria-label="เดือนก่อน">${icon('chevL')}</a><b>${monthName(m)}</b><a class="icon-btn sm ${nxt > cur ? 'disabled' : ''}" ${nxt > cur ? 'aria-disabled="true"' : `href="${link({ om: fmt.localDate(nxt).slice(0, 7) })}"`} aria-label="เดือนถัดไป">${icon('chevR')}</a></div>
       <div class="ot-sum"><div class="ot-big"><small>ค่าล่วงเวลาเดือนนี้</small><b>${money(s.amount)}</b><span>บาท</span></div>
-        <div class="ot-mini"><div><b>${s.days}</b><small>วัน</small></div><div><b>${s.hours}</b><small>ชั่วโมง</small></div><div><b>${s.sat}</b><small>วันเสาร์</small></div><div><b>${s.med}</b><small>ฉุกเฉินกลางคืน</small></div></div></div>
-      ${myDuty.length ? `<div class="note-box navy" style="margin-top:12px">${icon('calendar')}<div>เวรวันอาทิตย์ของคุณ: <b>${myDuty.map(x => fmt.date(dayStart(x))).join(' · ')}</b></div></div>` : ''}
+        <div class="ot-mini"><div><b>${s.days}</b><small>วัน</small></div><div><b>${s.hours}</b><small>ชั่วโมง</small></div><div><b>${s.sat}</b><small>วันเสาร์</small></div><div><b>${s.med}</b><small>ฉุกเฉินเหมา</small></div></div></div>
+      ${myDuty.length || myEve.length ? `<div class="note-box navy" style="margin-top:12px">${icon('calendar')}<div>${myEve.length ? `เวรเย็น จ.–ศ. (ถึง 18.00): <b>${myEve.map(x => weekLabel(x, 'eveRoster')).join(' · ')}</b>` : ''}${myEve.length && myDuty.length ? '<br>' : ''}${myDuty.length ? `เวรวันอาทิตย์ (ถึง 16.30): <b>${myDuty.map(x => fmt.date(dayStart(x))).join(' · ')}</b>` : ''}</div></div>` : ''}
       <div class="ot-list">${days.length ? days.map(y => `<div class="ot-item ${y.ov ? 'is-ov' : ''}"><div class="ot-date"><b>${dayStart(y.date).getDate()}</b><small>${WD[y.wd]}</small></div>
           <div class="ot-body"><b>${esc(basisText(y))}</b>${y.trips.map(t => `<small>${esc(S.destName(t.r))} · ${fmt.time(t.dep)}–${fmt.time(t.ret)}${t.med ? ' · ฉุกเฉิน' : ''}</small>`).join('')}</div>
           <div class="ot-amt"><b>${money(y.amount)}</b><small>${y.hours ? y.hours + ' ชม.' : 'เหมา'}</small></div></div>`).join('')
         : UI.empty('ยังไม่มีค่าล่วงเวลาในเดือนนี้', 'clock')}</div>
-      <p class="hint" style="margin-top:12px">${icon('info')} คำนวณจากเวลากด "ออกเดินทาง" และ "กลับถึง" · ช่วงเย็นหลัง 16.30 หรือช่วงเช้าก่อน 05.00 ชม.ละ ${RATE} บาท ไม่เกิน ${CAP_H} ชม./วัน · วันเสาร์เหมา ${SAT_FLAT} บาท · งานฉุกเฉิน ออกหลัง 18.00 เหมา ${MED_NIGHT} บาท ออกก่อน 18.00 นับตั้งแต่ 18.00 · ยอดสุดท้ายตามที่งานยานพาหนะตรวจสอบ</p>
+      <p class="hint" style="margin-top:12px">${icon('info')} คำนวณจากเวลากด "ออกเดินทาง" และ "กลับถึง" · ช่วงเย็นหลัง 16.30 หรือช่วงเช้าก่อน 05.00 ชม.ละ ${RATE} บาท ไม่เกิน ${CAP_H} ชม./วัน · วันเสาร์เหมา ${SAT_FLAT} บาท · งานฉุกเฉิน คนขับหอพักเหมา ${MED_NIGHT} บาท คนขับทั่วไปนับตั้งแต่ 18.00 · ยอดสุดท้ายตามที่งานยานพาหนะตรวจสอบ</p>
     </div>`;
   };
   Pages._otCalc = { calcDay, daysOf, tripsOf, sumOf, hoursOf };
