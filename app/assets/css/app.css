@@ -2271,3 +2271,5 @@ html.is-loading .ld-road { opacity: 1; }
 .lt640 .med-grid, .rq-split.dv-open .med-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sb-tag { background: #fff1f1 !important; color: #b91c1c !important; font-size: .72rem; }
 .sb-check { width: max-content; max-width: 100%; color: #b91c1c; font-weight: 500; } .sb-check .i { width: 16px; height: 16px; }
+.chip-em .em-wait { margin-left: 2px; padding: 0 8px; border-radius: 99px; background: #fde68a; color: #7c2d12; font-size: .74rem; font-weight: 600; }
+.chip-em.on .em-wait { background: #fff7d6; }

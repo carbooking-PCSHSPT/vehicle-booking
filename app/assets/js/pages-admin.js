@@ -166,7 +166,7 @@
 
   // ═════════ รายการคำขอ ═════════
   Pages.adminRequests = ({ query }) => {
-    const f = query.md ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', df = query.df || '', dt = query.dt || '', cf = query.c || '', sg = query.sg || '', md = query.md || '';
+    const f = query.md || query.em ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', df = query.df || '', dt = query.dt || '', cf = query.c || '', sg = query.sg || '', md = query.md || '', em = query.em || '';
     // กลับถึงโรงเรียน = ปิดงานอัตโนมัติ (ไม่มีแท็บ "รอปิดงาน" · ข้อมูลเก่าสถานะ returned รวมอยู่ใน "ปิดงานแล้ว")
     const G = { pending: ['pending'], revise: ['revise'], approved: ['approved'], ontrip: ['ontrip'], closed: ['returned', 'closed'], rejected: ['rejected', 'cancelled'], all: null };
     let list = S.db.requests.filter(r => !G[f] || G[f].includes(r.status));
@@ -181,16 +181,20 @@
     // ติดตามคำขอเร่งด่วนที่ยังค้างบันทึกข้อความ
     const debtN = S.db.requests.filter(S.needsMemo).length;
     if (md) list = list.filter(S.needsMemo);
+    // งานฉุกเฉินนำส่งผู้ป่วย
+    const emN = S.db.requests.filter(r => r.medical).length, emWait = S.db.requests.filter(r => r.medical && !r.medical.ack).length;
+    if (em) list = list.filter(r => r.medical);
     if (q) list = list.filter(r => [r.id, r.purpose, r.requester.name, r.requester.dept, S.destName(r)].join(' ').toLowerCase().includes(q.toLowerCase()));
     list.sort(S.byNewest);   // ทุกแท็บ: ส่งคำขอล่าสุดก่อน
     const cnt = k => S.db.requests.filter(r => !G[k] || G[k].includes(r.status)).length;
-    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, df, dt, c: cf, sg, md, ...o });
+    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, df, dt, c: cf, sg, md, em, ...o });
     const printable = list;
     return {
       layout: 'admin',
       html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a><button class="btn btn-danger btn-sm" id="medNew">${icon('alert')} บันทึกงานฉุกเฉิน (นำส่งผู้ป่วย)</button>`)}
         <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '' })}"><button class="${f === k && !md ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
-          ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}</div>
+          ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', em: '', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}
+          <a class="chip-debt chip-em ${em ? 'on' : ''}" href="${qs({ em: em ? '' : '1', md: '', f: em ? 'pending' : 'all' })}">${icon('alert')} งานฉุกเฉิน <b>${emN}</b>${emWait ? `<span class="em-wait">รอรับทราบ ${emWait}</span>` : ''}</a></div>
         <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><div class="dr-pick" title="ช่วงวันที่เดินทาง"><label>ตั้งแต่<input class="input" type="date" id="df" value="${esc(df)}"></label><span>–</span><label>ถึง<input class="input" type="date" id="dt" value="${esc(dt)}" ${df ? `min="${esc(df)}"` : ''}></label>${df || dt || m ? `<a class="chip-x" href="${qs({ df: '', dt: '', m: '' })}" title="ล้างช่วงวันที่">${icon('x')}</a>` : `<a class="chip-x today" href="${qs({ df: fmt.localDate(new Date()), dt: fmt.localDate(new Date()) })}">วันนี้</a>`}</div><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
           <select class="input" id="sg" style="width:auto" title="บันทึกข้อความฉบับลงนาม"><option value="">ฉบับลงนาม: ทั้งหมด</option><option value="no" ${sg === 'no' ? 'selected' : ''}>ยังไม่มีฉบับลงนาม</option><option value="yes" ${sg === 'yes' ? 'selected' : ''}>เก็บฉบับลงนามแล้ว</option></select>
           <button class="btn btn-primary btn-sm" id="memoBatch" ${printable.length ? '' : 'disabled'}>${icon('printer')} <span>พิมพ์ / PDF</span></button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
@@ -199,7 +203,7 @@
           <thead><tr><th class="ck">${printable.length ? `<input type="checkbox" id="pickAll" aria-label="เลือกทั้งหมด">` : ''}</th><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
           <tbody>${list.map(r => `<tr class="click rs-${r.status}" data-href="#/admin/requests/${r.id}">
             <td class="ck"><input type="checkbox" data-pick="${r.id}" aria-label="เลือก ${r.id}"></td>
-            <td><b style="white-space:nowrap">${r.id}</b>${r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}${C.canMemo(r) ? (hasSig(r) ? '<small style="color:var(--ok)">✓ มีฉบับลงนาม</small>' : '<small style="color:var(--gold-700)">ยังไม่มีฉบับลงนาม</small>') : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
+            <td><b style="white-space:nowrap">${r.id}</b>${r.medical ? `<small style="color:var(--bad)">ฉุกเฉิน · นำส่งผู้ป่วย${r.medical.ack ? '' : ' · รอรับทราบ'}</small>` : r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}${C.canMemo(r) ? (hasSig(r) ? '<small style="color:var(--ok)">✓ มีฉบับลงนาม</small>' : '<small style="color:var(--gold-700)">ยังไม่มีฉบับลงนาม</small>') : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
             <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${S.tripTag(r) ? `<small>${S.tripTag(r).text}</small>` : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
             <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
