@@ -918,6 +918,7 @@
     return {
       html: `<div class="page"><div class="container">
         <div class="page-head"><div><div class="eyebrow">ติดต่อเรา</div><h1>คณะทำงานงานยานพาหนะ</h1><p class="ct-sub"><span class="nw">${esc(s.division)}</span> · <span class="nw fitw">${esc(s.schoolName)}</span></p></div>${S.isAdmin(S.me) ? `<a class="btn btn-ghost btn-sm" href="#/admin/settings">${icon('edit')} แก้ไขข้อมูลติดต่อ</a>` : ''}</div>
+        ${inn() && Pages._dormNow ? (() => { const n = Pages._dormNext(3), now = n[0] && n[0].d; return now ? `<div class="dorm-now reveal"><div class="dn-ic">${icon('alert')}</div><div class="dn-main"><small>คนขับหอพัก · เวร${[0, 6].includes(new Date(n[0].date + 'T00:00:00').getDay()) ? 'วันนี้ (ทั้งวัน)' : 'คืนนี้ (หลัง 18.00 น.)'}</small><b>${esc(now.name)}</b><span>งานฉุกเฉินนำส่งผู้ป่วย · ถัดไป: ${n.slice(1).map(x => `${new Date(x.date + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' })} ${esc(x.d ? C.firstName(x.d.name) : '-')}`).join(' · ')}</span></div>${now.phone ? `<a class="btn btn-danger dn-call" href="tel:${esc(String(now.phone).replace(/[^0-9+]/g, ''))}">${icon('phone')} โทร ${esc(now.phone)}</a>` : ''}</div>` : ''; })() : ''}
         <div class="org">${levels.map(lv => `<div class="org-level">${cm.filter(c => (+c.level || 3) === lv).sort((a, b) => headFirst(b) - headFirst(a)).map(c => `
           <div class="person l${lv} ${c.name ? '' : 'ph-empty'} reveal">
             <div class="ph">${c.photo ? UI.img(c.photo, c.name) : icon('user')}</div>

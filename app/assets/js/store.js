@@ -1445,8 +1445,8 @@ const Store = (() => {
     },
     async deleteOt(id) { needAdmin(); await A.del('ot', id); },
     // เวรวันอาทิตย์: { order: [driverId…], start: 'YYYY-MM-DD' (วันอาทิตย์ที่คนแรกเข้าเวร), swaps: { 'YYYY-MM-DD': driverId } }
-    // key = 'dutyRoster' (เวรวันอาทิตย์) | 'eveRoster' (เวรเย็น จ.–ศ. อยู่ถึง 18.00 สัปดาห์ละ 1 คน)
-    async saveRoster(r, key = 'dutyRoster') { needAdmin(); if (!['dutyRoster', 'eveRoster'].includes(key)) throw new Error('ตารางเวรไม่ถูกต้อง'); await A.put('settings', 'settings', { ...db.settings, [key]: { order: r.order || [], start: r.start || '', swaps: r.swaps || {} } }); },
+    // key = 'dutyRoster' (เวรวันอาทิตย์) | 'eveRoster' (เวรเย็น จ.–ศ. อยู่ถึง 18.00 สัปดาห์ละ 1 คน) | 'dormRoster' (คนขับหอพัก สลับวันต่อวัน)
+    async saveRoster(r, key = 'dutyRoster') { needAdmin(); if (!['dutyRoster', 'eveRoster', 'dormRoster'].includes(key)) throw new Error('ตารางเวรไม่ถูกต้อง'); await A.put('settings', 'settings', { ...db.settings, [key]: { order: r.order || [], start: r.start || '', swaps: r.swaps || {} } }); },
     // ระบบจริง: นำเข้ารถ 14 คัน + คนขับ 7 คน + สถานที่ยอดนิยม (จากตารางข้อมูลรถของโรงเรียน) เมื่อฐานข้อมูลยังว่าง
     // โหลดข้อมูลย้อนหลังให้ครบก่อน (ใช้ก่อนล้างข้อมูลตามช่วงวันที่)
     async ensureHistory() { if (!A) return; if (A.histState() === 'none') await A.loadHistory(); for (let i = 0; i < 150 && A.histState() === 'loading'; i++) await new Promise(r => setTimeout(r, 200)); },

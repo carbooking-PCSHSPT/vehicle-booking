@@ -2315,3 +2315,11 @@ html.is-loading .ld-road { opacity: 1; }
 .ot-dlabel { font-family: var(--font-display); font-weight: 600; font-size: .9rem; color: var(--navy); margin: 0 2px 6px; } .ot-dlabel small { font-weight: 400; color: var(--muted); }
 .duty-today { margin-top: 12px; }
 .rs-tabs { width: max-content; max-width: 100%; }
+/* คนขับหอพักเวรคืนนี้ (หน้าติดต่อเรา) */
+.dorm-now { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 8px 0 22px; padding: 16px 18px; border-radius: 20px; background: #fff1f1; border: 1px solid #f5c9c9; }
+.dn-ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: #dc2626; color: #fff; flex: none; } .dn-ic .i { width: 24px; height: 24px; }
+.dn-main { flex: 1; min-width: 200px; display: grid; } .dn-main small { color: #b91c1c; font-weight: 500; } .dn-main b { font: 600 1.2rem var(--font-display); } .dn-main span { font-size: .84rem; color: var(--muted); }
+.dn-call { white-space: nowrap; }
+.lt640 .dn-call { width: 100%; justify-content: center; }
+.ot-duty.we { background: #faf7f0; }
+.tbl tr.we td { background: #faf7f0; }

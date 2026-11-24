@@ -106,14 +106,17 @@
   // ── ตารางเวร: วันอาทิตย์ (อยู่ถึง 16.30) · เวรเย็น จ.–ศ. (สัปดาห์ละ 1 คน อยู่ถึง 18.00) — หมุนเวียนตามลำดับ สลับรายสัปดาห์ได้ ──
   const ROSTERS = {
     dutyRoster: { title: 'เวรวันอาทิตย์', note: 'วันอาทิตย์มีเวรมาทำงาน 1 คน (ถึง 16.30)', startLabel: 'วันอาทิตย์ที่คนลำดับ 1 เข้าเวร', anchor: ROSTER_ANCHOR, dow: 0 },
-    eveRoster: { title: 'เวรเย็น จันทร์–ศุกร์', note: 'สัปดาห์ละ 1 คน อยู่ถึง 18.00 รอส่งต่อคนขับหอพัก', startLabel: 'วันจันทร์ที่คนลำดับ 1 เริ่มเวร', anchor: '2026-11-30', dow: 1 }
+    eveRoster: { title: 'เวรเย็น จันทร์–ศุกร์', note: 'สัปดาห์ละ 1 คน อยู่ถึง 18.00 รอส่งต่อคนขับหอพัก', startLabel: 'วันจันทร์ที่คนลำดับ 1 เริ่มเวร', anchor: '2026-11-30', dow: 1 },
+    // คนขับหอพัก: สลับกันวันต่อวัน · เวรของวันใด = เย็นวันนั้นหลัง 18.00 ต่อถึง 05.00 วันรุ่งขึ้น (ส.–อา. ทั้งวัน)
+    dormRoster: { title: 'คนขับหอพัก', note: 'สลับกันวันต่อวัน · เวรของแต่ละวัน = หลัง 18.00 ถึง 05.00 ของวันรุ่งขึ้น (เสาร์–อาทิตย์ทั้งวัน) · ครูเห็นเวรคืนนี้พร้อมเบอร์โทรในหน้าติดต่อเรา', startLabel: 'วันที่คนลำดับ 1 เข้าเวร', anchor: '2026-11-26', dow: null, daily: true }
   };
   // วันแรกของสัปดาห์เวร (อาทิตย์ / จันทร์) ตั้งแต่ from
   const nextDow = (from, dow) => { const d = new Date(from); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + ((dow - d.getDay() + 7) % 7)); return d; };
   const weekStart = (date, dow) => { const d = dayStart(date); d.setDate(d.getDate() - ((d.getDay() - dow + 7) % 7)); return fmt.localDate(d); };
   function roster(key = 'dutyRoster') {
     const R = S.db.settings[key], K = ROSTERS[key];
-    if (R && (R.order || []).length) return { order: R.order, start: R.start || K.anchor, swaps: R.swaps || {} };
+    if (R && (R.order || []).length) return { order: R.order, start: R.start || K.anchor, swaps: R.swaps || {}, daily: !!K.daily };
+    if (K.daily) return { order: S.db.drivers.filter(d => d.dorm && d.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0)).map(d => d.id), start: K.anchor, swaps: {}, daily: true };
     const order = ['สวง', 'บุญทัน', 'พัลลภ'].map(n => (S.db.drivers.find(d => !d.standby && d.active !== false && (d.name || '').includes(n)) || {}).id).filter(Boolean);
     return { order, start: K.anchor, swaps: {} };
   }
@@ -121,7 +124,7 @@
   function dutyOf(date, R = roster()) {
     if (R.swaps && R.swaps[date]) return R.swaps[date];
     if (!R.order.length) return '';
-    const wk = Math.round((dayStart(date) - dayStart(R.start)) / (7 * 864e5)), n = R.order.length;
+    const wk = Math.round((dayStart(date) - dayStart(R.start)) / ((R.daily ? 1 : 7) * 864e5)), n = R.order.length;
     return R.order[((wk % n) + n) % n];
   }
   const weeks = (from, n, dow) => Array.from({ length: n }, (_, i) => { const d = nextDow(from, dow); d.setDate(d.getDate() + i * 7); return fmt.localDate(d); });
@@ -129,34 +132,40 @@
   const eveWeeks = (from, n) => weeks(dayStart(weekStart(fmt.localDate(from), 1)), n, 1);   // รวมสัปดาห์ปัจจุบัน
   const weekLabel = (date, key) => key === 'eveRoster' ? (() => { const a = dayStart(date), b = new Date(a); b.setDate(b.getDate() + 4); return `${fmt.dayMonth(a)}–${fmt.date(b)}`; })() : fmt.date(dayStart(date));
   Pages._dutyOf = dutyOf;
+  const dayList = (from, n) => Array.from({ length: n }, (_, i) => { const d = new Date(from); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return fmt.localDate(d); });
+  // คนขับหอพักเวร "คืนนี้" (หลังเที่ยงคืนถึง 05.00 ยังเป็นเวรของเมื่อวาน)
+  const dormDate = (at = new Date()) => { const d = new Date(at); if (d.getHours() < 5) d.setDate(d.getDate() - 1); return fmt.localDate(d); };
+  Pages._dormNow = () => { const id = dutyOf(dormDate(), roster('dormRoster')); return id ? S.driver(id) : null; };
+  Pages._dormNext = n => dayList(dayStart(dormDate()), n).map(x => ({ date: x, d: S.driver(dutyOf(x, roster('dormRoster'))) }));
   // เวรวันนี้ของคนขับ (ใช้หน้าแรกคนขับ)
   Pages._todayDuty = driverId => {
     const now = new Date(), wd = now.getDay(), today = fmt.localDate(now);
     if (wd === 0 && dutyOf(today, roster('dutyRoster')) === driverId) return 'วันนี้คุณเป็นเวรวันอาทิตย์ (ถึง 16.30 น.)';
     if (wd >= 1 && wd <= 5 && dutyOf(weekStart(today, 1), roster('eveRoster')) === driverId) return 'สัปดาห์นี้คุณอยู่เวรเย็น — อยู่ถึง 18.00 น.';
+    if (dutyOf(dormDate(now), roster('dormRoster')) === driverId) return [0, 6].includes(dayStart(dormDate(now)).getDay()) ? 'วันนี้คุณเป็นเวรคนขับหอพัก (ทั้งวัน)' : 'คืนนี้คุณเป็นเวรคนขับหอพัก (หลัง 18.00 น.)';
     return '';
   };
 
   function rosterModal(key = 'dutyRoster') {
-    const K = ROSTERS[key], R = roster(key), ds = S.db.drivers.filter(d => d.active !== false && !d.standby);
-    const opt = (sel, blank) => `${blank ? `<option value="">${blank}</option>` : ''}${ds.map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}`;
-    const list = key === 'eveRoster' ? eveWeeks(new Date(), 12) : sundays(new Date(), 12);
+    const K = ROSTERS[key], R = roster(key), ds = S.db.drivers.filter(d => d.active !== false && (!d.standby || (K.daily && d.dorm))).sort((a, b) => K.daily ? (!!b.dorm - !!a.dorm) : 0);
+    const opt = (sel, blank) => `${blank ? `<option value="">${blank}</option>` : ''}${ds.map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}${K.daily && d.dorm ? ' (หอพัก)' : ''}</option>`).join('')}`;
+    const list = K.daily ? dayList(dayStart(dormDate()), 21) : key === 'eveRoster' ? eveWeeks(new Date(), 12) : sundays(new Date(), 12);
     return UI.modal({
       title: `${icon('calendar')} ${K.title}`, size: 'lg',
       body: `<form id="rsF" class="stack">
         <div class="seg rs-tabs">${Object.entries(ROSTERS).map(([k, x]) => `<button type="button" class="${k === key ? 'on' : ''}" data-rk="${k}">${x.title}</button>`).join('')}</div>
-        <p class="hint">${K.note} · หมุนเวียนตามลำดับด้านล่าง · ถ้าบางสัปดาห์สลับเวร เลือกชื่อในตารางได้ (ว่าง = ตามลำดับ) · เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร</p>
+        <p class="hint">${K.note} · หมุนเวียนตามลำดับด้านล่าง · ถ้าบาง${K.daily ? 'วัน' : 'สัปดาห์'}สลับเวร เลือกชื่อในตารางได้ (ว่าง = ตามลำดับ) · เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร${K.daily && !R.order.length ? ' · <b>ยังไม่มีคนขับที่ติ๊ก "คนขับหอพัก"</b> — ติ๊กในหน้าพนักงานขับรถก่อน หรือเลือกชื่อด้านล่าง' : ''}</p>
         <div class="field"><label>ลำดับเวร</label><div class="stack rs-order" style="gap:6px">${[0, 1, 2, 3, 4].map(i => `<div class="row" style="gap:8px"><b style="width:22px">${i + 1}.</b><select class="input" name="o${i}">${opt(R.order[i], i < 1 ? '' : '— ไม่มี —')}</select></div>`).join('')}</div></div>
         <div class="field"><label>${K.startLabel}</label><input type="date" name="start" value="${esc(R.start)}"></div>
-        <div class="field"><label>12 สัปดาห์ข้างหน้า</label><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>${key === 'eveRoster' ? 'สัปดาห์' : 'วันอาทิตย์'}</th><th>ตามลำดับ</th><th>สลับเวร</th></tr></thead>
-          <tbody>${list.map(s => `<tr><td class="nw">${weekLabel(s, key)}</td><td>${esc(C.dName(dutyOf(s, { ...R, swaps: {} })))}</td><td><select class="input" data-sw="${s}">${opt((R.swaps || {})[s], '— ตามลำดับ —')}</select></td></tr>`).join('')}</tbody></table></div></div>
+        <div class="field"><label>${K.daily ? '21 วันข้างหน้า' : '12 สัปดาห์ข้างหน้า'}</label><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>${K.daily ? 'วันที่' : key === 'eveRoster' ? 'สัปดาห์' : 'วันอาทิตย์'}</th><th>ตามลำดับ</th><th>สลับเวร</th></tr></thead>
+          <tbody>${list.map(s => `<tr class="${K.daily && [0, 6].includes(dayStart(s).getDay()) ? 'we' : ''}"><td class="nw">${K.daily ? dLabel(s) : weekLabel(s, key)}</td><td>${esc(C.dName(dutyOf(s, { ...R, swaps: {} })))}</td><td><select class="input" data-sw="${s}">${opt((R.swaps || {})[s], '— ตามลำดับ —')}</select></td></tr>`).join('')}</tbody></table></div></div>
       </form>`,
       onOpen(el, close) { el.querySelectorAll('[data-rk]').forEach(b => b.addEventListener('click', () => { if (b.dataset.rk === key) return; close(null); setTimeout(() => rosterModal(b.dataset.rk).then(r => { if (r) App.render(); }), 280); })); },
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกตารางเวร', kind: 'btn-primary', icon: 'check', onClick: async el => {
         const f = UI.formData(el.querySelector('#rsF'));
         const order = [0, 1, 2, 3, 4].map(i => f['o' + i]).filter(Boolean);
         if (!order.length) { UI.toast('เลือกคนเข้าเวรอย่างน้อย 1 คน', 'error'); return false; }
-        if (!f.start || dayStart(f.start).getDay() !== K.dow) { UI.toast(`วันเริ่มต้องเป็นวัน${K.dow ? 'จันทร์' : 'อาทิตย์'}`, 'error'); return false; }
+        if (!f.start || (K.dow != null && dayStart(f.start).getDay() !== K.dow)) { UI.toast(K.dow == null ? 'กรุณาเลือกวันเริ่ม' : `วันเริ่มต้องเป็นวัน${K.dow ? 'จันทร์' : 'อาทิตย์'}`, 'error'); return false; }
         const swaps = {}; Object.entries(R.swaps || {}).forEach(([k, v]) => { if (k < list[0]) swaps[k] = v; });   // เก็บการสลับเวรในอดีตไว้
         $$('[data-sw]', el).forEach(x => { if (x.value) swaps[x.dataset.sw] = x.value; });
         await S.saveRoster({ order, start: f.start, swaps }, key);
@@ -249,12 +258,12 @@
     const hist = S.needHistory(per.from);
     const from = per.k === 'all' ? new Date(2020, 0, 1) : per.from, to = per.to > new Date(2900, 0) ? new Date() : per.to;
     const od = query.od || '';
-    const all = S.db.drivers.map(d => ({ d, days: daysOf(d.id, from, to) })).filter(x => x.days.length || (x.d.active !== false && !x.d.standby));
+    const all = S.db.drivers.map(d => ({ d, days: daysOf(d.id, from, to) })).filter(x => x.days.length || (x.d.active !== false && (!x.d.standby || x.d.dorm)));
     const sums = all.map(x => ({ ...x, s: sumOf(x.days) }));
     const T = sums.reduce((t, x) => ({ amount: t.amount + x.s.amount, hours: t.hours + x.s.hours, days: t.days + x.s.days, sat: t.sat + x.s.sat, med: t.med + x.s.med }), { amount: 0, hours: 0, days: 0, sat: 0, med: 0 });
     const qs = o => '#/admin/expenses?' + new URLSearchParams({ ...q, ...o });
     const list = sums.filter(x => !od || x.d.id === od);
-    const R = roster('dutyRoster'), RE = roster('eveRoster'), next = sundays(new Date(), 4), nextE = eveWeeks(new Date(), 4);
+    const R = roster('dutyRoster'), RE = roster('eveRoster'), RD = roster('dormRoster'), next = sundays(new Date(), 4), nextE = eveWeeks(new Date(), 4), nextD = dayList(dayStart(dormDate()), 7);
     // รายเดือน (ช่วงยาวกว่า 1 เดือน)
     const ms = monthsIn(from, to).reverse();
     const byMonth = ms.length > 1 ? ms.map(m => { const m1 = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59); return { m, v: S.db.drivers.map(d => sumOf(daysOf(d.id, m, m1)).amount) }; }) : [];
@@ -284,6 +293,8 @@
           <div class="card"><div class="card-head"><h3>${icon('calendar')} ตารางเวร</h3><button class="btn btn-ghost btn-xs" id="otRoster2">${icon('edit')} จัดเวร</button></div>
             <div class="ot-dlabel">เวรเย็น จ.–ศ. <small>อยู่ถึง 18.00</small></div>
             ${RE.order.length ? `<div class="stack" style="gap:6px">${nextE.map((s, i) => `<div class="ot-duty ${i === 0 ? 'next' : ''}"><span>${weekLabel(s, 'eveRoster')}</span><b>${esc(C.dName(dutyOf(s, RE)))}</b>${(RE.swaps || {})[s] ? '<small>สลับเวร</small>' : ''}</div>`).join('')}</div>` : '<p class="hint">ยังไม่ได้ตั้ง</p>'}
+            <div class="ot-dlabel" style="margin-top:12px">คนขับหอพัก <small>หลัง 18.00 · ส.–อา. ทั้งวัน · สลับวันต่อวัน</small></div>
+            ${RD.order.length ? `<div class="stack" style="gap:6px">${nextD.map((s, i) => `<div class="ot-duty ${i === 0 ? 'next' : ''} ${[0, 6].includes(dayStart(s).getDay()) ? 'we' : ''}"><span>${i === 0 ? 'คืนนี้' : dLabel(s)}</span><b>${esc(C.dName(dutyOf(s, RD)))}</b>${(RD.swaps || {})[s] ? '<small>สลับเวร</small>' : ''}</div>`).join('')}</div>` : '<p class="hint">ยังไม่ได้ตั้ง — ติ๊ก "คนขับหอพัก" ในหน้าพนักงานขับรถ แล้วกดจัดเวร</p>'}
             <div class="ot-dlabel" style="margin-top:12px">เวรวันอาทิตย์ <small>อยู่ถึง 16.30</small></div>
             ${R.order.length ? `<div class="stack" style="gap:6px">${next.map((s, i) => `<div class="ot-duty ${i === 0 ? 'next' : ''}"><span>${fmt.date(dayStart(s))}</span><b>${esc(C.dName(dutyOf(s, R)))}</b>${(R.swaps || {})[s] ? '<small>สลับเวร</small>' : ''}</div>`).join('')}</div>` : '<p class="hint">ยังไม่ได้ตั้ง</p>'}</div>
         </div>
@@ -319,10 +330,12 @@
     const minM = adminView ? new Date(2020, 0, 1) : new Date(cur.getFullYear(), cur.getMonth() - 1, 1);
     const R = roster('dutyRoster'), RE = roster('eveRoster');
     const myDuty = sundays(now, 12).filter(x => dutyOf(x, R) === d.id).slice(0, 3), myEve = eveWeeks(now, 12).filter(x => dutyOf(x, RE) === d.id).slice(0, 2);
+    const RD = roster('dormRoster'), myDorm = dayList(dayStart(dormDate()), 14).filter(x => dutyOf(x, RD) === d.id).slice(0, 5);
     return `<div class="ot-drv">
       <div class="ot-mnav"><a class="icon-btn sm ${prev < minM ? 'disabled' : ''}" ${prev < minM ? 'aria-disabled="true"' : `href="${link({ om: fmt.localDate(prev).slice(0, 7) })}"`} aria-label="เดือนก่อน">${icon('chevL')}</a><b>${monthName(m)}</b><a class="icon-btn sm ${nxt > cur ? 'disabled' : ''}" ${nxt > cur ? 'aria-disabled="true"' : `href="${link({ om: fmt.localDate(nxt).slice(0, 7) })}"`} aria-label="เดือนถัดไป">${icon('chevR')}</a></div>
       <div class="ot-sum"><div class="ot-big"><small>ค่าล่วงเวลาเดือนนี้</small><b>${money(s.amount)}</b><span>บาท</span></div>
         <div class="ot-mini"><div><b>${s.days}</b><small>วัน</small></div><div><b>${s.hours}</b><small>ชั่วโมง</small></div><div><b>${s.sat}</b><small>วันเสาร์</small></div><div><b>${s.med}</b><small>ฉุกเฉินเหมา</small></div></div></div>
+      ${myDorm.length ? `<div class="note-box navy" style="margin-top:12px">${icon('calendar')}<div>เวรคนขับหอพัก: <b>${myDorm.map(x => dLabel(x)).join(' · ')}</b></div></div>` : ''}
       ${myDuty.length || myEve.length ? `<div class="note-box navy" style="margin-top:12px">${icon('calendar')}<div>${myEve.length ? `เวรเย็น จ.–ศ. (ถึง 18.00): <b>${myEve.map(x => weekLabel(x, 'eveRoster')).join(' · ')}</b>` : ''}${myEve.length && myDuty.length ? '<br>' : ''}${myDuty.length ? `เวรวันอาทิตย์ (ถึง 16.30): <b>${myDuty.map(x => fmt.date(dayStart(x))).join(' · ')}</b>` : ''}</div></div>` : ''}
       <div class="ot-list">${days.length ? days.map(y => `<div class="ot-item ${y.ov ? 'is-ov' : ''}"><div class="ot-date"><b>${dayStart(y.date).getDate()}</b><small>${WD[y.wd]}</small></div>
           <div class="ot-body"><b>${esc(basisText(y))}</b>${y.trips.map(t => `<small>${esc(S.destName(t.r))} · ${fmt.time(t.dep)}–${fmt.time(t.ret)}${t.med ? ' · ฉุกเฉิน' : ''}</small>`).join('')}</div>
