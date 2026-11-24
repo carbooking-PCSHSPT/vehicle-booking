@@ -466,7 +466,7 @@ const C = (() => {
       depName: m.depName || ud.name || byPos(/รองผู้อำนวยการ/), depPos: m.depPos || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป'
     };
   }
-  const canMemo = r => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);
+  const canMemo = r => !r.medical && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);   // งานฉุกเฉินนำส่งผู้ป่วยไม่มีบันทึกข้อความ
   const MEMO_PAGE = { margin: '12mm 20mm 10mm 30mm', pageNo: false, fitWidth: '160mm', fitPage: 272 };   // ขอบตามหนังสือราชการ: ซ้าย 3 ซม. ขวา 2 ซม.
   // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
   const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);

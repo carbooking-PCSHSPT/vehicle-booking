@@ -57,6 +57,7 @@
     const alerts = [];
     rs.filter(r => r.status === 'ontrip').forEach(r => r.assignments.forEach(a => { if (a.status === 'ontrip' && now - new Date(r.endAt) > 30 * 6e4) alerts.push({ red: true, ic: 'clock', t: `${C.vName(a.vehicleId)} เลยเวลากลับแล้ว ${fmt.dur(now - new Date(r.endAt))} (ยังไม่กดกลับถึง)`, h: `#/admin/requests/${r.id}` }); }));
     rs.filter(r => r.status === 'approved' && r.assignments.some(a => a.status === 'assigned') && now - new Date(r.startAt) > 60 * 6e4).forEach(r => alerts.push({ ic: 'navigation', t: `${r.id} ถึงเวลาออกเดินทางแล้วแต่คนขับยังไม่กดออกเดินทาง`, h: `#/admin/requests/${r.id}` }));
+    rs.filter(r => r.medical && !r.medical.ack).forEach(r => alerts.push({ red: true, ic: 'alert', t: `${r.id} งานฉุกเฉินนำส่งผู้ป่วย (${esc(C.vName((r.assignments[0] || {}).vehicleId))} · ${esc(C.dName((r.assignments[0] || {}).driverId))}) — รอแอดมินรับทราบ`, h: `#/admin/requests/${r.id}` }));
     rs.filter(r => r.status === 'approved' && r.assignments.some(a => !a.driverId)).forEach(r => alerts.push({ ic: 'wheel', t: `${r.id} ยังไม่ได้ระบุคนขับ`, h: `#/admin/requests/${r.id}` }));
     // คนขับแจ้งปัญหาตอนตรวจรถก่อนออกเดินทาง (3 วันล่าสุด)
     rs.forEach(r => (r.assignments || []).forEach(a => { if (a.check && !a.check.ok && !a.check.skipped && now - new Date(a.check.at) < 3 * DAY) alerts.push({ red: true, ic: 'shield', t: `${C.vName(a.vehicleId)} · คนขับแจ้งปัญหาก่อนออกเดินทาง: ${[...(a.check.miss || []), a.check.note].filter(Boolean).join(', ')}`, h: `#/admin/requests/${r.id}` }); }));
@@ -97,7 +98,7 @@
   // ═════════ ตารางเวรคนขับ (รวมทุกคน) ═════════
   // ตารางงานคนขับ (คนขับ × วัน) — ใช้ทั้งหน้าตารางงานคนขับ และหน้าต่างซ้อนตอนจัดรถ (hl = ช่วงวันของคำขอที่กำลังจัด)
   function rosterGrid(days, view, { sel = days[0], hl = null, links = true } = {}) {
-    const ds = S.db.drivers.filter(d => d.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const ds = S.db.drivers.filter(d => d.active !== false && !d.standby).sort((a, b) => (a.order || 0) - (b.order || 0));
     const rows = ds.map(d => { const jobs = Pages._driverJobs(d.id); return { d, cells: days.map(day => { const list = Pages._jobsOn(jobs, day); return { day, list, s: Pages._daySummary(list, day) }; }) }; });
     const inHl = day => hl && new Date(hl[0]) <= new Date(day.getTime() + 864e5 - 1) && new Date(hl[1]) >= day;
     const cls = day => `${UI.sameDay(day, new Date()) ? 'today' : ''} ${day.getDay() === 0 || day.getDay() === 6 ? 'we' : ''} ${inHl(day) ? 'hl' : ''}`;
@@ -187,7 +188,7 @@
     const printable = list;
     return {
       layout: 'admin',
-      html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a>`)}
+      html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a><button class="btn btn-danger btn-sm" id="medNew">${icon('alert')} บันทึกงานฉุกเฉิน (นำส่งผู้ป่วย)</button>`)}
         <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '' })}"><button class="${f === k && !md ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
           ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}</div>
         <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><div class="dr-pick" title="ช่วงวันที่เดินทาง"><label>ตั้งแต่<input class="input" type="date" id="df" value="${esc(df)}"></label><span>–</span><label>ถึง<input class="input" type="date" id="dt" value="${esc(dt)}" ${df ? `min="${esc(df)}"` : ''}></label>${df || dt || m ? `<a class="chip-x" href="${qs({ df: '', dt: '', m: '' })}" title="ล้างช่วงวันที่">${icon('x')}</a>` : `<a class="chip-x today" href="${qs({ df: fmt.localDate(new Date()), dt: fmt.localDate(new Date()) })}">วันนี้</a>`}</div><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
@@ -223,6 +224,7 @@
         });
         $('#sg', root).addEventListener('change', e => { location.hash = qs({ sg: e.target.value }); });
         $('#daySum', root).addEventListener('click', () => dailySummary(new Date()));
+        $('#medNew', root).addEventListener('click', async () => { const r = await Pages._medicalModal({ admin: true }); if (r) location.hash = '#/admin/requests/' + r.id; });
         $('#q', root).addEventListener('input', UI.debounce(e => { location.hash = qs({ q: e.target.value }); }, 450));
         $('#df', root).addEventListener('change', e => { const v = e.target.value, t = $('#dt', root).value; location.hash = qs({ m: '', df: v, dt: t && v && t < v ? v : t }); });
         $('#dt', root).addEventListener('change', e => { location.hash = qs({ m: '', dt: e.target.value }); });
@@ -245,7 +247,7 @@
       return `<div class="av-row ${sel.has(v.id) ? 'on' : ''} ${busy && !sel.has(v.id) ? 'busy' : ''} ${extra ? 'extra' : ''}" data-v="${v.id}" ${extra ? 'hidden' : ''}>
         <input type="checkbox" ${sel.has(v.id) ? 'checked' : ''} aria-label="เลือก ${esc(v.name)}">
         <div><b>${icon(kindIcon(v.kind))} ${esc(v.name)}</b><small>${esc(v.plate)} · <b style="display:inline">${v.seats}</b> ที่นั่ง</small>${busy ? `<small class="bad">${icon('alert')} ${c.map(x => x.maint ? esc(x.dest) : `ไม่ว่าง: ${x.id} ${esc(S.destName(x))}`).join(', ')}</small>` : '<small style="color:var(--ok)">ว่างในช่วงเวลานี้</small>'}</div>
-        <select data-drv aria-label="คนขับ"><option value="">— เลือกคนขับ —</option>${S.db.drivers.filter(d => d.active !== false).map(d => { const dc = r.startAt ? S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) : []; return `<option value="${d.id}" ${d.id === dId ? 'selected' : ''}>${esc(d.name)}${dc.length ? ' (ติดงาน ' + dc.map(x => x.id).join(',') + ')' : ''}</option>`; }).join('')}</select>
+        <select data-drv aria-label="คนขับ"><option value="">— เลือกคนขับ —</option>${S.db.drivers.filter(d => d.active !== false && !d.standby).map(d => { const dc = r.startAt ? S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) : []; return `<option value="${d.id}" ${d.id === dId ? 'selected' : ''}>${esc(d.name)}${dc.length ? ' (ติดงาน ' + dc.map(x => x.id).join(',') + ')' : ''}</option>`; }).join('')}</select>
         <input type="text" data-note placeholder="หมายเหตุถึงผู้ขอ เช่น คันนี้นั่งได้ ${v.seats} คน" value="${esc(a.note || '')}">
         <span></span>
       </div>`;
@@ -278,7 +280,7 @@
   // คนขับที่ติดงานในช่วงเวลาของคำขอนี้ (แดง + งานและเวลาแบบสั้น) · ปุ่มเปิดตารางงานคนขับแบบหน้าต่างซ้อน
   function driverDay(r) {
     if (!r.startAt) return '';
-    const ds = S.db.drivers.filter(d => d.active !== false).map(d => ({ d, c: S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) }));
+    const ds = S.db.drivers.filter(d => d.active !== false && !d.standby).map(d => ({ d, c: S.driverConflicts(d.id, r.startAt, r.endAt, r.id, S.windows(r)) }));
     const tm = x => `${fmt.time(x.startAt)}–${UI.sameDay(x.startAt, x.endAt) ? fmt.time(x.endAt) : fmt.dayMonth(x.endAt)}`;
     const free = ds.filter(x => !x.c.length), busy = ds.filter(x => x.c.length);
     return `<div class="drv-day"><div class="label dd-head"><span>${icon('wheel')} คนขับที่ติดงานช่วงนี้ <span class="hint">ติดงาน ${busy.length} · ว่าง ${free.length}</span></span><button type="button" class="btn btn-ghost btn-xs" data-roster>${icon('calendar')} ดูตารางงานคนขับ</button></div>
@@ -342,6 +344,10 @@
           ${Pages._changeDiff(r.changeReq)}<p style="margin-top:8px"><b>เหตุผล:</b> ${esc(r.changeReq.reason)}</p>
           ${r.changeReq.data.startAt || r.changeReq.data.endAt ? `<p class="hint" style="margin-top:6px">${icon('alert')} เปลี่ยนวันเวลา — ตรวจว่ารถ/คนขับที่จัดไว้ยังว่างในช่วงใหม่ ถ้าไม่ว่าง ให้อนุมัติแล้วปรับรถด้านล่าง</p>` : ''}
           <div class="row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-chg="1">${icon('check')} อนุมัติการแก้ไข</button><button class="btn btn-ghost btn-sm" data-chg="0">${icon('xCircle')} ไม่อนุมัติ</button></div></div>` : ''}
+        ${r.medical ? `<div class="card med-card"><div class="card-head"><h3>${icon('alert')} งานฉุกเฉิน · นำส่งผู้ป่วย</h3>${r.medical.ack ? `<span class="pill tone-free">${icon('check')} รับทราบแล้ว</span>` : `<button class="btn btn-danger btn-sm" id="medAck">${icon('check')} รับทราบ / ตรวจแล้ว</button>`}</div>
+          <div class="med-grid"><div><small>สถานพยาบาล</small><b>${esc(S.destName(r))}</b></div><div><small>ผู้ป่วย</small><b>${r.medical.patients} คน</b></div><div><small>ผู้ดูแลที่ไปด้วย</small><b>${esc((r.medical.carer || {}).name || '-')}</b></div><div><small>บันทึกโดย</small><b>${esc(r.medical.byName || r.medical.by)}</b></div></div>
+          ${r.medical.backdated ? `<p class="hint" style="margin-top:8px">${icon('clock')} บันทึกย้อนหลัง (คนขับลืมกดตอนออก)</p>` : ''}${(r.medical.clash || []).length ? `<div class="note-box warn-y" style="margin-top:10px">${icon('alert')}<div>อาจกระทบงานที่จัดไว้: ${r.medical.clash.map(id => `<a class="link" href="#/admin/requests/${id}">${id}</a>`).join(', ')} — ตรวจรถ/คนขับ</div></div>` : ''}
+          ${r.medical.ack ? `<p class="hint" style="margin-top:8px">รับทราบโดย ${esc(r.medical.ack.byName)} · ${fmt.dt(r.medical.ack.at)}${r.medical.ack.note ? ` · ${esc(r.medical.ack.note)}` : ''}</p>` : ''}</div>` : ''}
         <div style="margin-bottom:18px">${Pages._decisionBox(r)}</div>
         ${canDecide || canReassign ? `
         <div class="req-top">${Pages._requestInfo(r, { hideDocs: true })}</div>
@@ -455,6 +461,7 @@
           if (e.target.closest('#addExp')) { const res = await Pages._expenseModal(S.request(r.id), (r.assignments[0] || {}).vehicleId); if (res) App.render(); return; }
           const ee = e.target.closest('[data-xedit]'); if (ee) { const rr = S.request(r.id); const res = await Pages._expenseModal(rr, null, rr.expenses.find(x => x.id === ee.dataset.xedit)); if (res) App.render(); return; }
           const de = e.target.closest('[data-xdel]'); if (de) { if (await UI.confirm('ลบรายการค่าใช้จ่ายนี้?', { danger: true, ok: 'ลบ' })) S.removeExpense(r.id, de.dataset.xdel).then(App.render); return; }
+          if (e.target.closest('#medAck')) { const res = await UI.confirm('รับทราบงานฉุกเฉินนี้ (ตรวจเลขไมล์/ผู้ดูแลลงชื่อแล้ว)', { title: 'รับทราบงานฉุกเฉิน', ok: 'รับทราบ', input: { label: 'หมายเหตุ (ถ้ามี)' } }); if (res) S.ackMedical(r.id, res.value).then(() => { UI.toast('รับทราบแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); return; }
           if (e.target.closest('#aClose')) { const res = await UI.confirm('ปิดงานคำขอนี้? (ตรวจสอบเลขไมล์และค่าใช้จ่ายให้ครบก่อน)', { title: 'ปิดงาน', ok: 'ปิดงาน', input: { label: 'หมายเหตุ (ถ้ามี)' } }); if (res) S.closeRequest(r.id, res.value).then(() => { UI.toast('ปิดงานแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); }
           if (e.target.closest('#aReopen')) S.reopenRequest(r.id).then(App.render);
           if (e.target.closest('#aCancel')) { const res = await UI.confirm('ยกเลิกคำขอนี้? ระบบจะแจ้งผู้ขอในเว็บ', { title: 'ยกเลิกคำขอ', ok: 'ยกเลิกคำขอ', danger: true, input: { label: 'เหตุผล', required: true } }); if (res) S.cancelRequest(r.id, res.value).then(() => { UI.toast('ยกเลิกแล้ว'); App.render(); }).catch(err => UI.toast(err.message, 'error')); }
@@ -723,7 +730,7 @@
           <div class="field"><label>สี</label><input name="color" value="${esc(v.color || '')}"></div>
           <div class="field"><label>จำนวนที่นั่ง <b class="req">*</b></label><input name="seats" type="number" min="0" value="${v.seats}"></div>
           <div class="field"><label>ที่นั่งเมื่อมีสัมภาระมาก</label><input name="seatsLuggage" type="number" min="0" value="${esc(v.seatsLuggage || '')}"></div>
-          <div class="field"><label>คนขับที่รับผิดชอบ</label><select name="driverId"><option value="">— ไม่ระบุ —</option>${S.db.drivers.map(d => `<option value="${d.id}" ${d.id === v.driverId ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></div>
+          <div class="field"><label>คนขับที่รับผิดชอบ</label><select name="driverId"><option value="">— ไม่ระบุ —</option>${S.db.drivers.filter(d => !d.standby).map(d => `<option value="${d.id}" ${d.id === v.driverId ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></div>
           <div class="field full"><label>เหมาะกับงาน</label><input name="suitable" value="${esc(v.suitable || '')}" placeholder="เช่น ประชุม อบรม คณะไม่เกิน 12 คน"></div>
           <div class="field full"><label>อุปกรณ์ในรถ</label><div class="checks">${[...new Set([...S.FEATURES, ...(v.features || [])])].map(f => `<label class="check"><input type="checkbox" name="features" data-multi value="${esc(f)}" ${(v.features || []).includes(f) ? 'checked' : ''}>${esc(f)}</label>`).join('')}</div></div>
           <div class="field full"><label>ข้อปฏิบัติ / ประกาศของรถคันนี้</label><textarea name="rules" rows="2">${esc(v.rules || '')}</textarea></div>
@@ -855,7 +862,7 @@
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>คนขับ</th><th>รถที่รับผิดชอบ</th><th>ใบขับขี่</th><th>บัญชีเข้าระบบ</th><th>คะแนนเฉลี่ย</th><th></th></tr></thead>
           <tbody>${ds.map(d => { const mine = rt.filter(x => x.driverId === d.id); const avg = mine.length ? mine.reduce((s, x) => s + Object.values(x.scores).reduce((a, b) => a + b, 0) / 4, 0) / mine.length : 0; const u = d.email && S.user(d.email); return `<tr>
-            <td><div class="row" style="gap:10px">${UI.avatar(d.name)}<div><b>${esc(d.name)}</b><small>${esc(d.phone || '-')}${d.active === false ? ' · <span style="color:var(--bad)">พักงาน</span>' : ''}</small></div></div></td>
+            <td><div class="row" style="gap:10px">${UI.avatar(d.name)}<div><b>${esc(d.name)}</b>${d.standby ? ' <span class="tag sb-tag">สำรอง · ฉุกเฉินเท่านั้น</span>' : ''}<small>${esc(d.phone || '-')}${d.active === false ? ' · <span style="color:var(--bad)">พักงาน</span>' : ''}</small></div></div></td>
             <td>${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '<small>—</small>'}</td>
             <td>${d.licenseExpiry ? `${fmt.date(d.licenseExpiry)}<small>${daysTo(d.licenseExpiry) < 0 ? 'หมดอายุแล้ว' : `อีก ${daysTo(d.licenseExpiry)} วัน`}</small>` : '<small>—</small>'}</td>
             <td>${u ? `<b>${esc(S.usernameOf(u.email) || u.email)}</b><small>${u.active ? 'ใช้งานได้' : 'ปิดใช้งาน'}</small>` : `<button class="btn btn-ghost btn-xs" data-acct="${d.id}">${icon('key')} สร้างบัญชี</button>`}</td>
@@ -936,6 +943,7 @@
                 <div class="field"><label>ฝ่าย</label><input name="dept" value="${esc(u.dept || '')}"></div><div class="field"><label>เบอร์โทร</label><input name="phone" value="${esc(u.phone || '')}"></div>
                 <div class="field full"><label>สิทธิ์</label><div class="checks">${Object.keys(S.ROLES).map(r => `<label class="check"><input type="checkbox" name="roles" data-multi value="${r}" ${(u.roles || []).includes(r) ? 'checked' : ''} ${(r === 'admin' || r === 'superadmin') && !sup ? 'disabled' : ''}>${S.ROLES[r]}</label>`).join('')}</div></div>
                 <div class="field full"><label>ผูกกับพนักงานขับรถ (ถ้าเป็นคนขับ)</label><select name="driverId" id="uDrv"><option value="">— ไม่ผูก —</option>${S.db.drivers.map(d => { const cur = (S.driverOfUser({ ...u, roles: ['driver'] }) || {}).id === d.id, other = d.email && d.email !== u.email ? S.user(d.email) : null; return `<option value="${d.id}" ${cur ? 'selected' : ''}>${esc(d.name)}${other ? ` (ผูกกับบัญชี ${esc(S.usernameOf(other.email) || other.name || other.email)} อยู่ — จะย้ายมาบัญชีนี้)` : ''}</option>`; }).join('')}</select><span class="hint">${S.isUsernameEmail(u.email) ? 'เลือกคนขับแล้ว ระบบเติมชื่อ/เบอร์โทรตามคนขับให้ · ' : 'บัญชี Google ใช้ชื่อ/ฝ่าย/เบอร์ของเจ้าของบัญชีเหมือนเดิม · '}เอาสิทธิ์คนขับออก = ยกเลิกการผูก และคืนข้อมูลเดิม</span></div>
+                <div class="field full"><label class="check sb-check"><input type="checkbox" name="standby" ${(S.driverOfUser(u) || {}).standby ? 'checked' : ''}> ${icon('alert')} คนขับสำรอง (ฉุกเฉินเท่านั้น)</label><span class="hint">เช่น ครูเวรที่ขับรถนำส่งผู้ป่วยได้ · ระบบสร้างชื่อในพนักงานขับรถให้อัตโนมัติ ใช้ได้เฉพาะปุ่ม "ออกงานฉุกเฉิน" ไม่โผล่ตอนจัดรถ</span></div>
                 <div class="field full"><label class="check" style="width:max-content"><input type="checkbox" name="active" ${u.active !== false ? 'checked' : ''}> เปิดใช้งานบัญชี</label></div></form>`,
               onOpen: el => {
                 const sel = el.querySelector('#uDrv'), rd = el.querySelector('input[name=roles][value=driver]'), F = n => el.querySelector(`#uF [name=${n}]`);
@@ -943,7 +951,7 @@
                 sel.addEventListener('change', () => { const d = S.driver(sel.value); if (!d) return; if (rd) rd.checked = true; if (!S.isUsernameEmail(u.email)) return; F('name').value = d.name || ''; if (d.phone) F('phone').value = d.phone; F('dept').value = F('dept').value || 'งานยานพาหนะ'; });
                 if (rd) rd.addEventListener('change', () => { if (!rd.checked) sel.value = ''; });
               },
-              actions: [{ label: 'ลบผู้ใช้', kind: 'btn-danger', onClick: async () => { if (!(await UI.confirm('ลบผู้ใช้นี้ออกจากระบบ?', { danger: true, ok: 'ลบ' }))) return false; await S.removeUser(u.email); return 'del'; } }, { label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: async el => { const f = UI.formData(el.querySelector('#uF')); const roles = sup ? f.roles : [...new Set([...(f.roles || []).filter(r => r !== 'admin' && r !== 'superadmin'), ...(u.roles || []).filter(r => r === 'admin' || r === 'superadmin')])]; await S.saveUser({ ...u, name: f.name, dept: f.dept, phone: f.phone, roles, active: f.active, driverId: f.driverId }); return true; } }] });
+              actions: [{ label: 'ลบผู้ใช้', kind: 'btn-danger', onClick: async () => { if (!(await UI.confirm('ลบผู้ใช้นี้ออกจากระบบ?', { danger: true, ok: 'ลบ' }))) return false; await S.removeUser(u.email); return 'del'; } }, { label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: async el => { const f = UI.formData(el.querySelector('#uF')); const roles = sup ? f.roles : [...new Set([...(f.roles || []).filter(r => r !== 'admin' && r !== 'superadmin'), ...(u.roles || []).filter(r => r === 'admin' || r === 'superadmin')])]; const wasSb = !!(S.driverOfUser(u) || {}).standby; await S.saveUser({ ...u, name: f.name, dept: f.dept, phone: f.phone, roles, active: f.active, driverId: f.driverId }); if (!!f.standby !== wasSb) await S.setStandby(u.email, !!f.standby); return true; } }] });
             if (res) { UI.toast(res === 'del' ? 'ลบผู้ใช้แล้ว' : 'บันทึกแล้ว'); App.render(); }
           }
         });
@@ -1434,6 +1442,7 @@
             <div class="field"><label>ฝ่าย</label><input name="division" value="${esc(s.division)}"></div>
             <div class="field"><label>งาน</label><input name="unit" value="${esc(s.unit)}"></div>
             <div class="field"><label>ต้องขอใช้รถล่วงหน้าอย่างน้อย (วัน)</label><input name="leadDays" type="number" min="0" value="${s.leadDays}"></div>
+            <div class="field full"><label>${icon('alert')} สถานพยาบาลสำหรับงานฉุกเฉิน (นำส่งผู้ป่วย) <span class="hint" style="font-weight:400">บรรทัดละแห่ง · เรียงตามที่ใช้บ่อย</span></label><textarea name="hospitals" rows="4">${esc(S.hospitals().join('\n'))}</textarea></div>
             <div class="field"><label>งานประจำ: ขอก่อนเวลาออกอย่างน้อย (ชั่วโมง)</label><input name="quickLeadHours" type="number" min="0" step="0.5" value="${S.quickHours()}"><span class="hint">ใช้กับหมวดที่ติ๊ก "งานประจำ" ด้านล่าง — ขอในวันได้ ไม่ต้องแนบบันทึกข้อความ</span></div>
           </div></div>
           <div class="form-section"><h3>${icon('file')} บันทึกข้อความขอใช้รถ <span class="hint" style="font-weight:400">(เอกสารที่พิมพ์ให้ลงนามหลังอนุมัติ · เว้นชื่อว่าง = ใช้ชื่อจากคณะทำงานด้านล่าง)</span></h3>
@@ -1495,7 +1504,7 @@
           const f = UI.formData($('#sf', root));
           const committee = $$('[data-ci]', root).map(row => { const i = +row.dataset.ci; const o = { ...(cm[i] || { id: 'c' + Date.now() + i }) }; $$('[data-k]', row).forEach(el => { o[el.dataset.k] = el.dataset.k === 'level' ? +el.value : el.value; }); o.photo = (photoGetters[i] ? photoGetters[i]() : [])[0] || ''; return o; });
           const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.quick = c.id !== 'other' && row.querySelector('[data-ck=quick]').checked; c.order = i; return c; });
-          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactName: (f.contactName || '').trim(), contactPhone: f.contactPhone, contactEmail: (f.contactEmail || '').trim(), contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
+          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), hospitals: String(f.hospitals || '').split('\n').map(x => x.trim()).filter(Boolean), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactName: (f.contactName || '').trim(), contactPhone: f.contactPhone, contactEmail: (f.contactEmail || '').trim(), contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
             memo: { headEmail: f.m_headEmail || '', depEmail: f.m_depEmail || '', to: f.m_to.trim(), noPrefix: f.m_noPrefix.trim(), headName: f.m_headName.trim(), headPos: f.m_headPos.trim(), depName: f.m_depName.trim(), depPos: f.m_depPos.trim() } };
         };
         const saveCats = async mut => { const x = collect(); mut(x.categories); x.categories.forEach((c, i) => { c.order = i; }); await S.saveSettings(x); App.render(); };

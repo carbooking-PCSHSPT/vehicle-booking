@@ -187,6 +187,64 @@
     ? `<button class="${cls}" data-go="ontrip" data-r="${r.id}" data-i="${i}">${icon('navigation')} ออกเดินทาง</button>`
     : `<button class="${cls} is-wait ${st.late ? 'is-late' : ''}" disabled title="${st.late ? 'เลยกำหนดออกเกิน 24 ชั่วโมง ให้แอดมินบันทึกแทน' : `กดได้ก่อนเวลาออก 3 ชั่วโมง`}">${icon(st.late ? 'alert' : 'clock')} ${st.msg}</button>`; };
   Pages._departState = departState;
+  // ───────── ออกงานฉุกเฉิน (นำส่งผู้ป่วย): คนขับกดเองทันที · แอดมินบันทึกแทนได้ (เลือกคนขับ + เวลาออก/กลับ) ─────────
+  Pages._medicalModal = async ({ admin = false } = {}) => {
+    const me = S.me, myD = S.driverOfUser(me);
+    const mem = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+    const onTrip = id => S.db.requests.some(r => (r.assignments || []).some(a => a.vehicleId === id && a.status === 'ontrip'));
+    const soon = id => { const t = Date.now(), u = t + 6 * 36e5; const r = S.db.requests.filter(x => ['approved', 'ontrip'].includes(x.status) && new Date(x.startAt).getTime() < u && new Date(x.endAt).getTime() > t && (x.assignments || []).some(a => a.vehicleId === id && a.status === 'assigned')).sort((a, b) => a.startAt.localeCompare(b.startAt))[0]; return r ? `มีงาน ${fmt.time(r.startAt)}` : ''; };
+    // เฉพาะรถรับส่งคน (รถตู้ก่อน) — ไม่แสดงรถบรรทุก/รถขนขยะ/รถกอล์ฟ
+    const vs = S.db.vehicles.filter(v => v.bookable !== false && S.PASSENGER_KINDS.includes(v.kind)).sort((a, b) => (S.PASSENGER_KINDS.indexOf(a.kind) < 0) - (S.PASSENGER_KINDS.indexOf(b.kind) < 0) || (a.kind === 'van' ? -1 : 0) - (b.kind === 'van' ? -1 : 0) || (+a.no || 0) - (+b.no || 0));
+    const mine = myD && (S.db.vehicles.find(v => v.driverId === myD.id) || {}).id;
+    const defV = [mem('vb-med-v', ''), mine].find(id => id && vs.some(v => v.id === id) && !onTrip(id)) || (vs.find(v => !onTrip(v.id) && v.kind === 'van') || {}).id || '';
+    // รายชื่อครูให้เลือก: แอดมินเห็นผู้ใช้ทั้งหมด · คนขับใช้ชื่อผู้ขอใช้รถที่เคยเห็นในระบบ (พิมพ์ชื่อเองได้เสมอ)
+    const names = [...new Set([...S.db.users.filter(u => u.active !== false && (u.roles || []).includes('teacher')).map(u => u.name), ...S.db.requests.map(r => (r.requester || {}).name), ...((S.db.settings.committee || []).map(c => c.name))].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+    const H = S.hospitals();
+    const drivers = S.db.drivers.filter(d => d.active !== false);
+    const nowL = fmt.local(new Date()), minL = fmt.local(new Date(Date.now() - 24 * 36e5));
+    return UI.modal({
+      title: `<span class="em-ttl">${icon('alert')} ออกงานฉุกเฉิน · นำส่งผู้ป่วย</span>`, size: 'lg',
+      body: `<form id="emF" class="stack em-form">
+        <div class="note-box red">${icon('alert')}<div>ใช้เมื่อ<b>นำส่งผู้ป่วย/ผู้บาดเจ็บกรณีฉุกเฉิน</b>เท่านั้น · ไม่ต้องขออนุญาตล่วงหน้า ระบบแจ้งแอดมินทันที · กลับถึงแล้วให้ผู้ดูแลลงชื่อ</div></div>
+        ${admin ? `<div class="field"><label>คนขับ <b class="req">*</b></label><select name="driverId"><option value="">— เลือกคนขับ —</option>${drivers.map(d => `<option value="${d.id}">${esc(d.name)}${d.standby ? ' (สำรอง)' : ''}</option>`).join('')}</select></div>` : ''}
+        <div class="field"><label>รถที่ใช้ <b class="req">*</b> <span class="hint">(เลือกคันไหนก็ได้ที่ว่าง)</span></label>
+          <div class="em-veh">${vs.map(v => { const busy = onTrip(v.id) && !admin, s = soon(v.id); return `<label class="em-v ${busy ? 'is-busy' : ''}"><input type="radio" name="vehicleId" value="${v.id}" ${v.id === defV ? 'checked' : ''} ${busy ? 'disabled' : ''}><span><b>${esc(v.name)}</b><small>${esc(v.plate || '')}</small>${busy ? '<em class="bad">กำลังเดินทาง</em>' : s ? `<em>${s}</em>` : ''}</span></label>`; }).join('')}</div></div>
+        <div class="field"><label>สถานพยาบาล <b class="req">*</b></label>
+          <div class="em-hos">${[...H, '_'].map(h => `<label class="em-h"><input type="radio" name="hosSel" value="${esc(h)}"><span>${h === '_' ? 'อื่น ๆ (พิมพ์เอง)' : esc(h)}</span></label>`).join('')}</div>
+          <input name="hosOther" class="em-hos-other" placeholder="ชื่อสถานพยาบาล *" hidden></div>
+        <div class="grid2">
+          <div class="field"><label>จำนวนผู้ป่วย <b class="req">*</b></label><div class="em-step"><button type="button" class="icon-btn" data-step="-1" aria-label="ลด">${icon('minus')}</button><input name="patients" type="number" inputmode="numeric" min="1" value="1"><button type="button" class="icon-btn" data-step="1" aria-label="เพิ่ม">${icon('plus')}</button><span>คน</span></div></div>
+          <div class="field"><label>ผู้ดูแลที่ไปด้วย (ครู/พยาบาล) <b class="req">*</b></label><input name="carer" list="emCarer" autocomplete="off" placeholder="เลือกจากรายชื่อ หรือพิมพ์ชื่อเอง"><datalist id="emCarer">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
+          <div class="field"><label>เลขไมล์ตอนออก</label><input name="odoStart" type="number" inputmode="numeric" min="0" placeholder="เลขไมล์"></div>
+          <div class="field"><label>เวลาออก</label>${admin ? `<input name="departAt" type="datetime-local" value="${nowL}" max="${nowL}">` : `<label class="check em-late"><input type="checkbox" name="late"> ลืมกดตอนออก (บันทึกย้อนหลัง ไม่เกิน 24 ชม.)</label><input name="departAt" type="datetime-local" value="${nowL}" min="${minL}" max="${nowL}" hidden>`}</div>
+          ${admin ? `<div class="field"><label>เวลากลับถึง <span class="hint">(ถ้ากลับแล้ว)</span></label><input name="returnAt" type="datetime-local" max="${nowL}"></div>
+          <div class="field"><label>เลขไมล์ตอนกลับ</label><input name="odoEnd" type="number" inputmode="numeric" min="0"></div>` : ''}
+          <div class="field full"><label>หมายเหตุ <span class="hint">(ไม่ต้องระบุอาการ/ชื่อผู้ป่วย)</span></label><input name="note" placeholder="เช่น ออกจากหอพักชาย"></div>
+        </div>
+      </form>`,
+      onOpen(el) {
+        const f = el.querySelector('#emF');
+        const odoOf = () => { const v = (f.querySelector('[name=vehicleId]:checked') || {}).value; const o = v ? lastOdo(v) : null; f.odoStart.placeholder = o != null ? `ล่าสุด ${fmt.num(o)}` : 'เลขไมล์'; if (o != null && !f.odoStart.dataset.touched) f.odoStart.value = o; };
+        f.odoStart.addEventListener('input', () => { f.odoStart.dataset.touched = 1; });
+        f.addEventListener('change', e => {
+          if (e.target.name === 'vehicleId') odoOf();
+          if (e.target.name === 'hosSel') { const o = e.target.value === '_'; f.hosOther.hidden = !o; if (o) f.hosOther.focus(); }
+          if (e.target.name === 'late') f.departAt.hidden = !e.target.checked;
+        });
+        f.addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) f.patients.value = Math.max(1, (+f.patients.value || 1) + +b.dataset.step); });
+        odoOf();
+      },
+      actions: [{ label: 'ยกเลิก', value: null }, { label: admin ? 'บันทึกงานฉุกเฉิน' : 'ออกเดินทาง (ฉุกเฉิน)', kind: 'btn-danger', icon: 'navigation', onClick: async el => {
+        const f = el.querySelector('#emF'), g = n => (f.querySelector(`[name=${n}]:checked`) || f.querySelector(`[name=${n}]:not([type=radio])`) || {}).value || '';
+        const hs = g('hosSel'), hospital = hs === '_' ? f.hosOther.value.trim() : hs;
+        const departAt = admin || (f.late && f.late.checked) ? f.departAt.value : '';
+        const r = await S.createMedical({ vehicleId: g('vehicleId'), hospital, patients: f.patients.value, carer: { name: f.carer.value.trim() }, odoStart: f.odoStart.value, departAt, note: f.note.value,
+          ...(admin ? { driverId: f.driverId.value, returnAt: f.returnAt.value, odoEnd: f.odoEnd.value } : {}) });
+        try { localStorage.setItem('vb-med-v', r.assignments[0].vehicleId); } catch (e) { /* ไม่จำก็ได้ */ }
+        return r;
+      } }]
+    }).then(r => { if (r) UI.toast(admin ? `บันทึกงานฉุกเฉิน ${r.id} แล้ว` : 'บันทึกออกงานฉุกเฉินแล้ว — แจ้งแอดมินแล้ว · กลับถึงแล้วกด "กลับถึง" และให้ผู้ดูแลลงชื่อ', 'ok'); return r; });
+  };
   // ตรวจสภาพรถก่อนออกเดินทาง (คนขับต้องติ๊กครบ หรือแจ้งปัญหาที่พบ — แอดมินเห็นในหน้าภาพรวม)
   const CHECKS = ['น้ำมันเพียงพอสำหรับการเดินทาง', 'ลมยางและสภาพยางปกติ', 'ไฟหน้า ไฟเลี้ยว ไฟเบรก ใช้งานได้', 'เบรก พวงมาลัย ไม่มีไฟเตือนบนหน้าปัด', 'น้ำมันเครื่อง น้ำหล่อเย็น ระดับปกติ', 'อุปกรณ์ฉุกเฉินและเอกสารประจำรถครบ', 'ห้องโดยสารสะอาด เข็มขัดนิรภัยใช้งานได้'];
 
@@ -197,7 +255,8 @@
     const admin = S.isAdmin(S.me) && !!override, dep = status === 'ontrip';
     if (dep && !override && !departState(r).ok) return UI.toast(departState(r).late ? departState(r).msg : `ยังไม่ถึงเวลา — ${departState(r).msg} (กดได้ก่อนเวลาออก 3 ชั่วโมง)`, 'error');
     if (!dep && a.status !== 'ontrip' && !override) return UI.toast(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้', 'error');
-    const early = !dep && earlyReturn(r);
+    const med = !!r.medical;
+    const early = !dep && !med && earlyReturn(r);
     const def = dep ? (a.odoStart ?? lastOdo(a.vehicleId) ?? '') : (a.odoEnd ?? '');
     const res = await UI.modal({
       title: dep ? `${icon('navigation')} ตรวจรถและออกเดินทาง` : `${icon('home')} ยืนยันกลับถึงโรงเรียน`,
@@ -208,9 +267,9 @@
           <div class="field" style="margin-top:8px"><label>พบปัญหา / ข้อสังเกต <span class="hint">(ถ้ามีข้อที่ไม่ผ่าน ต้องระบุ — แจ้งแอดมินอัตโนมัติ)</span></label><input id="chkNote" placeholder="เช่น ไฟเลี้ยวขวาไม่ติด"></div></div>` : ''}
         ${early ? `<div class="note-box warn-y">${icon('alert')}<div><b>กลับก่อนเวลาที่ขอ</b> (กำหนดกลับ ${fmt.when(r.endAt)}) — ระบุเหตุผล เช่น ภารกิจเสร็จเร็ว</div></div>
           <div class="field"><label>เหตุผลที่กลับก่อนเวลา <b class="req">*</b></label><input id="earlyNote" placeholder="เช่น ส่งเอกสารเสร็จเร็วกว่ากำหนด"></div>` : ''}
-        ${!dep ? `<div class="ps-box"><div class="chk-head"><b>${icon('edit')} ครูผู้ร่วมเดินทางลงชื่อ</b><span class="hint">ยืนยันเวลากลับถึง</span></div>
-          <div class="ps-opt"><label><input type="radio" name="psHas" value="1"> มีครูไปด้วย</label><label><input type="radio" name="psHas" value="0"> ไม่มีครูไปด้วย</label></div>
-          <div id="psWrap" hidden><div class="field"><label>ชื่อครูที่ลงชื่อ <b class="req">*</b></label><input id="psName" list="psList" value="${esc(r.requester.name)}" autocomplete="off"><datalist id="psList">${[r.requester.name, ...String(r.passengerNames || '').split(/[,\n،]+/)].map(x => x.trim()).filter(x => x && !/^[-–.\s]+$/.test(x)).map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+        ${!dep ? `<div class="ps-box"><div class="chk-head"><b>${icon('edit')} ${med ? 'ผู้ดูแลที่ไปด้วย (ครู/พยาบาล) ลงชื่อ' : 'ครูผู้ร่วมเดินทางลงชื่อ'}</b><span class="hint">ยืนยันเวลากลับถึง</span></div>
+          <div class="ps-opt" ${med ? 'hidden' : ''}><label><input type="radio" name="psHas" value="1" ${med ? 'checked' : ''}> มีครูไปด้วย</label><label><input type="radio" name="psHas" value="0"> ไม่มีครูไปด้วย</label></div>
+          <div id="psWrap" ${med ? '' : 'hidden'}><div class="field"><label>${med ? 'ชื่อผู้ดูแล' : 'ชื่อครูที่ลงชื่อ'} <b class="req">*</b></label><input id="psName" list="psList" value="${esc(med ? ((r.medical.carer || {}).name || '') : r.requester.name)}" autocomplete="off"><datalist id="psList">${[r.requester.name, ...String(r.passengerNames || '').split(/[,\n،]+/)].map(x => x.trim()).filter(x => x && !/^[-–.\s]+$/.test(x)).map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
             <div class="sig-pad"><canvas id="psPad" aria-label="ช่องเซ็นชื่อครู"></canvas><span class="sig-base">ครูลงชื่อบนเส้นนี้</span><span class="sig-x">✕</span></div>
             <div class="row between" style="margin-top:6px"><span class="hint">ส่งมือถือให้ครูเซ็น</span><button type="button" class="btn btn-ghost btn-sm" id="psClear">${icon('trash')} ล้าง</button></div></div></div>` : ''}        <div class="field"><label>เลขไมล์${dep ? 'ตอนออก' : 'ตอนกลับ'} (กม.)</label><input id="odoIn" type="number" inputmode="numeric" min="0" value="${def}" placeholder="ไม่บังคับ — กรอกภายหลังได้"></div>
         ${!dep && a.odoStart != null ? `<p class="hint">เลขไมล์ตอนออก ${fmt.num(a.odoStart)} กม.</p>` : ''}
@@ -219,6 +278,7 @@
       onOpen(el) {
         if (dep) return;
         let pad = null; const wrap = el.querySelector('#psWrap');
+        if (med) { pad = UI.signaturePad(el.querySelector('#psPad')); el._ps = pad; }
         el.addEventListener('change', e => { if (e.target.name !== 'psHas') return; wrap.hidden = e.target.value !== '1'; if (!wrap.hidden && !pad) { pad = UI.signaturePad(el.querySelector('#psPad')); el._ps = pad; } });
         el.querySelector('#psClear').addEventListener('click', () => pad && pad.clear());
       },
@@ -289,6 +349,7 @@
   }
   function bindJobs(root) {
     root.addEventListener('click', async e => {
+      if (e.target.closest('[data-emgo]')) { const r = await Pages._medicalModal(); if (r) App.render(); return; }
       const g = e.target.closest('[data-go]');
       if (g) { const r = S.request(g.dataset.r); return Pages._tripAction(r, +g.dataset.i, g.dataset.go); }
       const f = e.target.closest('[data-fuel]');
@@ -435,6 +496,7 @@
         ${adminView ? `<a class="btn btn-ghost btn-sm back-admin" href="#/admin">${icon('arrowL')} กลับระบบหลังบ้าน</a>
           <div class="note-box navy adm-pick" style="margin-bottom:14px">${icon('shield')}<div><span class="nw">มุมมองแอดมิน — เลือกคนขับ</span><div class="adm-pick-row"><select class="input" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><a class="link nw" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div></div>` : ''}
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
+        ${!adminView ? `<button type="button" class="em-go" data-emgo>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ</small></span>${icon('chevR')}</button>` : ''}
         ${tabs}
         ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
       </div>`,

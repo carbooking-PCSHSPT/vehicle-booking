@@ -71,6 +71,8 @@ const Store = (() => {
   const CAT_ICONS = ['users', 'trophy', 'sparkles', 'globe', 'user', 'package', 'heart', 'banknote', 'file', 'home', 'flag', 'star', 'flask', 'student', 'teacher', 'bus', 'info'];
 
   // ───────── สถานะ ─────────
+  // งานฉุกเฉินนำส่งผู้ป่วย: สถานพยาบาลที่ใช้บ่อย (ค่าเริ่มต้น)
+  const HOSPITALS = ['โรงพยาบาลกรุงสยามเซนต์คาร์ลอส', 'โรงพยาบาลลาดหลุมแก้ว', 'โรงพยาบาลปทุมธานี', 'โรงพยาบาลปทุมเวช', 'คลินิกเมืองปทุมธานี', 'อนามัยประจำตำบลบ่อเงิน'];
   let db = emptyDb();
   let me = null;
   let authState = 'loading';      // loading | out | in
@@ -89,6 +91,7 @@ const Store = (() => {
       school: { name: 'โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ปทุมธานี', lat: 14.0436, lng: 100.3773, address: 'ลาดหลุมแก้ว ปทุมธานี' },
       // หมวดงาน (แอดมินแก้ไขได้) — เก็บรหัสหมวดในคำขอ เปลี่ยนชื่อภายหลังสถิติยังถูกต้อง
       categories: DEFAULT_CATS.map((c, i) => ({ ...c, active: true, order: i })),
+      hospitals: HOSPITALS.slice(),
       contactNote: 'ติดต่อสอบถามเรื่องการขอใช้รถส่วนกลาง ในวันและเวลาราชการ',
       contactName: '', contactPhone: '', contactEmail: '', contactLine: '', contactRoom: '',
       committee: [
@@ -191,7 +194,8 @@ const Store = (() => {
     return { key: 'free', ...VSTATE.free, note: 'พร้อมให้บริการ' };
   }
   const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
-  const destName = r => (r.destinations || []).map(d => d.name).filter(Boolean).join(' · ') || '-';
+  const hideMed = r => !!r.medical && !!me && !isBack(me) && !(r.driverEmails || []).includes(me.email) && (r.requester || {}).email !== me.email;
+  const destName = r => hideMed(r) ? 'งานฉุกเฉิน' : ((r.destinations || []).map(d => d.name).filter(Boolean).join(' · ') || '-');
   const passengers = r => (+r.teachers || 0) + (+r.students || 0) + (+r.others || 0);
   // หมวดงาน
   const categories = (all = false) => (db.settings.categories && db.settings.categories.length ? db.settings.categories : DEFAULT_CATS.map((c, i) => ({ ...c, active: true, order: i })))
@@ -204,7 +208,7 @@ const Store = (() => {
   const quickHours = () => (db.settings.quickLeadHours != null ? +db.settings.quickLeadHours : 2);
   // คำขอที่ค้างบันทึกข้อความ: แอดมินบันทึกแทน (เร่งด่วน) · ไม่ใช่งานประจำ · ยังไม่มีไฟล์แนบ · ไม่ได้ยกเลิก/ไม่อนุมัติ
   // (คำขอที่ครูส่งเองต้องแนบตั้งแต่ตอนส่งอยู่แล้ว)
-  const needsMemo = r => !!r && !!r.emergency && !isQuickCat(r.category) && !(r.attachments || []).length && !r.memoWaived && !['cancelled', 'rejected'].includes(r.status);
+  const needsMemo = r => !!r && !!r.emergency && !r.medical && !isQuickCat(r.category) && !(r.attachments || []).length && !r.memoWaived && !['cancelled', 'rejected'].includes(r.status);
   // จับคู่ชื่อที่แอดมินพิมพ์เอง กับบัญชีผู้ใช้ (ตัดคำนำหน้าและช่องว่าง) — ใช้ติดตามบันทึกข้อความค้าง
   const nameKey = s => String(s || '').replace(/\s+/g, '').replace(/^(นางสาว|น\.ส\.|นาย|นาง|ดร\.|ว่าที่ร้อยตรี|ว่าที่ร\.ต\.)/, '');
   const userByName = n => { const k = nameKey(n); if (k.length < 3) return null; const m = db.users.filter(u => nameKey(u.name) === k); return m.length === 1 ? m[0] : null; };
@@ -251,6 +255,7 @@ const Store = (() => {
     const myDriver = driverOfUser(me);
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
+      medical: 'รถออกงานฉุกเฉิน (นำส่งผู้ป่วย)', medicalack: 'แอดมินรับทราบงานฉุกเฉินแล้ว',
       depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน',
       memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว', memowaive: 'แอดมินยกเว้นบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้',
       changereq: 'มีคำขอแก้ไขข้อมูล รอพิจารณา', changeok: 'แอดมินอนุมัติการแก้ไขข้อมูลแล้ว', changeno: 'แอดมินไม่อนุมัติการแก้ไขข้อมูล'
@@ -260,7 +265,7 @@ const Store = (() => {
         if (h.by === me.email) return;
         let mine = false, link = '';
         if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive', 'changeok', 'changeno'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
-        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
+        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq', 'medical'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen && h.at <= nowStr });
       });
@@ -1155,6 +1160,71 @@ const Store = (() => {
       await createReq(r); rememberPlaces(x.destinations);
       return r;
     },
+    // ═══ งานฉุกเฉินนำส่งผู้ป่วย: คนขับกดออกเองทันที (ไม่ต้องขอ/อนุมัติ) · บันทึกย้อนหลังได้ 24 ชม. · เกินนั้นแอดมินบันทึกแทน ═══
+    // o = { vehicleId, hospital, patients, carer: { name, email }, odoStart, departAt, note } · แอดมินเพิ่ม: driverId, returnAt, odoEnd
+    async createMedical(o) {
+      const admin = isAdmin(me);
+      const drv = admin && o.driverId ? driver(o.driverId) : driverOfUser(me);
+      if (!drv) throw new Error(admin ? 'กรุณาเลือกคนขับ' : 'บัญชีนี้ยังไม่ได้ผูกกับรายชื่อพนักงานขับรถ — ติดต่อแอดมิน');
+      if (!admin && !isDriver(me)) throw new Error('เฉพาะพนักงานขับรถ');
+      const v = vehicle(o.vehicleId); if (!v) throw new Error('กรุณาเลือกรถ');
+      const hospital = String(o.hospital || '').trim(); if (!hospital) throw new Error('กรุณาเลือกสถานพยาบาล');
+      const patients = Math.max(0, Math.round(+o.patients || 0)); if (!patients) throw new Error('กรุณาระบุจำนวนผู้ป่วย');
+      const carer = { name: String((o.carer || {}).name || '').trim(), email: String((o.carer || {}).email || '').trim() };
+      if (!carer.name) throw new Error('กรุณาระบุผู้ดูแลที่ไปด้วย (ครู/พยาบาล)');
+      const now = Date.now(), dep = o.departAt ? new Date(o.departAt) : new Date(now);
+      if (isNaN(dep)) throw new Error('เวลาออกไม่ถูกต้อง');
+      if (dep.getTime() > now + 5 * 6e4) throw new Error('เวลาออกต้องไม่เกินเวลาปัจจุบัน');
+      if (!admin && now - dep.getTime() > 24 * 36e5) throw new Error('เลย 24 ชั่วโมงแล้ว — ให้แอดมินบันทึกแทน');
+      const ret = admin && o.returnAt ? new Date(o.returnAt) : null;
+      if (ret && (isNaN(ret) || ret <= dep)) throw new Error('เวลากลับต้องหลังเวลาออก');
+      if (ret && ret.getTime() > now + 5 * 6e4) throw new Error('เวลากลับต้องไม่เกินเวลาปัจจุบัน');
+      if (!ret && db.requests.some(r => (r.assignments || []).some(a => a.vehicleId === v.id && a.status === 'ontrip'))) throw new Error(`${v.name} กำลังเดินทางอยู่ — เลือกคันอื่น`);
+      const odoS = o.odoStart === '' || o.odoStart == null ? null : +o.odoStart, odoE = ret && o.odoEnd !== '' && o.odoEnd != null ? +o.odoEnd : null;
+      if (odoS != null && odoE != null && odoE < odoS) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
+      // งานที่จองไว้ซึ่งอาจกระทบ (รถ/คนขับเดียวกัน ภายใน 6 ชม.) → แจ้งแอดมินในประวัติ
+      const until = dep.getTime() + 6 * 36e5;
+      const clash = db.requests.filter(r => blocking(r) && new Date(r.startAt).getTime() < until && new Date(r.endAt) > dep && (r.assignments || []).some(a => a.status !== 'returned' && (a.vehicleId === v.id || a.driverId === drv.id))).map(r => r.id);
+      const back = now - dep.getTime() > 15 * 6e4;
+      const id = await A.nextId(dep);
+      const startAt = dep.toISOString(), endAt = (ret || new Date(dep.getTime() + 3 * 36e5)).toISOString();
+      const a = { vehicleId: v.id, driverId: drv.id, note: '', status: ret ? 'returned' : 'ontrip', departedAt: startAt, returnedAt: ret ? ret.toISOString() : '', odoStart: odoS, odoEnd: odoE, rated: false, ratingSkipped: true };
+      if (ret) a.paxSign = { has: true, name: carer.name, img: '', at: ret.toISOString() };
+      const r = {
+        id, createdAt: nowISO(), category: 'other', categoryOther: 'นำส่งผู้ป่วย (ฉุกเฉิน)', purpose: 'นำส่งผู้ป่วยไปสถานพยาบาล (กรณีฉุกเฉิน)', project: '',
+        destinations: [{ id: uid('pl'), name: hospital, address: '', province: '', lat: null, lng: null, km: 0, mins: 0 }], totalKm: 0, totalMins: 0,
+        startAt, endAt, tripType: 'day', onewayDir: '', overnight: false, lodging: '',
+        teachers: 1, students: patients, others: 0, passengerNames: '', pickup: 'โรงเรียน', contactPhone: drv.phone || '', note: String(o.note || '').trim(), attachments: [],
+        requester: { email: drv.email || '', name: drv.name, dept: 'งานยานพาหนะ', phone: drv.phone || '' },
+        status: ret ? 'closed' : 'ontrip', emergency: true, createdBy: me.email,
+        medical: { patients, carer, by: me.email, byName: me.name || me.email, backdated: back, adminEntry: admin && (!!o.driverId || !!ret), clash, ack: null },
+        decision: { by: me.email, byName: me.name || me.email, at: nowISO(), action: 'approve', note: 'งานฉุกเฉินนำส่งผู้ป่วย — ไม่ต้องขออนุญาตล่วงหน้า' },
+        assignments: [a], driverEmails: drv.email ? [drv.email] : [], expenses: [],
+        history: [H('medical', `${v.name} · ${hospital} · ผู้ป่วย ${patients} คน · ผู้ดูแล ${carer.name}${back ? ' · บันทึกย้อนหลัง' : ''}${admin && o.driverId ? ` · แอดมินบันทึกแทน (คนขับ ${drv.name})` : ''}${clash.length ? ` · ⚠ อาจกระทบงาน ${clash.join(', ')}` : ''}`), H('depart', v.name)]
+      };
+      if (ret) { r.history.push(H('return', v.name)); r.closedAt = ret.toISOString(); }
+      await createReq(r);
+      return r;
+    },
+    async ackMedical(id, note = '') {
+      needAdmin();
+      return mutateReq(id, r => { if (!r.medical) return r; r.medical = { ...r.medical, ack: { by: me.email, byName: me.name || me.email, at: nowISO(), note: String(note || '').trim() } }; r.history.push(H('medicalack', note)); return r; });
+    },
+    hospitals: () => (db.settings.hospitals && db.settings.hospitals.length ? db.settings.hospitals : HOSPITALS),
+    // คนขับสำรอง (ฉุกเฉินเท่านั้น): สร้างชื่อในพนักงานขับรถให้อัตโนมัติ (standby) · ไม่โผล่ตอนจัดรถ/ตารางงาน/ติดต่อเรา
+    async setStandby(email, on) {
+      needAdmin();
+      const u = user(email); if (!u) throw new Error('ไม่พบผู้ใช้');
+      if (on) {
+        let d = driverOfUser({ ...u, roles: ['driver'] });
+        if (!d) { d = { id: uid('d'), name: u.name || email, phone: u.phone || '', email: u.email, photo: '', standby: true, active: true, order: db.drivers.length, licenseExpiry: '', updatedAt: nowISO() }; await A.put('drivers', d.id, d); }
+        await api.saveUser({ ...u, roles: [...new Set([...(u.roles || []), 'driver'])], driverId: d.id });
+      } else {
+        const d = driverOfUser(u);
+        if (d && d.standby) await A.put('drivers', d.id, { ...d, active: false, email: '', updatedAt: nowISO() });
+        await api.saveUser({ ...u, roles: (u.roles || []).filter(r => r !== 'driver'), driverId: '' });
+      }
+    },
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
     async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '', paxSign = null } = {}) {
       const when = at ? new Date(at).toISOString() : nowISO();
@@ -1185,7 +1255,7 @@ const Store = (() => {
           if (a.status !== 'ontrip' && !ov) throw new Error(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้');
           if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
           if (paxSign) a.paxSign = paxSign.has ? { has: true, name: String(paxSign.name || '').trim(), img: String(paxSign.img || ''), at: paxSign.at || nowISO() } : { has: false, at: paxSign.at || nowISO() };
-          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
+          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (r.medical) r.endAt = when; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
         return r;
       });
