@@ -78,7 +78,7 @@ const Store = (() => {
   let authState = 'loading';      // loading | out | in
   let authError = '';
   const listeners = new Set();
-  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [], ot: [] }; }
+  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [], ot: [], feedback: [], errlog: [] }; }
   const TRASH_DAYS = 30;   // ข้อมูลที่ล้างแล้วอยู่ในถังขยะกี่วันก่อนลบถาวร
   function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
 
@@ -487,6 +487,8 @@ const Store = (() => {
     db = saved && saved.v === 1 ? saved.db : seed();
     if (!db.trash) db.trash = [];
     if (!db.ot) db.ot = [];
+    if (!db.feedback) db.feedback = [];
+    if (!db.errlog) db.errlog = [];
     if (!db.settings.categories) db.settings.categories = defaultSettings().categories;
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, db })); } catch (e) { console.warn('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม', e); if (typeof UI !== 'undefined') UI.toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม (โหมดทดลอง) ลองลบรูปบางส่วน', 'error'); } };
     save();
@@ -496,7 +498,7 @@ const Store = (() => {
       try { const s = JSON.parse(e.newValue); if (s && s.v === 1) { db = s.db; if (me) me = user(me.email) || me; emit(); } } catch (err) { /* ข้าม */ }
     });
     const sessKey = 'pcs-vehicle-session';
-    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id', trash: 'id', ot: 'id' };
+    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id', trash: 'id', ot: 'id', feedback: 'id', errlog: 'id' };
     return {
       async start() {
         // โหมดทดลองเท่านั้น: ?as=อีเมล หรือ ?as=username เพื่อเข้าเป็นบัญชีตัวอย่างทันที (ใช้สาธิต/ทดสอบ)
@@ -534,6 +536,8 @@ const Store = (() => {
         else db[col] = db[col].filter(x => x[cols[col]] !== id);
         save(); emit();
       },
+      async setCounter(y, n) { db.settings.counter = db.settings.counter || {}; db.settings.counter[y] = n; save(); emit(); },
+      async getCounter(y) { return ((db.settings.counter || {})[y]) || 0; },
       async nextId(d) {
         const y = beYear(d || new Date());
         db.settings.counter = db.settings.counter || {};
@@ -587,7 +591,7 @@ const Store = (() => {
     const auth = firebase.auth(), fs = firebase.firestore();
     try { fs.settings({ ignoreUndefinedProperties: true }); } catch (e) { /* ตั้งไว้แล้ว */ }
     fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures', trash: 'trash', ot: 'ot' };
+    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures', trash: 'trash', ot: 'ot', feedback: 'feedback', errlog: 'errlog' };
     const strip = o => JSON.parse(JSON.stringify(o));
     // แปลงข้อผิดพลาดของ Firestore เป็นข้อความที่ผู้ใช้เข้าใจ (ข้อผิดพลาดจากการตรวจข้อมูลของระบบส่งต่อตามเดิม)
     const friendly = e => {
@@ -597,7 +601,7 @@ const Store = (() => {
       if (/aborted|failed-precondition/.test(c)) return new Error('มีผู้อื่นแก้ไขรายการนี้พร้อมกัน กรุณาลองใหม่');
       return e;
     };
-    const guard = p => p.catch(e => { throw friendly(e); });
+    const guard = p => p.catch(e => { if (e && e.code && typeof api !== 'undefined' && api.logError) api.logError({ kind: 'firestore', msg: `${e.code}: ${e.message || ''}`, stack: e.stack || '' }); throw friendly(e); });
     let unsubs = [], reqMaps = {}, rateMaps = {}, profileUnsub = null, warned = false;
     // ประหยัดโควตาอ่าน: แอดมิน/ผู้บริหารฟังเรียลไทม์เฉพาะคำขอ/ผลประเมิน ~13 เดือนล่าสุด
     // ข้อมูลเก่ากว่านั้นโหลดครั้งเดียวเมื่อหน้าที่ต้องใช้ขอ (needHistory) — histState: none | loading | done
@@ -610,6 +614,7 @@ const Store = (() => {
     // ตัวรับฟังเรียลไทม์หลุด → แจ้งผู้ใช้ครั้งเดียว (ไม่ให้เห็นข้อมูลว่างโดยไม่รู้สาเหตุ)
     const onErr = name => e => {
       console.error('Firestore', name, e);
+      if (typeof api !== 'undefined' && api.logError) api.logError({ kind: 'listener', msg: `${name} · ${(e && e.code) || ''}: ${(e && e.message) || e}` });
       if (!warned && typeof UI !== 'undefined') { warned = true; UI.toast('โหลดข้อมูลบางส่วนไม่สำเร็จ: ' + friendly(e).message, 'error'); }
     };
     const mergeReq = () => {
@@ -661,11 +666,13 @@ const Store = (() => {
       unsubs.push(col('places').orderBy('count', 'desc').limit(400).onSnapshot(s => { db = { ...db, places: s.docs.map(d => d.data()) }; emit(); }, onErr('places')));
       if (isBack(me)) listenReq('recent', col('requests').where('endAt', '>=', historyCutoff().toISOString()));
       else listenReq('window', col('requests').where('endAt', '>=', new Date(Date.now() - 45 * DAY).toISOString()));
-      listenReq('mine', col('requests').where('requester.email', '==', me.email));   // "การขอใช้รถของฉัน" ครบทุกใบ (รวมแอดมินที่ขอรถเอง)
+      listenReq('mine', col('requests').where('requester.email', '==', me.email));
+      if (isDriver(me) && !isBack(me)) listenReq('drv', col('requests').where('driverEmails', 'array-contains', me.email));   // งานทั้งหมดของคนขับ (ค่าล่วงเวลาย้อนหลัง)   // "การขอใช้รถของฉัน" ครบทุกใบ (รวมแอดมินที่ขอรถเอง)
       if (isAdmin(me)) {
         unsubs.push(col('users').onSnapshot(s => { db = { ...db, users: s.docs.map(d => d.data()) }; if (me) me = db.users.find(u => u.email === me.email) || me; emit(); }, onErr('users')));
       }
       if (isBack(me)) unsubs.push(col('vehiclePrivate').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); db = { ...db, vprivate: o }; emit(); }, onErr('vehiclePrivate')));
+      if (isAdmin(me)) unsubs.push(col('feedback').onSnapshot(s => { db = { ...db, feedback: s.docs.map(d => d.data()) }; emit(); }, onErr('feedback')));
       if (isBack(me)) unsubs.push(col('ot').onSnapshot(s => { db = { ...db, ot: s.docs.map(d => d.data()) }; emit(); }, onErr('ot')));
       else if (isDriver(me)) unsubs.push(col('ot').where('driverEmail', '==', me.email).onSnapshot(s => { db = { ...db, ot: s.docs.map(d => d.data()) }; emit(); }, onErr('ot')));
       if (isBack(me)) unsubs.push(col('ratings').where('at', '>=', historyCutoff().toISOString()).onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); rateMaps.recent = mp; mergeRatings(); }, onErr('ratings')));
@@ -746,6 +753,8 @@ const Store = (() => {
       async getDoc(col, id) { const s = await guard(fs.collection(colName[col]).doc(id).get()); return s.exists ? s.data() : null; },
       async list(col) { const s = await guard(fs.collection(colName[col]).get()); return s.docs.map(d => d.data()); },
       async del(col, id) { return guard(fs.collection(colName[col]).doc(id).delete()); },
+      async setCounter(y, n) { await guard(fs.collection('counters').doc(String(y)).set({ n })); },
+      async getCounter(y) { const s = await guard(fs.collection('counters').doc(String(y)).get()); return (s.exists && s.data().n) || 0; },
       async nextId(d) {
         const y = beYear(d || new Date());
         const ref = fs.collection('counters').doc(String(y));
@@ -1432,6 +1441,37 @@ const Store = (() => {
       await A.put('settings', 'settings', { ...db.settings, ...x });
     },
     async deletePlace(id) { needAdmin(); await A.del('places', id); },
+    // ═══ ดูแลระบบ: บันทึกข้อผิดพลาดอัตโนมัติ · เรื่องที่ผู้ใช้แจ้ง ═══
+    // บันทึกข้อผิดพลาด (เงียบ ไม่แจ้งผู้ใช้ · จำกัด 15 ครั้งต่อการเปิดเว็บ · ข้อความซ้ำบันทึกครั้งเดียว)
+    async logError(x = {}) {
+      try {
+        if (!me || authState !== 'in') return;
+        const msg = String(x.msg || '').slice(0, 1500); if (!msg) return;
+        api._errSeen = api._errSeen || new Set();
+        if (api._errSeen.has(msg) || api._errSeen.size >= 15) return;
+        api._errSeen.add(msg);
+        const id = uid('er');
+        const ver = ((document.querySelector('script[src*="store.js"]') || {}).src || '').split('v=')[1] || '';
+        await A.put('errlog', id, { id, at: nowISO(), email: me.email, name: me.name || '', roles: (me.roles || []).join(','), page: String(location.hash || '').slice(0, 200), kind: String(x.kind || 'js').slice(0, 20), msg, stack: String(x.stack || '').slice(0, 3000), ua: String(navigator.userAgent || '').slice(0, 300), ver: ver.slice(0, 30) });
+      } catch (e) { /* บันทึกไม่สำเร็จก็ข้าม (ไม่ให้วนซ้ำ) */ }
+    },
+    async errorList() { needAdmin(); return (await A.list('errlog')).sort((a, b) => b.at.localeCompare(a.at)); },
+    async clearErrors(ids) { needAdmin(); for (let i = 0; i < ids.length; i += 20) await Promise.all(ids.slice(i, i + 20).map(id => A.del('errlog', id))); },
+    // ผู้ใช้แจ้งปัญหา/ข้อเสนอแนะ (แนบรูปหน้าจอได้)
+    async sendFeedback({ type = 'bug', text = '', photos = [], page = '' } = {}) {
+      if (!me) throw new Error('กรุณาเข้าสู่ระบบ');
+      const t = String(text || '').trim(); if (!t) throw new Error('กรุณาเล่าปัญหา/ข้อเสนอแนะ');
+      const id = uid('fb');
+      const ph = photos.length ? await A.upload(photos, { kind: 'feedback', ref: id, label: 'แจ้งปัญหา' }) : [];
+      const o = { id, at: nowISO(), email: me.email, name: me.name || me.email, roles: (me.roles || []).join(','), type: ['bug', 'idea', 'other'].includes(type) ? type : 'other', text: t.slice(0, 4000), photos: ph, page: String(page || '').slice(0, 200), ua: String(navigator.userAgent || '').slice(0, 300), status: 'new' };
+      await A.put('feedback', id, o); return o;
+    },
+    async setFeedback(id, status, note = '') {
+      needAdmin();
+      const f = (db.feedback || []).find(x => x.id === id); if (!f) throw new Error('ไม่พบรายการ');
+      await A.put('feedback', id, { ...f, status, note: String(note || '').trim(), doneBy: me.email, doneByName: me.name || me.email, doneAt: nowISO() });
+    },
+    async deleteFeedback(id) { needAdmin(); await A.del('feedback', id); },
     // ═══ ค่าล่วงเวลาคนขับ: ระบบคำนวณจากเวลาออก/กลับถึง · แอดมินปรับรายวันได้ (คนขับแก้ไม่ได้) ═══
     // x = { driverId, date: 'YYYY-MM-DD', hours, amount, note } → เอกสาร ot/{driverId}_{date}
     async saveOt(x) {
@@ -1455,8 +1495,9 @@ const Store = (() => {
     // หาเอกสารที่จะล้างตามตัวกรอง: kinds = ['requests','ratings','places','users'] · from/to = 'YYYY-MM-DD' · status[] · category · vehicleId
     purgeMatch(o = {}) {
       const inR = d => { if (!d) return !o.from && !o.to; const x = String(d).slice(0, 10); return (!o.from || x >= o.from) && (!o.to || x <= o.to); };
-      const K = new Set(o.kinds || []), out = { requests: [], ratings: [], places: [], users: [] };
-      if (K.has('requests')) out.requests = db.requests.filter(r => inR(r.startAt) && (!(o.status || []).length || o.status.includes(r.status)) && (!o.category || (r.category || '') === o.category) && (!o.vehicleId || (r.assignments || []).some(a => a.vehicleId === o.vehicleId)) && !blocking(r));
+      const K = new Set(o.kinds || []), out = { requests: [], ratings: [], places: [], users: [], ot: [] };
+      if (K.has('ot')) out.ot = (db.ot || []).filter(x => inR(x.date));
+      if (K.has('requests')) out.requests = db.requests.filter(r => inR(r.startAt) && (!(o.status || []).length || o.status.includes(r.status)) && (!o.category || (r.category || '') === o.category) && (!o.vehicleId || (r.assignments || []).some(a => a.vehicleId === o.vehicleId)) && (o.active || !blocking(r)));   // active = รวมงานที่ยังไม่จบ (ล้างข้อมูลทดลอง)
       if (K.has('ratings')) out.ratings = db.ratings.filter(x => inR(x.at) && (!o.vehicleId || x.vehicleId === o.vehicleId));
       if (K.has('places')) out.places = db.places.filter(p => (!o.from && !o.to) || inR(p.usedAt));
       if (K.has('users')) out.users = db.users.filter(u => u.active === false && u.email !== me.email && !has(u, 'superadmin'));
@@ -1465,9 +1506,9 @@ const Store = (() => {
     async purgeData(match, note = '') {
       if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
       const batch = uid('tb'), at = nowISO(), expireAt = new Date(Date.now() + TRASH_DAYS * 864e5).toISOString();
-      const label = (kind, x) => kind === 'requests' ? `${x.id} · ${destName(x)} · ${(x.requester || {}).name || ''}` : kind === 'ratings' ? `ประเมิน ${(driver(x.driverId) || {}).name || ''} · ${String(x.at || '').slice(0, 10)}` : kind === 'places' ? x.name : `${x.name || ''} (${x.email})`;
+      const label = (kind, x) => kind === 'requests' ? `${x.id} · ${destName(x)} · ${(x.requester || {}).name || ''}` : kind === 'ratings' ? `ประเมิน ${(driver(x.driverId) || {}).name || ''} · ${String(x.at || '').slice(0, 10)}` : kind === 'places' ? x.name : kind === 'ot' ? `ค่าล่วงเวลา ${(driver(x.driverId) || {}).name || ''} · ${x.date} · ${x.amount} บาท` : `${x.name || ''} (${x.email})`;
       const jobs = [];
-      for (const kind of ['requests', 'ratings', 'places', 'users']) for (const x of match[kind] || []) jobs.push({ kind, x });
+      for (const kind of ['requests', 'ratings', 'places', 'users', 'ot']) for (const x of match[kind] || []) jobs.push({ kind, x });
       let n = 0;
       for (let i = 0; i < jobs.length; i += 20) {
         await Promise.all(jobs.slice(i, i + 20).map(async ({ kind, x }) => {
@@ -1486,6 +1527,21 @@ const Store = (() => {
       const all = await A.list('trash'), now = nowISO(), keep = [];
       for (const t of all) { if (t.expireAt && t.expireAt < now) await A.del('trash', t.id).catch(() => {}); else keep.push(t); }
       return keep.sort((a, b) => b.at.localeCompare(a.at));
+    },
+    async counterInfo() {
+      const y = beYear(new Date()), pre = `VR-${y}-`;
+      const left = db.requests.filter(r => String(r.id).startsWith(pre)).length;
+      const inTrash = (await api.trashList()).filter(t => t.kind === 'requests' && String(t.docId).startsWith(pre)).length;
+      return { y, n: await A.getCounter(y), left, inTrash };
+    },
+    async resetCounter() {
+      if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');
+      await api.ensureHistory();
+      const c = await api.counterInfo();
+      if (c.left) throw new Error(`ยังมีคำขอปี ${c.y} อยู่ ${c.left} รายการ — ล้างข้อมูลคำขอก่อน`);
+      if (c.inTrash) throw new Error(`ยังมีคำขอปี ${c.y} ในถังขยะ ${c.inTrash} รายการ — ลบถาวรก่อน (กันเลขซ้ำตอนกู้คืน)`);
+      await A.setCounter(c.y, 0);
+      return c.y;
     },
     async restoreTrash(items) {
       if (!isSuper(me)) throw new Error('เฉพาะผู้ดูแลระบบสูงสุด');

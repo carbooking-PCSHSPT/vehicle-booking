@@ -2323,3 +2323,22 @@ html.is-loading .ld-road { opacity: 1; }
 .lt640 .dn-call { width: 100%; justify-content: center; }
 .ot-duty.we { background: #faf7f0; }
 .tbl tr.we td { background: #faf7f0; }
+
+/* ═════ ดูแลระบบ / วิธีใช้งาน / แจ้งปัญหา ═════ */
+.hp-tabs { margin-bottom: 16px; flex-wrap: wrap; }
+.hp-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; counter-reset: hp; }
+.hp-step { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 18px; background: #fff; border: 1px solid var(--line); counter-increment: hp; }
+.hp-ic { position: relative; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--navy-50); color: var(--navy); flex: none; }
+.hp-ic::after { content: counter(hp); position: absolute; top: -6px; left: -6px; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: #fff; font: 700 .72rem var(--font-display); display: grid; place-items: center; }
+.hp-step b { font-family: var(--font-display); font-weight: 600; font-size: 1.02rem; color: var(--navy); } .hp-step p { margin: 2px 0 0; color: var(--ink-2); font-size: .92rem; line-height: 1.6; }
+.fb-types { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sp-cnt { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 4px; border-radius: 99px; background: #dc2626; color: #fff; font-size: .72rem; }
+.sp-fb { padding: 14px 16px; } .sp-fb.new { border-color: #f5c9c9; }
+.sp-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .sp-top b { font-family: var(--font-display); } .sp-top small { color: var(--muted); }
+.sp-text { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 6px; } .sp-foot small { color: #047857; }
+.sp-err { padding: 12px 14px; } .sp-err summary { cursor: pointer; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sp-err summary b { flex: 1; min-width: 200px; font-weight: 500; overflow-wrap: anywhere; } .sp-err summary small { flex-basis: 100%; color: var(--muted); }
+.sp-errd { margin-top: 10px; font-size: .86rem; } .sp-errd pre { margin-top: 8px; padding: 10px; border-radius: 10px; background: #1b2147; color: #e6e9f5; font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.sp-bk { margin: 12px 0 0 18px; color: var(--ink-2); font-size: .9rem; line-height: 1.7; }
+.lt640 .fb-types { grid-template-columns: 1fr; }

@@ -36,7 +36,7 @@
         <h5>ข้อมูลหลัก</h5>${L('/admin/vehicles', 'van', 'ข้อมูลรถ')}${L('/admin/drivers', 'users', 'พนักงานขับรถ')}${L('/admin/users', 'userPlus', 'ผู้ใช้และสิทธิ์')}` : ''}
         <h5>รายงาน</h5>${admin ? L('/admin/expenses', 'fuel', 'ค่าน้ำมัน/ค่าใช้จ่าย') : ''}${L('/admin/stats', 'chart', 'สถิติและรายงาน')}${L('/admin/ratings', 'star', 'ประเมินคนขับ')}
         ${S.signerRoles(me).length ? `<h5>ลงนาม</h5>${L('/admin/esign', 'edit', 'บันทึกข้อความรอลงนาม', S.db.requests.filter(r => S.signerRoles(me).some(ro => S.needsMySign(r, ro))).length)}` : ''}
-        ${admin ? `<h5>ระบบ</h5>${L('/admin/settings', 'settings', 'ตั้งค่า')}` : ''}`;
+        ${admin ? `<h5>ระบบ</h5>${L('/admin/settings', 'settings', 'ตั้งค่า')}${L('/admin/support', 'activity', 'ดูแลระบบ', (S.db.feedback || []).filter(x => x.status === 'new').length)}` : ''}`;
     return `<div class="admin">
       <aside class="side no-print">
         <button type="button" class="side-toggle" data-side-toggle aria-expanded="false">${icon(cur ? cur.ic : 'grid')}<span><small>เมนูหลังบ้าน</small><b>${cur ? cur.t : 'เลือกเมนู'}</b></span>${pending && admin ? `<span class="cnt">${pending}</span>` : ''}${icon('chev', 'chev')}</button>
@@ -970,7 +970,7 @@
   };
 
   // ═════════ ล้างข้อมูล + ถังขยะ (ตั้งค่า · เฉพาะผู้ดูแลระบบสูงสุด) ═════════
-  const PURGE_KINDS = [['requests', 'คำขอใช้รถ + ค่าใช้จ่าย', 'clipboard'], ['ratings', 'ผลประเมินคนขับ', 'star'], ['places', 'สถานที่ที่เคยไป', 'pin'], ['users', 'ผู้ใช้ที่ปิดใช้งาน', 'users']];
+  const PURGE_KINDS = [['requests', 'คำขอใช้รถ + ค่าใช้จ่าย', 'clipboard'], ['ratings', 'ผลประเมินคนขับ', 'star'], ['ot', 'ค่าล่วงเวลาที่แอดมินปรับ', 'clock'], ['places', 'สถานที่ที่เคยไป', 'pin'], ['users', 'ผู้ใช้ที่ปิดใช้งาน', 'users']];
   const PURGE_ST = ['pending', 'revise', 'returned', 'closed', 'rejected', 'cancelled'];
   function purgeHTML() {
     return `<div class="card pg-card" id="purge" style="margin-top:18px"><div class="card-head"><h3>${icon('trash')} ล้างข้อมูล</h3><span class="hint">เฉพาะผู้ดูแลระบบสูงสุด · ย้ายไปถังขยะ ${S.TRASH_DAYS} วัน กู้คืนได้</span></div>
@@ -982,7 +982,8 @@
             <div class="field"><label>วันที่เดินทาง / วันที่ประเมิน / ใช้ล่าสุด — ตั้งแต่</label><input type="date" name="from"></div>
             <div class="field"><label>ถึง</label><input type="date" name="to"></div>
             <div class="field full"><label>สถานะคำขอ</label><div class="checks">${PURGE_ST.map(k => `<label class="check"><input type="checkbox" name="status" data-multi value="${k}">${esc(S.STATUS[k].label)}</label>`).join('')}</div>
-              <span class="hint">คำขอที่อนุมัติแล้วหรือกำลังเดินทาง จะไม่ถูกล้าง (กันลบงานที่ยังไม่จบ)</span></div>
+              <span class="hint">คำขอที่อนุมัติแล้วหรือกำลังเดินทาง จะไม่ถูกล้าง (กันลบงานที่ยังไม่จบ)</span>
+              <label class="check pg-active" style="margin-top:6px;width:max-content;max-width:100%"><input type="checkbox" name="active"> รวมงานที่อนุมัติแล้ว/กำลังเดินทางด้วย (ใช้ตอนล้างข้อมูลทดลองก่อนเปิดใช้จริง)</label></div>
             <div class="field"><label>หมวดงาน</label><select name="category"><option value="">ทุกหมวด</option>${S.categories(true).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}<option value="other">อื่น ๆ</option></select></div>
             <div class="field"><label>รถ</label><select name="vehicleId"><option value="">ทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select></div>
           </div></details>
@@ -990,12 +991,15 @@
         <div id="pgRes"></div>
       </form>
       <div class="divider"></div>
+      <div class="card-head" style="padding:0;margin-bottom:10px"><h3>${icon('list')} เลขที่คำขอ</h3></div>
+      <div id="pgCnt" class="pg-cnt"><p class="hint">กำลังตรวจ…</p></div>
+      <div class="divider"></div>
       <div class="card-head" style="padding:0;margin-bottom:10px"><h3>${icon('undo')} ถังขยะ</h3><span class="hint">ครบ ${S.TRASH_DAYS} วันระบบลบถาวรอัตโนมัติ</span></div>
       <div id="pgTrash"><p class="hint">กำลังโหลด…</p></div></div>`;
   }
   function bindPurge(root) {
     const box = $('#purge', root); if (!box) return;
-    const opts = () => { const f = UI.formData($('#pgF', box)); return { kinds: f.kinds || [], from: f.from, to: f.to, status: f.status || [], category: f.category, vehicleId: f.vehicleId }; };
+    const opts = () => { const f = UI.formData($('#pgF', box)); return { kinds: f.kinds || [], from: f.from, to: f.to, status: f.status || [], category: f.category, vehicleId: f.vehicleId, active: !!f.active }; };
     const L = Object.fromEntries(PURGE_KINDS.map(([k, l]) => [k, l]));
     const count = async () => {
       const o = opts(); if (!o.kinds.length) { UI.toast('เลือกข้อมูลที่จะล้างอย่างน้อย 1 อย่าง', 'error'); return null; }
@@ -1017,9 +1021,16 @@
             <div class="row" style="gap:6px"><button type="button" class="btn btn-ghost btn-xs" data-rest="${i}">${icon('undo')} กู้คืน</button><button type="button" class="btn btn-ghost btn-xs pg-del" data-tdel="${i}">${icon('x')} ลบถาวร</button></div></div>`; }).join('')}</div>`
         : `<p class="hint">ถังขยะว่าง</p>`;
     };
-    drawTrash();
+    const drawCnt = async () => {
+      const el = $('#pgCnt', box); if (!el) return;
+      try { const c = await S.counterInfo(); const ok = !c.left && !c.inTrash;
+        el.innerHTML = `<p>ปี ${c.y}: ออกเลขไปแล้วถึง <b>VR-${c.y}-${String(c.n).padStart(4, '0')}</b> · คำขอถัดไปจะเป็น <b>VR-${c.y}-${String(c.n + 1).padStart(4, '0')}</b></p>${c.n ? `<div class="row" style="gap:10px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn btn-ghost btn-sm" id="pgCntReset" ${ok ? '' : 'disabled'}>${icon('refresh')} เริ่มเลขคำขอใหม่ (VR-${c.y}-0001)</button>${ok ? '' : `<span class="hint">ต้องล้างคำขอปี ${c.y} ให้หมด${c.left ? ` (เหลือ ${c.left})` : ''} และลบถาวรจากถังขยะ${c.inTrash ? ` (อยู่ในถังขยะ ${c.inTrash})` : ''} ก่อน — กันเลขซ้ำ</span>`}</div>` : ''}`;
+      } catch (err) { el.innerHTML = `<p class="hint">ตรวจเลขคำขอไม่สำเร็จ: ${esc(err.message)}</p>`; }
+    };
+    drawTrash(); drawCnt();
     box.addEventListener('click', async e => {
-      if (e.target.closest('#pgAll')) { $$('input[name=kinds]', box).forEach(c => { c.checked = true; }); ['from', 'to', 'category', 'vehicleId'].forEach(n => { $(`[name=${n}]`, box).value = ''; }); $$('input[name=status]', box).forEach(c => { c.checked = false; }); UI.toast('เลือกทุกประเภท และล้างตัวกรองแล้ว — กดตรวจจำนวนก่อนล้าง'); return; }
+      if (e.target.closest('#pgCntReset')) { if (!(await UI.confirm('เริ่มเลขคำขอใหม่ คำขอถัดไปจะเป็นเลข 0001 ของปีนี้', { title: 'เริ่มเลขคำขอใหม่', ok: 'เริ่มใหม่' }))) return; try { const y = await S.resetCounter(); UI.toast(`คำขอถัดไปจะเป็น VR-${y}-0001`); drawCnt(); } catch (err) { UI.toast(err.message, 'error'); } return; }
+      if (e.target.closest('#pgAll')) { $$('input[name=kinds]', box).forEach(c => { c.checked = true; }); ['from', 'to', 'category', 'vehicleId'].forEach(n => { $(`[name=${n}]`, box).value = ''; }); $$('input[name=status]', box).forEach(c => { c.checked = false; }); const ac = $('[name=active]', box); if (ac) ac.checked = true; UI.toast('เลือกทุกประเภท รวมงานที่ยังไม่จบ และล้างตัวกรองแล้ว — กดตรวจจำนวนก่อนล้าง'); return; }
       if (e.target.closest('#pgChk')) { const b = e.target.closest('#pgChk'); b.disabled = true; try { await count(); } finally { b.disabled = false; } return; }
       if (e.target.closest('#pgGo')) {
         const b = e.target.closest('#pgGo'); b.disabled = true;
@@ -1031,7 +1042,7 @@
           UI.toast('กำลังล้างข้อมูล…', 'info');
           const r = await S.purgeData(c.m);
           UI.toast(`ล้างข้อมูลแล้ว ${r.n} รายการ (กู้คืนได้ใน ${S.TRASH_DAYS} วัน)`);
-          $('#pgRes', box).innerHTML = ''; await drawTrash();
+          $('#pgRes', box).innerHTML = ''; await drawTrash(); drawCnt();
         } catch (err) { UI.toast(err.message, 'error'); } finally { b.disabled = false; }
         return;
       }
@@ -1040,7 +1051,7 @@
         const g = (box._trash || [])[+(rs || td).dataset[rs ? 'rest' : 'tdel']]; if (!g) return;
         if (rs && !(await UI.confirm(`กู้คืนข้อมูล <b>${g.length}</b> รายการกลับเข้าระบบ?`, { title: 'กู้คืนข้อมูล', ok: 'กู้คืน' }))) return;
         if (td && !(await UI.confirm(`ลบถาวร <b>${g.length}</b> รายการ — กู้คืนไม่ได้อีก`, { title: 'ลบถาวร', danger: true, ok: 'ลบถาวร' }))) return;
-        try { if (rs) await S.restoreTrash(g); else await S.deleteTrash(g); UI.toast(rs ? 'กู้คืนแล้ว' : 'ลบถาวรแล้ว'); await drawTrash(); } catch (err) { UI.toast(err.message, 'error'); }
+        try { if (rs) await S.restoreTrash(g); else await S.deleteTrash(g); UI.toast(rs ? 'กู้คืนแล้ว' : 'ลบถาวรแล้ว'); await drawTrash(); drawCnt(); } catch (err) { UI.toast(err.message, 'error'); }
       }
     });
   }

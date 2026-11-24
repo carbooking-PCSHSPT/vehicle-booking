@@ -684,12 +684,12 @@ const App = (() => {
     ['/', 'home', 'any'], ['/login', 'login', 'out'], ['/profile', 'profile', 'in'], ['/password', 'password', 'in'],
     ['/request', 'requestForm', 'in'], ['/request/:id', 'requestForm', 'in'],
     ['/schedule', 'schedule', 'in'], ['/vehicles', 'vehicles', 'in'], ['/vehicles/:id', 'vehicleDetail', 'in'],
-    ['/my', 'my', 'in'], ['/my/:id', 'myDetail', 'in'], ['/rate/:id/:idx', 'rate', 'in'], ['/contact', 'contact', 'any'],
+    ['/my', 'my', 'in'], ['/my/:id', 'myDetail', 'in'], ['/rate/:id/:idx', 'rate', 'in'], ['/contact', 'contact', 'any'], ['/help', 'help', 'any'],
     ['/driver', 'driverHome', 'driver'], ['/driver/:id/:idx', 'driverJob', 'driver'],
     ['/admin', 'adminHome', 'back'], ['/admin/requests', 'adminRequests', 'admin'], ['/admin/requests/:id', 'adminRequest', 'admin'], ['/admin/esign', 'adminEsign', 'back'],
     ['/admin/new', 'adminNew', 'admin'], ['/admin/roster', 'adminRoster', 'admin'], ['/admin/vehicles', 'adminVehicles', 'admin'], ['/admin/vehicles/:id', 'adminVehicle', 'admin'],
     ['/admin/drivers', 'adminDrivers', 'admin'], ['/admin/users', 'adminUsers', 'admin'], ['/admin/expenses', 'adminExpenses', 'admin'],
-    ['/admin/ratings', 'adminRatings', 'back'], ['/admin/stats', 'adminStats', 'back'], ['/admin/settings', 'adminSettings', 'admin']
+    ['/admin/ratings', 'adminRatings', 'back'], ['/admin/stats', 'adminStats', 'back'], ['/admin/settings', 'adminSettings', 'admin'], ['/admin/support', 'adminSupport', 'admin']
   ];
   function match(path) {
     for (const [pat, page, auth] of ROUTES) {
@@ -749,6 +749,8 @@ const App = (() => {
               ${Store.isUsernameEmail(me.email) ? `<a href="#/password"><span class="dd-ic">${icon('key')}</span><span><strong>เปลี่ยนรหัสผ่าน</strong></span></a>` : ''}
               ${onlyDriver ? '' : `<a href="#/my"><span class="dd-ic">${icon('clipboard')}</span><span><strong>การขอใช้รถของฉัน</strong></span></a>`}
               ${back ? `<a href="#/admin"><span class="dd-ic">${icon('shield')}</span><span><strong>ระบบหลังบ้าน</strong></span></a>` : ''}
+              <a href="#/help"><span class="dd-ic">${icon('info')}</span><span><strong>วิธีใช้งาน</strong></span></a>
+              <button class="dd-item" data-feedback><span class="dd-ic">${icon('send')}</span><span><strong>แจ้งปัญหา / ข้อเสนอแนะ</strong></span></button>
               <div class="dd-sep"></div>
               ${ViewMode.pickerHTML()}
               <div class="dd-sep"></div>
@@ -813,7 +815,7 @@ const App = (() => {
     const ctx = { params: m.params, query, path };
     let view;
     try { view = await page(ctx); }
-    catch (e) { console.error(e); view = { html: `<div class="page container">${UI.empty('เกิดข้อผิดพลาด: ' + esc(e.message), 'alert')}</div>` }; }
+    catch (e) { console.error(e); Store.logError && Store.logError({ kind: 'render', msg: `${m.page}: ${e.message}`, stack: e.stack }); view = { html: `<div class="page container">${UI.empty('เกิดข้อผิดพลาด: ' + esc(e.message), 'alert')}<p style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" data-feedback>${icon('send')} แจ้งปัญหา</button></p></div>` }; }
     // หน้าเดิมแต่เปลี่ยนเฉพาะตัวกรอง (เช่น วันที่ของกระดานเที่ยวรถ/ตารางรถ) → แก้เฉพาะส่วนที่เปลี่ยน ไม่วาดใหม่ทั้งหน้า ไม่เด้งขึ้นบน
     const samePage = !!current.path && current.path.split('?')[0] === location.hash.split('?')[0];
     const same = current.path === location.hash || (samePage && !!view.patch && !!(current.view && current.view.patch));

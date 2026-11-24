@@ -156,6 +156,26 @@ service cloud.firestore {
       allow write: if admin();
     }
 
+    // ───── บันทึกข้อผิดพลาดอัตโนมัติ (ผู้ใช้ทุกคนส่งได้ของตัวเอง · เฉพาะแอดมินอ่าน/ลบ) ─────
+    match /errlog/{id} {
+      allow create: if signedIn()
+                    && request.resource.data.keys().hasOnly(['id', 'at', 'email', 'name', 'roles', 'page', 'kind', 'msg', 'stack', 'ua', 'ver'])
+                    && request.resource.data.email == email()
+                    && request.resource.data.msg is string && request.resource.data.msg.size() <= 1500
+                    && request.resource.data.stack is string && request.resource.data.stack.size() <= 3000;
+      allow read, delete: if admin();
+    }
+
+    // ───── แจ้งปัญหา / ข้อเสนอแนะจากผู้ใช้ (ส่งได้ของตัวเอง สถานะใหม่ · แอดมินจัดการ) ─────
+    match /feedback/{id} {
+      allow create: if active()
+                    && request.resource.data.email == email()
+                    && request.resource.data.status == 'new'
+                    && request.resource.data.text is string && request.resource.data.text.size() <= 4000;
+      allow read: if admin() || (signedIn() && resource.data.email == email());
+      allow update, delete: if admin();
+    }
+
     // ───── ผลประเมินคนขับ (ไม่เก็บชื่อผู้ประเมิน) ─────
     match /ratings/{id} {
       allow read: if back();
