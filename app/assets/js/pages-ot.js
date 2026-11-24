@@ -137,6 +137,36 @@
   const dormDate = (at = new Date()) => { const d = new Date(at); if (d.getHours() < 5) d.setDate(d.getDate() - 1); return fmt.localDate(d); };
   Pages._dormNow = () => { const id = dutyOf(dormDate(), roster('dormRoster')); return id ? S.driver(id) : null; };
   Pages._dormNext = n => dayList(dayStart(dormDate()), n).map(x => ({ date: x, d: S.driver(dutyOf(x, roster('dormRoster'))) }));
+  // ป้ายเวรของคนขับวันนี้ (หน้าติดต่อเรา)
+  Pages._dutyTags = id => {
+    const now = new Date(), wd = now.getDay(), today = fmt.localDate(now), out = [];
+    if (wd >= 1 && wd <= 5 && dutyOf(weekStart(today, 1), roster('eveRoster')) === id) out.push('เวรเย็นสัปดาห์นี้ · ถึง 18.00');
+    if (wd === 0 && dutyOf(today, roster('dutyRoster')) === id) out.push('เวรวันอาทิตย์วันนี้');
+    const dd = dormDate(now);
+    if (dutyOf(dd, roster('dormRoster')) === id) out.push([0, 6].includes(dayStart(dd).getDay()) ? 'เวรหอพักวันนี้ (ทั้งวัน)' : 'เวรหอพักคืนนี้');
+    return out;
+  };
+  // การ์ดเวรตอนนี้ (หน้าแรก + หน้าติดต่อเรา) — เปลี่ยนเองตามเวลาและตารางเวร · เฉพาะผู้ที่เข้าสู่ระบบ (มีเบอร์โทร)
+  //   จ.–ศ. ก่อน 18.00: เวรเย็นวันนี้ + คนขับหอพักคืนนี้ · หลัง 18.00 / ส.–อา.: คนขับหอพักเด่น · อาทิตย์ก่อน 16.30: เวรวันอาทิตย์ด้วย
+  Pages._dutyCard = () => {
+    if (!S.me) return '';
+    const now = new Date(), wd = now.getDay(), mins = now.getHours() * 60 + now.getMinutes(), today = fmt.localDate(now);
+    const dd = dormDate(now), weekend = [0, 6].includes(dayStart(dd).getDay()), night = mins >= 18 * 60 || mins < 5 * 60;
+    const dorm = S.driver(dutyOf(dd, roster('dormRoster')));
+    const rows = [];
+    if (dorm) rows.push({ d: dorm, dorm: true, label: weekend ? 'คนขับหอพัก · เวรวันนี้ (ทั้งวัน)' : night ? 'คนขับหอพัก · เวรตอนนี้' : 'คนขับหอพัก · เวรคืนนี้ (หลัง 18.00 น.)' });
+    if (wd >= 1 && wd <= 5 && !night) { const e = S.driver(dutyOf(weekStart(today, 1), roster('eveRoster'))); if (e) rows.unshift({ d: e, label: 'เวรเย็นวันนี้ · อยู่ถึง 18.00 น.' }); }
+    if (wd === 0 && mins >= 5 * 60 && mins < 16 * 60 + 30) { const su = S.driver(dutyOf(today, roster('dutyRoster'))); if (su) rows.push({ d: su, label: 'เวรวันอาทิตย์ · ถึง 16.30 น.' }); }
+    if (!rows.length) return '';
+    const tel = p => String(p || '').replace(/[^0-9+]/g, '');
+    const next = Pages._dormNext(4).slice(1).filter(x => x.d);
+    return `<div class="duty-card reveal">
+      ${rows.map(x => `<div class="dy-row ${x.dorm ? 'dorm' : ''}"><div class="dy-ic">${icon(x.dorm ? 'alert' : 'clock')}</div>
+        <div class="dy-main"><small>${x.label}</small><b>${esc(x.d.name)}</b>${x.dorm ? '<span>งานฉุกเฉินนำส่งผู้ป่วย</span>' : ''}</div>
+        ${x.d.phone ? `<a class="btn ${x.dorm ? 'btn-danger' : 'btn-primary'} dy-call" href="tel:${esc(tel(x.d.phone))}">${icon('phone')} โทร ${esc(x.d.phone)}</a>` : ''}</div>`).join('')}
+      ${next.length ? `<p class="dy-next">คนขับหอพักถัดไป: ${next.map(x => `${new Date(x.date + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric' })} ${esc(C.firstName(x.d.name))}`).join(' · ')}</p>` : ''}
+    </div>`;
+  };
   // เวรวันนี้ของคนขับ (ใช้หน้าแรกคนขับ)
   Pages._todayDuty = driverId => {
     const now = new Date(), wd = now.getDay(), today = fmt.localDate(now);

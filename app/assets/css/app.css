@@ -2342,3 +2342,20 @@ html.is-loading .ld-road { opacity: 1; }
 .sp-errd { margin-top: 10px; font-size: .86rem; } .sp-errd pre { margin-top: 8px; padding: 10px; border-radius: 10px; background: #1b2147; color: #e6e9f5; font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
 .sp-bk { margin: 12px 0 0 18px; color: var(--ink-2); font-size: .9rem; line-height: 1.7; }
 .lt640 .fb-types { grid-template-columns: 1fr; }
+
+/* ===== การ์ดเวรตอนนี้ (หน้าแรก + ติดต่อเรา) + ป้ายคนขับ ===== */
+.duty-card { display: grid; gap: 10px; margin: 8px 0 22px; }
+.dy-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: 18px; background: #fff; border: 1px solid var(--line, #e5e7eb); color: var(--ink, #1f2937); }
+.dy-row.dorm { background: #fff1f1; border-color: #f5c9c9; }
+.dy-ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--navy, #1e2a5a); color: #fff; flex: none; } .dy-ic .i { width: 22px; height: 22px; }
+.dy-row.dorm .dy-ic { background: #dc2626; }
+.dy-main { flex: 1; min-width: 180px; display: grid; } .dy-main small { color: var(--muted); font-weight: 500; } .dy-row.dorm .dy-main small { color: #b91c1c; }
+.dy-main b { font: 600 1.15rem var(--font-display); } .dy-main span { font-size: .84rem; color: var(--muted); }
+.dy-call { white-space: nowrap; }
+.dy-next { margin: 0 4px; font-size: .84rem; color: var(--muted); }
+.dash.navy .dy-next { color: rgba(255,255,255,.75); }
+.lt640 .dy-call { width: 100%; justify-content: center; }
+.drv-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 6px; }
+.dt-tag { font-size: .7rem; line-height: 1.3; padding: 2px 8px; border-radius: 999px; background: #eef0fb; color: var(--navy, #1e2a5a); }
+.dt-tag.dorm { background: #fde8e8; color: #b91c1c; font-weight: 500; }
+.dt-tag.duty { background: #fdf3d8; color: #8a5a00; }
