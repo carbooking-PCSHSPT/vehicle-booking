@@ -2273,3 +2273,42 @@ html.is-loading .ld-road { opacity: 1; }
 .sb-check { width: max-content; max-width: 100%; color: #b91c1c; font-weight: 500; } .sb-check .i { width: 16px; height: 16px; }
 .chip-em .em-wait { margin-left: 2px; padding: 0 8px; border-radius: 99px; background: #fde68a; color: #7c2d12; font-size: .74rem; font-weight: 600; }
 .chip-em.on .em-wait { background: #fff7d6; }
+
+/* ═════ ค่าล่วงเวลาคนขับ ═════ */
+.ot-rules { margin-bottom: 14px; padding: 10px 14px; border-radius: 14px; background: var(--navy-50); font-size: .88rem; }
+.ot-rules summary { cursor: pointer; font-family: var(--font-display); font-weight: 500; display: flex; align-items: center; gap: 6px; color: var(--navy); }
+.ot-rules summary .i { width: 16px; height: 16px; } .ot-rules ul { margin: 8px 0 2px 18px; line-height: 1.7; }
+.ot-duty { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--cream); border: 1px solid var(--line); }
+.ot-duty span { width: 92px; color: var(--muted); font-size: .86rem; } .ot-duty b { font-family: var(--font-display); font-weight: 600; }
+.ot-duty small { margin-left: auto; color: #8a5a00; font-size: .74rem; }
+.ot-duty.next { border-color: var(--gold); background: var(--gold-50); }
+.ot-dhead { display: flex; align-items: center; gap: 8px; margin: 12px 2px 6px; font-family: var(--font-display); font-weight: 600; color: var(--navy); }
+.ot-dhead .i { width: 17px; height: 17px; color: var(--gold); } .ot-dhead small { font-weight: 400; color: var(--muted); }
+.ot-days small { display: block; color: var(--muted); }
+.ot-days tr.is-ov td { background: #fffbea; }
+.tbl tr.on td { background: var(--navy-50); }
+/* หน้าคนขับ */
+.ot-drv { margin-top: 16px; }
+.ot-mnav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 12px; } .ot-mnav b { font-family: var(--font-display); font-size: 1.05rem; color: var(--navy); min-width: 150px; text-align: center; }
+.ot-mnav .disabled { opacity: .35; pointer-events: none; }
+.ot-sum { display: grid; gap: 10px; padding: 16px; border-radius: 20px; background: linear-gradient(135deg, var(--navy), #3b52c9); color: #fff; }
+.ot-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; } .ot-big small { flex-basis: 100%; opacity: .8; }
+.ot-big b { font: 700 2.4rem var(--font-display); line-height: 1; } .ot-big span { opacity: .85; }
+.ot-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ot-mini > div { padding: 6px 4px; border-radius: 12px; background: rgba(255, 255, 255, .12); text-align: center; }
+.ot-mini b { display: block; font: 600 1.1rem var(--font-display); } .ot-mini small { font-size: .72rem; opacity: .85; }
+.ot-list { display: grid; gap: 8px; margin-top: 12px; }
+.ot-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: #fff; border: 1px solid var(--line); }
+.ot-item.is-ov { border-color: #f2d27a; background: #fffbea; }
+.ot-date { width: 52px; flex: none; text-align: center; } .ot-date b { display: block; font: 700 1.3rem var(--font-display); color: var(--navy); line-height: 1.1; } .ot-date small { font-size: .72rem; color: var(--muted); }
+.ot-body { flex: 1; min-width: 0; display: grid; } .ot-body b { font-family: var(--font-display); font-weight: 500; font-size: .92rem; } .ot-body small { color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+.ot-amt { text-align: right; flex: none; } .ot-amt b { display: block; font: 700 1.15rem var(--font-display); color: var(--navy); } .ot-amt small { font-size: .74rem; color: var(--muted); }
+/* PDF */
+.print-doc .ot-break { break-before: page; }
+.print-doc .ot-tbl th.r, .print-doc .ot-tbl td.r { text-align: right; } .print-doc .ot-tbl th.c, .print-doc .ot-tbl td.c { text-align: center; }
+.print-doc .ot-tbl td.wr { overflow-wrap: anywhere; } .print-doc .ot-tbl td.nw, .print-doc .ot-tbl th.nw { white-space: nowrap; }
+.print-doc .ot-rule { font-size: 11pt; color: #444; margin-top: 8px; line-height: 1.35; }
+.print-doc .ot-sign { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 40px; }
+.print-doc .ot-sign .pd-line { position: relative; }
+.print-doc .ot-sig { position: absolute; left: 50%; bottom: 2px; transform: translateX(-30%); height: 42px; max-width: 150px; object-fit: contain; }
+.dorm-tag { background: #eef0fb !important; color: var(--navy) !important; font-size: .72rem; }

@@ -78,7 +78,7 @@ const Store = (() => {
   let authState = 'loading';      // loading | out | in
   let authError = '';
   const listeners = new Set();
-  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [] }; }
+  function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [], ot: [] }; }
   const TRASH_DAYS = 30;   // ข้อมูลที่ล้างแล้วอยู่ในถังขยะกี่วันก่อนลบถาวร
   function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
 
@@ -486,6 +486,7 @@ const Store = (() => {
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
     db = saved && saved.v === 1 ? saved.db : seed();
     if (!db.trash) db.trash = [];
+    if (!db.ot) db.ot = [];
     if (!db.settings.categories) db.settings.categories = defaultSettings().categories;
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, db })); } catch (e) { console.warn('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม', e); if (typeof UI !== 'undefined') UI.toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม (โหมดทดลอง) ลองลบรูปบางส่วน', 'error'); } };
     save();
@@ -495,7 +496,7 @@ const Store = (() => {
       try { const s = JSON.parse(e.newValue); if (s && s.v === 1) { db = s.db; if (me) me = user(me.email) || me; emit(); } } catch (err) { /* ข้าม */ }
     });
     const sessKey = 'pcs-vehicle-session';
-    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id', trash: 'id' };
+    const cols = { vehicles: 'id', drivers: 'id', users: 'email', requests: 'id', places: 'id', ratings: 'id', trash: 'id', ot: 'id' };
     return {
       async start() {
         // โหมดทดลองเท่านั้น: ?as=อีเมล หรือ ?as=username เพื่อเข้าเป็นบัญชีตัวอย่างทันที (ใช้สาธิต/ทดสอบ)
@@ -586,7 +587,7 @@ const Store = (() => {
     const auth = firebase.auth(), fs = firebase.firestore();
     try { fs.settings({ ignoreUndefinedProperties: true }); } catch (e) { /* ตั้งไว้แล้ว */ }
     fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures', trash: 'trash' };
+    const colName = { vehicles: 'vehicles', drivers: 'drivers', users: 'users', requests: 'requests', places: 'places', ratings: 'ratings', vprivate: 'vehiclePrivate', signatures: 'signatures', trash: 'trash', ot: 'ot' };
     const strip = o => JSON.parse(JSON.stringify(o));
     // แปลงข้อผิดพลาดของ Firestore เป็นข้อความที่ผู้ใช้เข้าใจ (ข้อผิดพลาดจากการตรวจข้อมูลของระบบส่งต่อตามเดิม)
     const friendly = e => {
@@ -665,6 +666,8 @@ const Store = (() => {
         unsubs.push(col('users').onSnapshot(s => { db = { ...db, users: s.docs.map(d => d.data()) }; if (me) me = db.users.find(u => u.email === me.email) || me; emit(); }, onErr('users')));
       }
       if (isBack(me)) unsubs.push(col('vehiclePrivate').onSnapshot(s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); db = { ...db, vprivate: o }; emit(); }, onErr('vehiclePrivate')));
+      if (isBack(me)) unsubs.push(col('ot').onSnapshot(s => { db = { ...db, ot: s.docs.map(d => d.data()) }; emit(); }, onErr('ot')));
+      else if (isDriver(me)) unsubs.push(col('ot').where('driverEmail', '==', me.email).onSnapshot(s => { db = { ...db, ot: s.docs.map(d => d.data()) }; emit(); }, onErr('ot')));
       if (isBack(me)) unsubs.push(col('ratings').where('at', '>=', historyCutoff().toISOString()).onSnapshot(s => { const mp = new Map(); s.docs.forEach(d => mp.set(d.id, d.data())); rateMaps.recent = mp; mergeRatings(); }, onErr('ratings')));
     }
     async function loadMe(fu) {
@@ -1429,6 +1432,20 @@ const Store = (() => {
       await A.put('settings', 'settings', { ...db.settings, ...x });
     },
     async deletePlace(id) { needAdmin(); await A.del('places', id); },
+    // ═══ ค่าล่วงเวลาคนขับ: ระบบคำนวณจากเวลาออก/กลับถึง · แอดมินปรับรายวันได้ (คนขับแก้ไม่ได้) ═══
+    // x = { driverId, date: 'YYYY-MM-DD', hours, amount, note } → เอกสาร ot/{driverId}_{date}
+    async saveOt(x) {
+      needAdmin();
+      const d = driver(x.driverId); if (!d) throw new Error('ไม่พบคนขับ');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(x.date || '')) throw new Error('วันที่ไม่ถูกต้อง');
+      const amount = Math.max(0, Math.round(+x.amount || 0)), hours = Math.max(0, +x.hours || 0);
+      const id = `${d.id}_${x.date}`;
+      const o = { id, driverId: d.id, driverEmail: d.email || '', date: x.date, hours, amount, note: String(x.note || '').trim(), by: me.email, byName: me.name || me.email, at: nowISO() };
+      await A.put('ot', id, o); return o;
+    },
+    async deleteOt(id) { needAdmin(); await A.del('ot', id); },
+    // เวรวันอาทิตย์: { order: [driverId…], start: 'YYYY-MM-DD' (วันอาทิตย์ที่คนแรกเข้าเวร), swaps: { 'YYYY-MM-DD': driverId } }
+    async saveRoster(r) { needAdmin(); await A.put('settings', 'settings', { ...db.settings, dutyRoster: { order: r.order || [], start: r.start || '', swaps: r.swaps || {} } }); },
     // ระบบจริง: นำเข้ารถ 14 คัน + คนขับ 7 คน + สถานที่ยอดนิยม (จากตารางข้อมูลรถของโรงเรียน) เมื่อฐานข้อมูลยังว่าง
     // โหลดข้อมูลย้อนหลังให้ครบก่อน (ใช้ก่อนล้างข้อมูลตามช่วงวันที่)
     async ensureHistory() { if (!A) return; if (A.histState() === 'none') await A.loadHistory(); for (let i = 0; i < 150 && A.histState() === 'loading'; i++) await new Promise(r => setTimeout(r, 200)); },

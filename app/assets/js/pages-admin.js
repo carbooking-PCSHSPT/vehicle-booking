@@ -850,6 +850,7 @@
         <div class="field"><label>เลขใบขับขี่</label><input name="licenseNo" value="${esc(d.licenseNo || '')}"></div>
         <div class="field"><label>ใบขับขี่หมดอายุ</label><input type="date" name="licenseExpiry" value="${esc(d.licenseExpiry || '')}"></div>
         <div class="field"><label class="check" style="margin-top:28px"><input type="checkbox" name="active" ${d.active !== false ? 'checked' : ''}> ปฏิบัติงานอยู่</label></div>
+        <div class="field full"><label class="check" style="width:max-content;max-width:100%"><input type="checkbox" name="dorm" ${d.dorm ? 'checked' : ''}> คนขับหอพัก (งานฉุกเฉินหลัง 18.00)</label></div>
         <div class="field full"><label>ข้อมูลที่ครูเห็น (เช่น ความชำนาญเส้นทาง)</label><textarea name="note" rows="2">${esc(d.note || '')}</textarea></div>
         <div class="field full">${C.filePicker('dph', d.photo ? [d.photo] : [], { label: 'รูปคนขับ', multiple: false })}</div>
       </form>`,
@@ -866,7 +867,7 @@
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>คนขับ</th><th>รถที่รับผิดชอบ</th><th>ใบขับขี่</th><th>บัญชีเข้าระบบ</th><th>คะแนนเฉลี่ย</th><th></th></tr></thead>
           <tbody>${ds.map(d => { const mine = rt.filter(x => x.driverId === d.id); const avg = mine.length ? mine.reduce((s, x) => s + Object.values(x.scores).reduce((a, b) => a + b, 0) / 4, 0) / mine.length : 0; const u = d.email && S.user(d.email); return `<tr>
-            <td><div class="row" style="gap:10px">${UI.avatar(d.name)}<div><b>${esc(d.name)}</b>${d.standby ? ' <span class="tag sb-tag">สำรอง · ฉุกเฉินเท่านั้น</span>' : ''}<small>${esc(d.phone || '-')}${d.active === false ? ' · <span style="color:var(--bad)">พักงาน</span>' : ''}</small></div></div></td>
+            <td><div class="row" style="gap:10px">${UI.avatar(d.name)}<div><b>${esc(d.name)}</b>${d.standby ? ' <span class="tag sb-tag">สำรอง · ฉุกเฉินเท่านั้น</span>' : ''}${d.dorm ? ' <span class="tag dorm-tag">คนขับหอพัก · หลัง 18.00</span>' : ''}<small>${esc(d.phone || '-')}${d.active === false ? ' · <span style="color:var(--bad)">พักงาน</span>' : ''}</small></div></div></td>
             <td>${S.db.vehicles.filter(v => v.driverId === d.id).map(v => esc(v.name)).join(', ') || '<small>—</small>'}</td>
             <td>${d.licenseExpiry ? `${fmt.date(d.licenseExpiry)}<small>${daysTo(d.licenseExpiry) < 0 ? 'หมดอายุแล้ว' : `อีก ${daysTo(d.licenseExpiry)} วัน`}</small>` : '<small>—</small>'}</td>
             <td>${u ? `<b>${esc(S.usernameOf(u.email) || u.email)}</b><small>${u.active ? 'ใช้งานได้' : 'ปิดใช้งาน'}</small>` : `<button class="btn btn-ghost btn-xs" data-acct="${d.id}">${icon('key')} สร้างบัญชี</button>`}</td>
@@ -1063,6 +1064,8 @@
   }
   const bindPeriod = (root, base, query) => { const go = () => { location.hash = base + '?' + new URLSearchParams({ ...query, p: 'custom', from: $('#pFrom', root).value, to: $('#pTo', root).value }); }; $('#pFrom', root)?.addEventListener('change', go); $('#pTo', root)?.addEventListener('change', go); };
   const inPer = (d, per) => new Date(d) >= per.from && new Date(d) <= per.to;
+  // ใช้ร่วมกับหน้าค่าล่วงเวลา (pages-ot.js)
+  Pages._adm = { head, periodOf, periodBar, bindPeriod, inPer };
   // แถบแจ้งระหว่างโหลดข้อมูลย้อนหลัง (เก่ากว่า ~13 เดือน — ดู Store.needHistory)
   const histNote = loading => loading ? `<div class="note-box" style="margin-bottom:14px">${icon('clock')}<div>กำลังโหลดข้อมูลย้อนหลัง… ตัวเลขจะครบเมื่อโหลดเสร็จ</div></div>` : '';
 
@@ -1156,6 +1159,7 @@
 
   // ═════════ ค่าน้ำมัน / ค่าใช้จ่าย ═════════
   Pages.adminExpenses = ({ query }) => {
+    if (query.view === 'ot') return Pages._otAdmin({ query });   // แถบค่าล่วงเวลา
     const per = periodOf(query), vf = query.v || '', tf = query.t || '', cf = query.c || '';
     const hist = S.needHistory(per.from);
     const rows = [];
@@ -1200,7 +1204,7 @@
       layout: 'admin',
       html: `${head('รายงาน', 'ค่าน้ำมัน / ค่าใช้จ่าย', per.label, `<button class="btn btn-primary btn-sm" id="pdfDl" ${rows.length ? '' : 'disabled'}>${icon('download')} ดาวน์โหลด PDF</button><button class="btn btn-ghost btn-sm" id="pdf" ${rows.length ? '' : 'disabled'}>${icon('printer')} พิมพ์</button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button>`)}
         ${periodBar('#/admin/expenses', per, query)}${histNote(hist)}
-        <div class="toolbar"><div class="seg"><a href="${qs({ view: 'list' })}"><button class="${view === 'list' ? 'on' : ''}" tabindex="-1">${icon('clipboard')} รายการ</button></a><a href="${qs({ view: 'stats' })}"><button class="${view === 'stats' ? 'on' : ''}" tabindex="-1">${icon('chart')} สรุปสถิติค่าน้ำมัน</button></a></div></div>
+        <div class="toolbar"><div class="seg"><a href="${qs({ view: 'list' })}"><button class="${view === 'list' ? 'on' : ''}" tabindex="-1">${icon('clipboard')} รายการ</button></a><a href="${qs({ view: 'stats' })}"><button class="${view === 'stats' ? 'on' : ''}" tabindex="-1">${icon('chart')} สรุปสถิติค่าน้ำมัน</button></a><a href="${qs({ view: 'ot' })}"><button tabindex="-1">${icon('clock')} ค่าล่วงเวลา</button></a></div></div>
         <div class="toolbar"><select class="input" id="vf" style="width:auto"><option value="">รถทุกคัน</option>${S.db.vehicles.map(v => `<option value="${v.id}" ${v.id === vf ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
           <select class="input" id="tf" style="width:auto"><option value="">ทุกประเภท</option>${Object.entries(S.EXPENSE).map(([k, l]) => `<option value="${k}" ${k === tf ? 'selected' : ''}>${l}</option>`).join('')}</select>
           <select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select></div>

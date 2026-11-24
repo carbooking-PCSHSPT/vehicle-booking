@@ -201,13 +201,14 @@
     // รายชื่อครูให้เลือก: แอดมินเห็นผู้ใช้ทั้งหมด · คนขับใช้ชื่อผู้ขอใช้รถที่เคยเห็นในระบบ (พิมพ์ชื่อเองได้เสมอ)
     const names = [...new Set([...S.db.users.filter(u => u.active !== false && (u.roles || []).includes('teacher')).map(u => u.name), ...S.db.requests.map(r => (r.requester || {}).name), ...((S.db.settings.committee || []).map(c => c.name))].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
     const H = S.hospitals();
-    const drivers = S.db.drivers.filter(d => d.active !== false);
+    const night = (h => h >= 18 || h < 5)(new Date().getHours());
+    const drivers = S.db.drivers.filter(d => d.active !== false).sort((a, b) => night ? (!!b.dorm - !!a.dorm) : 0);
     const nowL = fmt.local(new Date()), minL = fmt.local(new Date(Date.now() - 24 * 36e5));
     return UI.modal({
       title: `<span class="em-ttl">${icon('alert')} ออกงานฉุกเฉิน · นำส่งผู้ป่วย</span>`, size: 'lg',
       body: `<form id="emF" class="stack em-form">
         <div class="note-box red">${icon('alert')}<div>ใช้เมื่อ<b>นำส่งผู้ป่วย/ผู้บาดเจ็บกรณีฉุกเฉิน</b>เท่านั้น · ไม่ต้องขออนุญาตล่วงหน้า ระบบแจ้งแอดมินทันที · กลับถึงแล้วให้ผู้ดูแลลงชื่อ</div></div>
-        ${admin ? `<div class="field"><label>คนขับ <b class="req">*</b></label><select name="driverId"><option value="">— เลือกคนขับ —</option>${drivers.map(d => `<option value="${d.id}" ${d.id === driverId ? 'selected' : ''}>${esc(d.name)}${d.standby ? ' (สำรอง)' : ''}</option>`).join('')}</select></div>` : ''}
+        ${admin ? `<div class="field"><label>คนขับ <b class="req">*</b></label><select name="driverId"><option value="">— เลือกคนขับ —</option>${drivers.map(d => `<option value="${d.id}" ${d.id === driverId ? 'selected' : ''}>${esc(d.name)}${d.dorm ? ' (หอพัก)' : ''}${d.standby ? ' (สำรอง)' : ''}</option>`).join('')}</select></div>` : ''}
         <div class="field"><label>รถที่ใช้ <b class="req">*</b> <span class="hint">(เลือกคันไหนก็ได้ที่ว่าง)</span></label>
           <div class="em-veh">${vs.map(v => { const busy = onTrip(v.id) && !admin, s = soon(v.id); return `<label class="em-v ${busy ? 'is-busy' : ''}"><input type="radio" name="vehicleId" value="${v.id}" ${v.id === defV ? 'checked' : ''} ${busy ? 'disabled' : ''}><span><b>${esc(v.name)}</b><small>${esc(v.plate || '')}</small>${busy ? '<em class="bad">กำลังเดินทาง</em>' : s ? `<em>${s}</em>` : ''}</span></label>`; }).join('')}</div></div>
         <div class="field"><label>สถานพยาบาล <b class="req">*</b></label>
@@ -486,11 +487,11 @@
     const mode = RANGES[query.r] ? query.r : 'day';   // เข้ามาครั้งแรก = ดูงานวันนี้
     const ref = query.date ? UI.dayOf(query.date) : new Date();
     const linkL = o => { const p = { ...(adminView ? { d: d.id } : {}), r: mode, ...o }; Object.keys(p).forEach(k => { if (!p[k]) delete p[k]; }); return '#/driver?' + new URLSearchParams(p); };
-    const tab = query.tab === 'cal' ? 'cal' : 'list';
+    const tab = ['cal', 'ot'].includes(query.tab) ? query.tab : 'list';
     const view = query.view === 'month' ? 'month' : 'week';   // ค่าเริ่มต้น = สัปดาห์ (ไม่มีมุมมองวันนี้แล้ว)
     const sel = UI.dayOf(query.date);
     const link = o => '#/driver?' + new URLSearchParams({ ...(adminView ? { d: d.id } : {}), tab: 'cal', view, date: fmt.localDate(sel), ...o });
-    const tabs = `<div class="seg" style="margin-top:16px;display:flex"><a href="#/driver${adminView ? `?d=${d.id}` : ''}" style="flex:1"><button class="${tab === 'list' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('list')} งานของฉัน</button></a><a href="${link({})}" style="flex:1"><button class="${tab === 'cal' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('calendar')} ปฏิทินงาน</button></a></div>`;
+    const tabs = `<div class="seg" style="margin-top:16px;display:flex"><a href="#/driver${adminView ? `?d=${d.id}` : ''}" style="flex:1"><button class="${tab === 'list' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('list')} งานของฉัน</button></a><a href="${link({})}" style="flex:1"><button class="${tab === 'cal' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('calendar')} ปฏิทินงาน</button></a><a href="#/driver?${new URLSearchParams({ ...(adminView ? { d: d.id } : {}), tab: 'ot' })}" style="flex:1"><button class="${tab === 'ot' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('coins')} ค่าล่วงเวลา</button></a></div>`;
     return {
       layout: 'driver',
       html: `<div class="drv ${tab === 'list' ? 'drv-wide' : ''}">
@@ -499,7 +500,7 @@
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
         <button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
         ${tabs}
-        ${tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
+        ${tab === 'ot' ? Pages._otDriver(d, query, adminView) : tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
       </div>`,
       patch: true,
       mount: bindJobs
