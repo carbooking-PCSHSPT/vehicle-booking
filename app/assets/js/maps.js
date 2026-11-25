@@ -136,7 +136,6 @@ const Maps = (() => {
           gm.href = !t ? 'https://www.google.com/maps' : from ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(t)}&travelmode=driving` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t)}`;
         };
         ['#pkName', '#pkProv'].forEach(id => el.querySelector(id).addEventListener('input', syncGm)); syncGm();
-        ll.addEventListener('change', readLL); ll.addEventListener('paste', () => setTimeout(readLL, 30));
         async function setPoint(p, { fromMap } = {}) {
           cur = { ...cur, ...p };
           ['name', 'address', 'province'].forEach(k => { if (p[k]) setF({ name: '#pkName', address: '#pkAddr', province: '#pkProv' }[k], p[k]); });
