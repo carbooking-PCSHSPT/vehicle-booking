@@ -181,34 +181,103 @@
     return '';
   };
 
+  // ═══ หน้าต่างจัดเวร (แบบใหม่ 3 ขั้น): ① ใครอยู่ในเวร (เรียงลำดับ) → ② ตอนนี้เป็นเวรของใคร (ระบบหมุนต่อเอง) → ③ ปฏิทิน แตะเปลี่ยนคน/สลับเวร ═══
+  const RS_COLORS = ['#2f6fde', '#d9581c', '#1f9d63', '#9b3fc4', '#c2185b', '#0e7490', '#a16207', '#4d7c0f'];
+  const RS_WD = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
   function rosterModal(key = 'dutyRoster') {
-    let K, R, ds, opt, list;
-    const build = k => {
-    key = k; K = ROSTERS[key]; R = roster(key); ds = S.db.drivers.filter(d => d.active !== false && (!d.standby || (K.daily && d.dorm))).sort((a, b) => K.daily ? (!!b.dorm - !!a.dorm) : 0);
-    opt = (sel, blank) => `${blank ? `<option value="">${blank}</option>` : ''}${ds.map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}${K.daily && d.dorm ? ' (หอพัก)' : ''}</option>`).join('')}`;
-    list = K.daily ? dayList(dayStart(dormDate()), 21) : key === 'eveRoster' ? eveWeeks(new Date(), 12) : sundays(new Date(), 12);
-    return `<form id="rsF" class="stack">
-        <div class="seg rs-tabs">${Object.entries(ROSTERS).map(([k, x]) => `<button type="button" class="${k === key ? 'on' : ''}" data-rk="${k}">${x.title}</button>`).join('')}</div>
-        <p class="hint">${K.note} · หมุนเวียนตามลำดับด้านล่าง · ถ้าบาง${K.daily ? 'วัน' : 'สัปดาห์'}สลับเวร เลือกชื่อในตารางได้ (ว่าง = ตามลำดับ) · เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร${K.daily && !R.order.length ? ' · <b>ยังไม่มีคนขับที่ติ๊ก "คนขับหอพัก"</b> — ติ๊กในหน้าพนักงานขับรถก่อน หรือเลือกชื่อด้านล่าง' : ''}</p>
-        <div class="field"><label>ลำดับเวร</label><div class="stack rs-order" style="gap:6px">${[0, 1, 2, 3, 4].map(i => `<div class="row" style="gap:8px"><b style="width:22px">${i + 1}.</b><select class="input" name="o${i}">${opt(R.order[i], i < 1 ? '' : '— ไม่มี —')}</select></div>`).join('')}</div></div>
-        <div class="field"><label>${K.startLabel}</label><input type="date" name="start" value="${esc(R.start)}"></div>
-        <div class="field"><label>${K.daily ? '21 วันข้างหน้า' : '12 สัปดาห์ข้างหน้า'}</label><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>${K.daily ? 'วันที่' : key === 'eveRoster' ? 'สัปดาห์' : 'วันอาทิตย์'}</th><th>ตามลำดับ</th><th>สลับเวร</th></tr></thead>
-          <tbody>${list.map(s => `<tr class="${K.daily && [0, 6].includes(dayStart(s).getDay()) ? 'we' : ''}"><td class="nw">${K.daily ? dLabel(s) : weekLabel(s, key)}</td><td>${esc(C.dName(dutyOf(s, { ...R, swaps: {} })))}</td><td><select class="input" data-sw="${s}">${opt((R.swaps || {})[s], '— ตามลำดับ —')}</select></td></tr>`).join('')}</tbody></table></div></div>
-      </form>`;
+    const all = S.db.drivers.filter(d => d.active !== false);
+    const colorOf = id => RS_COLORS[Math.max(0, all.findIndex(d => d.id === id)) % RS_COLORS.length];
+    const st = {};   // สถานะแต่ละแท็บ (แก้ได้หลายแท็บก่อนบันทึก)
+    const load = k => { const R = roster(k); st[k] = { order: [...R.order], start: R.start, swaps: { ...(R.swaps || {}) }, daily: !!ROSTERS[k].daily, dirty: false }; };
+    let month = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(), sel = null, swapFrom = null;
+    const K = () => ROSTERS[key], T = () => st[key];
+    const step = () => (K().daily ? 1 : 7);
+    // ช่วงเวรปัจจุบัน: หอพัก = วันเวร (ก่อน 05.00 นับเป็นคืนก่อน) · เวรเย็น = จันทร์ของสัปดาห์นี้ · วันอาทิตย์ = อาทิตย์ที่จะถึง (หรือวันนี้)
+    const curSlot = () => K().daily ? dormDate() : key === 'eveRoster' ? weekStart(fmt.localDate(new Date()), 1) : fmt.localDate(nextDow(new Date(), 0));
+    const addDays = (s, n) => { const d = dayStart(s); d.setDate(d.getDate() + n); return fmt.localDate(d); };
+    const base = s => dutyOf(s, { ...T(), swaps: {} });
+    const who = s => dutyOf(s, T());
+    const pool = () => all.filter(d => !d.standby || (K().daily && d.dorm));
+    const pill = id => { const d = S.driver(id); return d ? `<span class="rs-pill" style="--c:${colorOf(id)}">${esc(C.firstName(d.name))}</span>` : '<span class="rs-pill" style="--c:#9aa0b4">—</span>'; };
+    const label = s => K().daily ? dLabel(s) : key === 'eveRoster' ? `สัปดาห์ ${weekLabel(s, key)}` : `อาทิตย์ ${fmt.date(dayStart(s))}`;
+    const body = () => {
+      const t = T(), now = curSlot(), cur = base(now), unit = K().daily ? 'คืน' : 'ครั้ง';
+      const people = t.order.map((id, i) => { const d = S.driver(id) || {}; return `<div class="rs-person"><span class="rs-n">${i + 1}</span><span class="rs-dot" style="--c:${colorOf(id)}"></span><span class="rs-nm">${esc(d.name || '-')}${d.dorm && K().daily ? ' <small>(หอพัก)</small>' : ''}</span>
+        <button type="button" class="icon-btn sm" data-rs-up="${i}" aria-label="เลื่อนขึ้น" ${i ? '' : 'disabled'}><span style="display:inline-block;transform:rotate(180deg)">${icon('chev')}</span></button><button type="button" class="icon-btn sm" data-rs-down="${i}" aria-label="เลื่อนลง" ${i < t.order.length - 1 ? '' : 'disabled'}>${icon('chev')}</button><button type="button" class="icon-btn sm" data-rs-rm="${i}" aria-label="เอาออก">${icon('x')}</button></div>`; }).join('');
+      const rest = pool().filter(d => !t.order.includes(d.id));
+      // ปฏิทิน
+      let cal = '';
+      if (K().daily) {
+        const first = month, g0 = new Date(first); g0.setDate(1 - first.getDay());
+        const cells = []; for (let i = 0; i < 42; i++) { const d = new Date(g0); d.setDate(g0.getDate() + i); if (i >= 35 && d.getMonth() !== first.getMonth()) break; cells.push(d); }
+        cal = `<div class="rs-calhead"><button type="button" class="icon-btn sm" data-rs-mon="-1" aria-label="เดือนก่อน">${icon('chevL')}</button><b>${first.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}</b><button type="button" class="icon-btn sm" data-rs-mon="1" aria-label="เดือนถัดไป">${icon('chevR')}</button></div>
+          <div class="rs-grid">${RS_WD.map(w => `<div class="rs-wd">${w}</div>`).join('')}${cells.map(d => { const s = fmt.localDate(d), out = d.getMonth() !== first.getMonth();
+            return `<button type="button" class="rs-cell ${out ? 'out' : ''} ${s === now ? 'today' : ''} ${[0, 6].includes(d.getDay()) ? 'we' : ''} ${t.swaps[s] ? 'sw' : ''} ${swapFrom === s ? 'pick' : ''}" data-rs-cell="${s}" ${out ? 'tabindex="-1" aria-hidden="true"' : ''}><span class="d">${d.getDate()}</span>${pill(who(s))}</button>`; }).join('')}</div>`;
+      } else {
+        const rows = Array.from({ length: 12 }, (_, i) => addDays(now, i * 7));
+        cal = `<div class="rs-weeks">${rows.map((s, i) => `<button type="button" class="rs-wk ${!i ? 'now' : ''} ${t.swaps[s] ? 'sw' : ''} ${swapFrom === s ? 'pick' : ''}" data-rs-cell="${s}"><span>${label(s)}${!i ? `<small>${key === 'eveRoster' ? 'สัปดาห์นี้' : 'อาทิตย์นี้'}</small>` : ''}${t.swaps[s] ? '<small class="rs-swt">⇄ สลับแล้ว</small>' : ''}</span>${pill(who(s))}</button>`).join('')}</div>`;
+      }
+      // แผงเมื่อแตะช่อง
+      const sheet = sel && !swapFrom ? `<div class="rs-sheet"><b>${label(sel)} · ตอนนี้เป็นเวรของ ${esc((S.driver(who(sel)) || {}).name || '—')}</b>
+        <div class="rs-chips">${pool().map(d => `<button type="button" class="rs-chip ${d.id === who(sel) ? 'on' : ''}" data-rs-set="${d.id}" style="--c:${colorOf(d.id)}"><span class="rs-dot" style="--c:${colorOf(d.id)}"></span>${esc(C.firstName(d.name))}</button>`).join('')}</div>
+        <div class="row" style="gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-gold btn-sm" data-rs-swap>⇄ สลับกับ${K().daily ? 'วัน' : 'สัปดาห์'}อื่น</button>${t.swaps[sel] ? '<button type="button" class="btn btn-ghost btn-sm" data-rs-undo>กลับเป็นตามลำดับ</button>' : ''}<button type="button" class="btn btn-ghost btn-sm" data-rs-close>ปิด</button></div></div>` : '';
+      // นับเวร
+      const cnt = {};
+      if (K().daily) { for (let d = new Date(month); d.getMonth() === month.getMonth(); d.setDate(d.getDate() + 1)) { const w = who(fmt.localDate(d)); if (w) cnt[w] = (cnt[w] || 0) + 1; } }
+      else for (let i = 0; i < 12; i++) { const w = who(addDays(now, i * 7)); if (w) cnt[w] = (cnt[w] || 0) + 1; }
+      return `<div class="seg rs-tabs">${Object.entries(ROSTERS).map(([k, x]) => `<button type="button" class="${k === key ? 'on' : ''}" data-rk="${k}">${x.title}${st[k] && st[k].dirty ? ' •' : ''}</button>`).join('')}</div>
+        <p class="hint">${K().note} · เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร</p>
+        <section class="rs-step"><h4><b>1</b> ใครอยู่ในเวร <small>เรียงตามลำดับหมุนเวียน</small></h4>
+          <div class="rs-people">${people || `<p class="hint">ยังไม่มีคนในเวร — แตะชื่อด้านล่างเพื่อเพิ่ม${K().daily ? ' (ติ๊ก "คนขับหอพัก" ในหน้าผู้ใช้/พนักงานขับรถ จะขึ้นเป็นตัวเลือกแรก ๆ)' : ''}</p>`}</div>
+          ${rest.length ? `<div class="rs-add"><span>เพิ่ม:</span>${rest.sort((a, b) => K().daily ? (!!b.dorm - !!a.dorm) : 0).map(d => `<button type="button" class="rs-chip" data-rs-add="${d.id}" style="--c:${colorOf(d.id)}">${icon('plus')} ${esc(C.firstName(d.name))}${K().daily && d.dorm ? ' (หอพัก)' : ''}</button>`).join('')}</div>` : ''}</section>
+        <section class="rs-step"><h4><b>2</b> ${K().daily ? 'คืนนี้' : key === 'eveRoster' ? 'สัปดาห์นี้' : 'อาทิตย์นี้'}เป็นเวรของใคร <small>แตะชื่อ แล้วระบบหมุนต่อให้เอง</small></h4>
+          <div class="rs-chips">${t.order.map(id => `<button type="button" class="rs-chip ${id === cur ? 'on' : ''}" data-rs-now="${id}" style="--c:${colorOf(id)}"><span class="rs-dot" style="--c:${colorOf(id)}"></span>${esc(C.firstName((S.driver(id) || {}).name))}</button>`).join('') || '<span class="hint">เพิ่มคนในข้อ 1 ก่อน</span>'}</div></section>
+        <section class="rs-step"><h4><b>3</b> ปฏิทินเวร <small>แตะช่องเพื่อเปลี่ยนคน หรือสลับกับอีกช่อง</small></h4>
+          ${swapFrom ? `<div class="rs-banner">โหมดสลับ: แตะอีกช่องที่จะสลับกับ ${label(swapFrom)} (แตะช่องเดิมเพื่อยกเลิก)</div>` : ''}
+          ${cal}${sheet}
+          <div class="rs-fair"><span>${K().daily ? 'เดือนนี้' : '12 สัปดาห์'}:</span>${Object.entries(cnt).map(([id, n]) => `<span><span class="rs-dot" style="--c:${colorOf(id)}"></span>${esc(C.firstName((S.driver(id) || {}).name))} <b>${n}</b> ${unit}</span>`).join('')}</div></section>`;
     };
+    Object.keys(ROSTERS).forEach(load);
     return UI.modal({
-      title: `${icon('calendar')} <span class="rs-ttl">${ROSTERS[key].title}</span>`, size: 'lg',
-      body: `<div id="rsBox">${build(key)}</div>`,
-      onOpen(el) { el.addEventListener('click', e => { const b = e.target.closest('[data-rk]'); if (!b || b.dataset.rk === key) return; const box = el.querySelector('#rsBox'); box.innerHTML = build(b.dataset.rk); el.querySelector('.rs-ttl').textContent = K.title; el.querySelector('.modal-body').scrollTop = 0; }); },
-      actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกตารางเวร', kind: 'btn-primary', icon: 'check', onClick: async el => {
-        const f = UI.formData(el.querySelector('#rsF'));
-        const order = [0, 1, 2, 3, 4].map(i => f['o' + i]).filter(Boolean);
-        if (!order.length) { UI.toast('เลือกคนเข้าเวรอย่างน้อย 1 คน', 'error'); return false; }
-        if (!f.start || (K.dow != null && dayStart(f.start).getDay() !== K.dow)) { UI.toast(K.dow == null ? 'กรุณาเลือกวันเริ่ม' : `วันเริ่มต้องเป็นวัน${K.dow ? 'จันทร์' : 'อาทิตย์'}`, 'error'); return false; }
-        const swaps = {}; Object.entries(R.swaps || {}).forEach(([k, v]) => { if (k < list[0]) swaps[k] = v; });   // เก็บการสลับเวรในอดีตไว้
-        $$('[data-sw]', el).forEach(x => { if (x.value) swaps[x.dataset.sw] = x.value; });
-        await S.saveRoster({ order, start: f.start, swaps }, key);
-        UI.toast('บันทึกตารางเวรแล้ว'); return true;
+      title: `${icon('calendar')} จัดเวรคนขับ`, size: 'lg',
+      body: `<div id="rsBox" class="rs">${body()}</div>`,
+      onOpen(el) {
+        const box = el.querySelector('#rsBox'), draw = () => { box.innerHTML = body(); };
+        el.addEventListener('click', e => {
+          const b = e.target.closest('button'); if (!b || !box.contains(b)) return;
+          const t = T(), D = b.dataset, mark = () => { t.dirty = true; };
+          if (D.rk) { if (D.rk === key) return; key = D.rk; sel = swapFrom = null; el.querySelector('.modal-body').scrollTop = 0; }
+          else if (D.rsUp) { const i = +D.rsUp, now = curSlot(), c = base(now); [t.order[i - 1], t.order[i]] = [t.order[i], t.order[i - 1]]; keepNow(c); mark(); }
+          else if (D.rsDown) { const i = +D.rsDown, now = curSlot(), c = base(now); [t.order[i + 1], t.order[i]] = [t.order[i], t.order[i + 1]]; keepNow(c); mark(); }
+          else if (D.rsRm) { const c = base(curSlot()); t.order.splice(+D.rsRm, 1); keepNow(c); mark(); }
+          else if (D.rsAdd) { const c = base(curSlot()); t.order.push(D.rsAdd); keepNow(c); mark(); }
+          else if (D.rsNow) { setNow(D.rsNow); mark(); UI.toast(`${K().daily ? 'คืนนี้' : 'ช่วงนี้'}เป็นเวรของ ${C.firstName((S.driver(D.rsNow) || {}).name)} แล้วหมุนต่อตามลำดับ`); }
+          else if (D.rsMon) month = new Date(month.getFullYear(), month.getMonth() + +D.rsMon, 1);
+          else if (D.rsCell) {
+            if (swapFrom) {
+              if (D.rsCell !== swapFrom) { const a = who(swapFrom), c = who(D.rsCell); setSwap(swapFrom, c); setSwap(D.rsCell, a); mark(); UI.toast(`สลับแล้ว: ${label(swapFrom)} ⇄ ${label(D.rsCell)}`); }
+              swapFrom = sel = null;
+            } else sel = sel === D.rsCell ? null : D.rsCell;
+          }
+          else if (D.rsSet) { setSwap(sel, D.rsSet); mark(); sel = null; }
+          else if ('rsSwap' in D) { swapFrom = sel; sel = null; }
+          else if ('rsUndo' in D) { delete t.swaps[sel]; mark(); sel = null; }
+          else if ('rsClose' in D) sel = null;
+          else return;
+          draw();
+        });
+        // เปลี่ยนลำดับ/เพิ่ม/ลบคน → ให้คนที่เป็นเวรตอนนี้ยังเป็นคนเดิม (ถ้ายังอยู่ในเวร)
+        function keepNow(c) { if (c && T().order.includes(c)) setNow(c); else if (T().order.length) setNow(T().order[0]); }
+        function setNow(id) { const t = T(), i = t.order.indexOf(id); if (i < 0) return; t.start = addDays(curSlot(), -i * step()); }
+        function setSwap(s, id) { const t = T(); if (base(s) === id) delete t.swaps[s]; else t.swaps[s] = id; }
+      },
+      actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกตารางเวร', kind: 'btn-primary', icon: 'check', onClick: async () => {
+        const ks = Object.keys(st).filter(k => st[k].dirty);
+        if (!ks.length) { UI.toast('ยังไม่มีอะไรเปลี่ยน'); return true; }
+        const bad = ks.find(k => !st[k].order.length);
+        if (bad) { UI.toast(`${ROSTERS[bad].title}: เพิ่มคนในเวรอย่างน้อย 1 คน`, 'error'); key = bad; return false; }
+        for (const k of ks) await S.saveRoster({ order: st[k].order, start: st[k].start, swaps: st[k].swaps }, k);
+        UI.toast(`บันทึกตารางเวรแล้ว (${ks.map(k => ROSTERS[k].title).join(', ')})`); return true;
       } }]
     });
   }
