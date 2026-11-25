@@ -303,7 +303,7 @@
   const gbRuns = vid => S.db.requests.filter(r => r.garbage && (r.assignments || []).some(a => a.vehicleId === vid)).sort((a, b) => b.startAt.localeCompare(a.startAt));
   function garbagePanel(d, adminView) {
     const v = S.garbageVehicle();
-    if (!v || !(v.driverId === d.id || adminView)) return '';
+    if (!v || v.driverId !== d.id) return '';   // เฉพาะคนขับประจำรถขนขยะ (แอดมินดูหน้าคนขับคนอื่นก็ไม่ขึ้น)
     const runs = gbRuns(v.id), open = runs.find(r => r.assignments[0].status === 'ontrip');
     const today = runs.filter(r => UI.sameDay(r.startAt, new Date()));
     const mins = open ? Math.round((Date.now() - new Date(open.assignments[0].departedAt)) / 6e4) : 0;
@@ -610,8 +610,8 @@
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
         ${fsBar()}
         ${garbagePanel(d, adminView)}
-        <div class="go-btns"><button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
-        ${d.standby ? '' : `<button type="button" class="em-go sp-go" data-spgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('package')}<span><b>ออกซื้อ / รับของ</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)}` : 'งานประจำฝ่ายบริการ — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>`}</div>
+        ${(S.garbageVehicle() || {}).driverId === d.id ? '' : `<div class="go-btns"><button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
+        ${d.standby ? '' : `<button type="button" class="em-go sp-go" data-spgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('package')}<span><b>ออกซื้อ / รับของ</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)}` : 'งานประจำฝ่ายบริการ — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>`}</div>`}
         ${(() => { const t = Pages._todayDuty && Pages._todayDuty(d.id); return t ? `<div class="note-box navy duty-today">${icon('clock')}<div><b>${t}</b></div></div>` : ''; })()}
         ${tabs}
         ${tab === 'ot' ? Pages._otDriver(d, query, adminView) : tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}

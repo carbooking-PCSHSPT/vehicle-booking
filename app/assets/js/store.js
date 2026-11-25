@@ -610,15 +610,16 @@ const Store = (() => {
     // เน็ตหลุด: ไม่รอเซิร์ฟเวอร์ตอบ — Firestore เก็บการเขียนไว้ในเครื่อง (enablePersistence) แล้วส่งเองเมื่อกลับมาออนไลน์
     const isOff = () => typeof navigator !== 'undefined' && navigator.onLine === false;
     const offErr = e => /unavailable/.test(String((e && e.code) || '')) || /offline/i.test(String((e && e.message) || ''));
-    const waitSync = () => { if (!pendWait) pendWait = fs.waitForPendingWrites().then(() => { pendingN = 0; pendWait = null; emit(); }, () => { pendWait = null; }); };
     const queued = p => {
       pendingN++; emit();
-      p.catch(e => { if (api.logError) api.logError({ kind: 'firestore', msg: 'offline write: ' + ((e && e.code) || '') + ' ' + ((e && e.message) || '') }); });
-      waitSync();
+      p.catch(e => {
+        if (api.logError) api.logError({ kind: 'firestore', msg: 'offline write: ' + ((e && e.code) || '') + ' ' + ((e && e.message) || '') });
+        if (typeof UI !== 'undefined') UI.toast('ข้อมูลที่บันทึกไว้ตอนไม่มีเน็ต ส่งไม่สำเร็จ 1 รายการ: ' + friendly(e).message + ' — กรุณาตรวจสอบแล้วบันทึกใหม่', 'error');
+      }).finally(() => { pendingN = Math.max(0, pendingN - 1); emit(); });
     };
-    if (typeof window !== 'undefined') ['online', 'offline'].forEach(ev => window.addEventListener(ev, () => { emit(); if (ev === 'online' && pendingN) waitSync(); }));
+    if (typeof window !== 'undefined') ['online', 'offline'].forEach(ev => window.addEventListener(ev, () => emit()));
     const guard = p => p.catch(e => { if (e && e.code && typeof api !== 'undefined' && api.logError) api.logError({ kind: 'firestore', msg: `${e.code}: ${e.message || ''}`, stack: e.stack || '' }); throw friendly(e); });
-    let unsubs = [], reqMaps = {}, rateMaps = {}, profileUnsub = null, warned = false, pendingN = 0, pendWait = null;
+    let unsubs = [], reqMaps = {}, rateMaps = {}, profileUnsub = null, warned = false, pendingN = 0;
     // ประหยัดโควตาอ่าน: แอดมิน/ผู้บริหารฟังเรียลไทม์เฉพาะคำขอ/ผลประเมิน ~13 เดือนล่าสุด
     // ข้อมูลเก่ากว่านั้นโหลดครั้งเดียวเมื่อหน้าที่ต้องใช้ขอ (needHistory) — histState: none | loading | done
     let histState = 'none', dataGen = 0;

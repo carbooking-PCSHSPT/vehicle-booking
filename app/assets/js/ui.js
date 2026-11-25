@@ -147,6 +147,10 @@ const UI = (() => {
     });
   }
   let fitT = 0; addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(() => fitText(), 150); });
+  // รูปโปร่งใส 1×1 (ตัวยึดระหว่างโหลด/โหลดไม่สำเร็จ — ไม่ขึ้นไอคอนรูปแตก)
+  const BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  // โหลดไม่สำเร็จ (เช่น ไม่มีเน็ต) → ลองใหม่เมื่อกลับมาออนไลน์
+  if (typeof window !== 'undefined') window.addEventListener('online', () => setTimeout(() => { $$('img.broken[data-file]').forEach(i => { i._h = 0; i.classList.remove('broken'); }); hydrate(document); }, 1500));
   function hydrate(root = document) {
     if (root.querySelector && root.querySelector('.fitw')) { fitText(root); if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitText(root)); }
     $$('img[data-file]', root).forEach(img => {
@@ -156,7 +160,7 @@ const UI = (() => {
       // รูปที่แสดงเล็ก (ความกว้างจริงบนจอ × ความละเอียดจอ ≤ 260px) → ขอรูปย่อ โหลดเร็วกว่ามาก
       const w = img.getBoundingClientRect().width || img.parentElement?.getBoundingClientRect().width || 0;
       const small = w > 0 && w * (window.devicePixelRatio || 1) <= 260;
-      Store.fileUrl(img.dataset.file, { small }).then(u => { img.onload = () => img.classList.remove('ld'); img.src = u; if (img.complete) img.classList.remove('ld'); }).catch(() => { img.classList.remove('ld'); img.alt = ''; img.classList.add('broken'); });
+      Store.fileUrl(img.dataset.file, { small }).then(u => { img.onload = () => img.classList.remove('ld'); img.src = u; if (img.complete) img.classList.remove('ld'); }).catch(() => { img.classList.remove('ld'); img.alt = ''; img.src = BLANK; img.classList.add('broken'); });
     });
     stackTables(root);
   }
@@ -199,8 +203,8 @@ const UI = (() => {
   // แสดงรูปย่อ (รองรับ PDF)
   const thumb = (ref, cls = '') => isPdf(ref) || /^drive:/.test(ref) && /pdf/i.test(ref)
     ? `<button type="button" class="thumb pdf ${cls}" data-view="${esc(ref)}">${icon('file')}<span>PDF</span></button>`
-    : `<button type="button" class="thumb ${cls}" data-view="${esc(ref)}"><img ${/^drive:/.test(ref) ? `data-file="${esc(ref)}" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="` : `src="${esc(ref)}"`} alt="ไฟล์แนบ" loading="lazy"></button>`;
-  const img = (ref, alt = '', cls = '') => ref ? (/^drive:/.test(ref) ? `<img class="${cls}" data-file="${esc(ref)}" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="${esc(alt)}">` : `<img class="${cls}" src="${esc(ref)}" alt="${esc(alt)}" loading="lazy">`) : '';
+    : `<button type="button" class="thumb ${cls}" data-view="${esc(ref)}"><img ${/^drive:/.test(ref) ? `data-file="${esc(ref)}" src="${BLANK}"` : `src="${esc(ref)}"`} alt="ไฟล์แนบ" loading="lazy"></button>`;
+  const img = (ref, alt = '', cls = '') => ref ? (/^drive:/.test(ref) ? `<img class="${cls}" data-file="${esc(ref)}" src="${BLANK}" alt="${esc(alt)}">` : `<img class="${cls}" src="${esc(ref)}" alt="${esc(alt)}" loading="lazy">`) : '';
 
   // อ่านค่าฟอร์ม
   function formData(form) {

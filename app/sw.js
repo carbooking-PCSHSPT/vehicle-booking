@@ -4,12 +4,13 @@
    · ไม่มีเน็ต: ใช้สำเนาล่าสุดในเครื่อง
    · ข้อมูล (Firestore) ไม่ผ่านตัวนี้ — Firestore เก็บข้อมูล/คิวการเขียนในเครื่องเอง
    ═══════════════════════════════════════════════════════════ */
-const CACHE = 'vb-shell-v1';
+const CACHE = 'vb-shell-v2';
 const HOSTS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
-  caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())
+  // ลบเฉพาะสำเนาแอปรุ่นเก่า — ไม่แตะแคชรูปคนขับ/รถของแอป
+  caches.keys().then(ks => Promise.all(ks.filter(k => /^vb-shell-/.test(k) && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())
 ));
 
 self.addEventListener('fetch', e => {
