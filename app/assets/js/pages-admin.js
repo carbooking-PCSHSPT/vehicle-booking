@@ -1742,6 +1742,7 @@
     ['ลำดับ', 6, 0, ''],
     ['วันที่ไป *', 13, 1, 'พิมพ์ 3/12 หรือ 3/12/2569 (ไม่ใส่ปี = ปีนี้)'],
     ['เวลาไป *', 9, 1, 'กดลูกศรเลือกเวลา หรือพิมพ์ 8:30'],
+    ['วันที่กลับ', 13, 0, 'ว่าง = กลับวันเดียวกัน · ใส่เฉพาะงานค้างคืน'],
     ['เวลากลับ *', 9, 1, 'กดลูกศรเลือกเวลา หรือพิมพ์ 16:00'],
     ['ปลายทาง *', 30, 1, 'เลือกสถานที่ที่เคยไป หรือพิมพ์ชื่อใหม่ · หลายที่คั่นด้วย ;'],
     ['ผู้ขอใช้รถ *', 24, 1, 'เลือกชื่อครู (ระบบเติมฝ่าย/เบอร์ให้) หรือพิมพ์ชื่อเอง'],
@@ -1750,9 +1751,8 @@
     ['คนขับ', 20, 0, 'ไม่ใส่ได้ ให้แอดมินเลือกในระบบ'],
     ['ครู', 6, 0, 'จำนวนครู/บุคลากร'],
     ['นักเรียน', 8, 0, 'จำนวนนักเรียน'],
-    ['วันที่กลับ', 13, 0, 'ว่าง = กลับวันเดียวกัน · ใส่เฉพาะงานค้างคืน'],
     ['ภารกิจ', 28, 0, 'ว่าง = ใช้หมวดงาน + ปลายทาง'],
-    ['ฝ่าย / กลุ่มสาระ', 20, 0, 'ว่าง = ใช้ของครูในระบบ'],
+    ['ฝ่าย / กลุ่มสาระ', 30, 0, 'กดลูกศรเลือก · ว่าง = ใช้ของครูในระบบ'],
     ['เบอร์โทร', 13, 0, 'ว่าง = ใช้ของครูในระบบ'],
     ['จุดขึ้นรถ', 16, 0, 'ว่าง = โรงเรียน'],
     ['หมายเหตุ', 24, 0, '']
@@ -1777,7 +1777,9 @@
     const ppl = [...new Set(S.db.users.filter(u => u.active !== false && (u.roles || []).some(r => ['teacher', 'executive'].includes(r))).map(u => u.name).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'th'));
     const places = S.db.places.slice().sort((x, y) => (y.count || 0) - (x.count || 0)).map(p => p.name).filter(Boolean).slice(0, 400);
     const times = []; for (let m = 5 * 60; m <= 21 * 60; m += 30) times.push(`${p2(Math.floor(m / 60))}:${p2(m % 60)}`);
-    const LISTS = { 3: ['D', times], 4: ['D', times], 5: ['F', places, true], 6: ['E', ppl, true], 7: ['A', cats], 8: ['B', vehs], 9: ['C', drvs] };
+    const depts = [...new Set([...S.DEPTS, ...S.db.users.map(u => u.dept)].filter(Boolean))];
+    const col = h => RQ_COLS.findIndex(c => c[0].startsWith(h)) + 1;
+    const LISTS = { [col('เวลาไป')]: ['D', times], [col('เวลากลับ')]: ['D', times], [col('ปลายทาง')]: ['F', places, true], [col('ผู้ขอ')]: ['E', ppl, true], [col('หมวด')]: ['A', cats], [col('รถ')]: ['B', vehs], [col('คนขับ')]: ['C', drvs], [col('ฝ่าย')]: ['G', depts, true] };
     const wb = new EJ.Workbook(); wb.creator = 'ระบบยานพาหนะ';
     const NAVY = 'FF26307A', GREY = 'FF6B6F86', REQ = 'FFFFF6DD', N = 300, fmtDate = '[$-th-TH,107]d mmm yyyy';
     const build = (ws, rows) => {
@@ -1789,22 +1791,23 @@
         const row = ws.getRow(r);
         if (r > rows.length + 1) row.getCell(1).value = r - 1;
         RQ_COLS.forEach((c, i) => { if (c[2]) row.getCell(i + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REQ } }; });
-        [2, 12].forEach(c => { row.getCell(c).numFmt = fmtDate; });
+        [col('วันที่ไป'), col('วันที่กลับ')].forEach(c => { row.getCell(c).numFmt = fmtDate; });
         Object.entries(LISTS).forEach(([c, [col, list, free]]) => { if (!list.length) return; row.getCell(+c).dataValidation = { type: 'list', allowBlank: true, formulae: [`'ตัวเลือก'!$${col}$2:$${col}$${list.length + 1}`], showErrorMessage: !free, errorStyle: 'warning', errorTitle: 'ไม่อยู่ในรายการ', error: 'กด "ใช่" เพื่อใช้ค่าที่พิมพ์เอง' }; });
-        [10, 11].forEach(c => { row.getCell(c).dataValidation = { type: 'whole', operator: 'between', allowBlank: true, formulae: [0, 500], showErrorMessage: true, error: 'ใส่เป็นตัวเลขจำนวนคน' }; });
+        [col('ครู'), col('นักเรียน')].forEach(c => { row.getCell(c).dataValidation = { type: 'whole', operator: 'between', allowBlank: true, formulae: [0, 500], showErrorMessage: true, error: 'ใส่เป็นตัวเลขจำนวนคน' }; });
       }
       ws.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
     };
     build(wb.addWorksheet('งานที่จองไว้', { properties: { tabColor: { argb: NAVY } } }), []);
     const U = (m, d) => new Date(Date.UTC(2026, m, d));   // Excel เก็บวันที่แบบไม่มีเขตเวลา
+    const ex = o => RQ_COLS.map(c => { const k = Object.keys(o).find(h => c[0].startsWith(h)); return k ? o[k] : null; });
     build(wb.addWorksheet('ตัวอย่าง (ไม่ถูกนำเข้า)', { properties: { tabColor: { argb: 'FFC9971C' } } }), [
-      [1, U(11, 3), '08:30', '16:00', places[0] || 'สพม.ปทุมธานี', ppl[0] || 'ครูตัวอย่าง ใจดี', cats.find(c => /การเงิน/.test(c)) || '', vehs[0] || '', drvs[0] || '', 1, 0, null, '', '', '', '', 'กรอกแค่ 5 ช่องแรก + รถ/คนขับ ก็พอ'],
-      [2, U(11, 5), '07:00', '18:00', 'อุทยานแห่งชาติเขาใหญ่', ppl[1] || 'ครูตัวอย่าง สอนดี', cats.find(c => /กิจกรรม/.test(c)) || '', '', '', 2, 30, U(11, 6), 'ค่ายวิทยาศาสตร์ ม.4', '', '', '', 'ค้างคืน → ใส่วันที่กลับ · ไม่ใส่รถ = รอแอดมินจัดรถ'],
-      [3, U(11, 8), '13:00', '15:00', 'ธนาคารกรุงไทย; ไปรษณีย์', ppl[2] || 'ครูตัวอย่าง', '', '', '', 1, 0, null, '', '', '', '', 'ไปหลายที่คั่นด้วย ;']
+      ex({ 'ลำดับ': 1, 'วันที่ไป': U(11, 3), 'เวลาไป': '08:30', 'เวลากลับ': '16:00', 'ปลายทาง': places[0] || 'สพม.ปทุมธานี', 'ผู้ขอ': ppl[0] || 'ครูตัวอย่าง ใจดี', 'หมวด': cats.find(c => /การเงิน/.test(c)) || '', 'รถ': vehs[0] || '', 'คนขับ': drvs[0] || '', 'ครู': 1, 'นักเรียน': 0, 'ฝ่าย': depts[0], 'หมายเหตุ': 'กรอก 5 ช่องสีเหลือง + รถ/คนขับ ก็พอ' }),
+      ex({ 'ลำดับ': 2, 'วันที่ไป': U(11, 5), 'เวลาไป': '07:00', 'วันที่กลับ': U(11, 6), 'เวลากลับ': '18:00', 'ปลายทาง': 'อุทยานแห่งชาติเขาใหญ่', 'ผู้ขอ': ppl[1] || 'ครูตัวอย่าง สอนดี', 'หมวด': cats.find(c => /กิจกรรม/.test(c)) || '', 'ครู': 2, 'นักเรียน': 30, 'ภารกิจ': 'ค่ายวิทยาศาสตร์ ม.4', 'ฝ่าย': depts.find(d => /วิทยาศาสตร์/.test(d)) || '', 'หมายเหตุ': 'ค้างคืน → ใส่วันที่กลับ · ไม่ใส่รถ = รอแอดมินจัดรถ' }),
+      ex({ 'ลำดับ': 3, 'วันที่ไป': U(11, 8), 'เวลาไป': '13:00', 'เวลากลับ': '15:00', 'ปลายทาง': 'ธนาคารกรุงไทย; ไปรษณีย์', 'ผู้ขอ': ppl[2] || 'ครูตัวอย่าง', 'ครู': 1, 'หมายเหตุ': 'ไปหลายที่คั่นด้วย ;' })
     ]);
     const op = wb.addWorksheet('ตัวเลือก', { state: 'hidden' });
-    op.columns = ['หมวดงาน', 'รถ', 'คนขับ', 'เวลา', 'ผู้ขอใช้รถ', 'ปลายทาง'].map(h => ({ header: h, width: 26 }));
-    for (let i = 0; i < Math.max(cats.length, vehs.length, drvs.length, times.length, ppl.length, places.length); i++) op.addRow([cats[i] || null, vehs[i] || null, drvs[i] || null, times[i] || null, ppl[i] || null, places[i] || null]);
+    op.columns = ['หมวดงาน', 'รถ', 'คนขับ', 'เวลา', 'ผู้ขอใช้รถ', 'ปลายทาง', 'ฝ่าย / กลุ่มสาระ'].map(h => ({ header: h, width: 26 }));
+    for (let i = 0; i < Math.max(cats.length, vehs.length, drvs.length, times.length, ppl.length, places.length, depts.length); i++) op.addRow([cats[i] || null, vehs[i] || null, drvs[i] || null, times[i] || null, ppl[i] || null, places[i] || null, depts[i] || null]);
     const hw = wb.addWorksheet('วิธีกรอก'); hw.columns = [{ header: 'วิธีกรอก (ใช้เวลาประมาณ 30 วินาทีต่องาน)', width: 110 }];
     ['1 แถว = 1 งาน · กรอกในชีต "งานที่จองไว้" · ช่องสีเหลือง (หัวสีน้ำเงิน) ต้องกรอก 5 ช่อง ที่เหลือไม่บังคับ',
       'วันที่ไป: พิมพ์ 3/12 ก็พอ (ไม่ใส่ปี = ปีนี้) · เวลา ผู้ขอ ปลายทาง หมวด รถ คนขับ: กดลูกศรเลือก หรือพิมพ์เอง',
