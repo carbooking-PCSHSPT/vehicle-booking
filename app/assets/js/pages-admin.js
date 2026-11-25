@@ -32,7 +32,7 @@
     const L = (h, ic, t, cnt) => { if (isOn(h) && !cur) cur = { ic, t }; return `<a href="#${h}" title="${t}" class="${isOn(h) ? 'on' : ''}">${icon(ic)}<span class="sl">${t}</span>${cnt ? `<span class="cnt">${cnt}</span>` : ''}</a>`; };
     // แท็บเล็ต/มือถือ: ปุ่ม "เมนูหลังบ้าน" (บอกหน้าปัจจุบัน) → กดแล้วเปิดตารางปุ่มเมนู (แทนแถบเลื่อนแนวนอนที่ใช้ยาก)
     const links = `
-        ${admin ? `<h5>งานประจำวัน</h5>${L('/admin', 'grid', 'ภาพรวม')}${L('/admin/requests', 'clipboard', 'คำขอใช้รถ', pending)}${L('/admin/new', 'alert', 'บันทึกคำขอเร่งด่วน')}${L('/admin/roster', 'calendar', 'ตารางงานคนขับ')}${L('/driver', 'wheel', 'มุมมองคนขับ')}
+        ${admin ? `<h5>งานประจำวัน</h5>${L('/admin', 'grid', 'ภาพรวม')}${L('/admin/requests', 'clipboard', 'คำขอใช้รถ', pending)}${L('/admin/new', 'alert', 'บันทึกคำขอเร่งด่วน')}${L('/admin/roster', 'calendar', 'ตารางงานคนขับ')}<a href="#" data-rostermenu title="จัดเวรคนขับ">${icon('clock')}<span class="sl">จัดเวรคนขับ</span></a>${''}${L('/driver', 'wheel', 'มุมมองคนขับ')}
         <h5>ข้อมูลหลัก</h5>${L('/admin/vehicles', 'van', 'ข้อมูลรถ')}${L('/admin/drivers', 'users', 'พนักงานขับรถ')}${L('/admin/users', 'userPlus', 'ผู้ใช้และสิทธิ์')}` : ''}
         <h5>รายงาน</h5>${admin ? L('/admin/expenses', 'fuel', 'ค่าน้ำมัน/ค่าใช้จ่าย') : ''}${L('/admin/stats', 'chart', 'สถิติและรายงาน')}${L('/admin/ratings', 'star', 'ประเมินคนขับ')}
         ${S.signerRoles(me).length ? `<h5>ลงนาม</h5>${L('/admin/esign', 'edit', 'บันทึกข้อความรอลงนาม', S.db.requests.filter(r => S.signerRoles(me).some(ro => S.needsMySign(r, ro))).length)}` : ''}
@@ -45,6 +45,8 @@
       <div class="page-enter" style="min-width:0">${html}</div>
     </div>`;
   };
+  // เมนูจัดเวรคนขับ (เวรเย็น จ.–ศ. · เวรวันอาทิตย์ · คนขับหอพัก)
+  document.addEventListener('click', async e => { const m = e.target.closest('[data-rostermenu]'); if (!m) return; e.preventDefault(); if (Pages._rosterModal && await Pages._rosterModal('eveRoster')) App.render(); });
   document.addEventListener('click', async e => { const o = e.target.closest('[data-ordernew]'); if (!o) return; const r = await Pages._orderModal({ admin: S.isAdmin(S.me) }); if (r && S.isAdmin(S.me)) location.hash = '#/admin/requests/' + r.id; });
   document.addEventListener('click', e => { const t = e.target.closest('[data-side-toggle]'); if (!t) return; const s = t.closest('.side'); s.classList.toggle('open'); t.setAttribute('aria-expanded', s.classList.contains('open')); });
   const head = (eyebrow, title, sub = '', right = '') => `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="row">${right}</div>` : ''}</div>`;

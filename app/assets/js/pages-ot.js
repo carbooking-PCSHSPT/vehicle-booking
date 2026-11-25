@@ -380,4 +380,5 @@
     </div>`;
   };
   Pages._otCalc = { calcDay, daysOf, tripsOf, sumOf, hoursOf };
+  Pages._rosterModal = rosterModal;
 })();
