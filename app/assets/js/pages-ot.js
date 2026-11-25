@@ -182,20 +182,24 @@
   };
 
   function rosterModal(key = 'dutyRoster') {
-    const K = ROSTERS[key], R = roster(key), ds = S.db.drivers.filter(d => d.active !== false && (!d.standby || (K.daily && d.dorm))).sort((a, b) => K.daily ? (!!b.dorm - !!a.dorm) : 0);
-    const opt = (sel, blank) => `${blank ? `<option value="">${blank}</option>` : ''}${ds.map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}${K.daily && d.dorm ? ' (หอพัก)' : ''}</option>`).join('')}`;
-    const list = K.daily ? dayList(dayStart(dormDate()), 21) : key === 'eveRoster' ? eveWeeks(new Date(), 12) : sundays(new Date(), 12);
-    return UI.modal({
-      title: `${icon('calendar')} ${K.title}`, size: 'lg',
-      body: `<form id="rsF" class="stack">
+    let K, R, ds, opt, list;
+    const build = k => {
+    key = k; K = ROSTERS[key]; R = roster(key); ds = S.db.drivers.filter(d => d.active !== false && (!d.standby || (K.daily && d.dorm))).sort((a, b) => K.daily ? (!!b.dorm - !!a.dorm) : 0);
+    opt = (sel, blank) => `${blank ? `<option value="">${blank}</option>` : ''}${ds.map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)}${K.daily && d.dorm ? ' (หอพัก)' : ''}</option>`).join('')}`;
+    list = K.daily ? dayList(dayStart(dormDate()), 21) : key === 'eveRoster' ? eveWeeks(new Date(), 12) : sundays(new Date(), 12);
+    return `<form id="rsF" class="stack">
         <div class="seg rs-tabs">${Object.entries(ROSTERS).map(([k, x]) => `<button type="button" class="${k === key ? 'on' : ''}" data-rk="${k}">${x.title}</button>`).join('')}</div>
         <p class="hint">${K.note} · หมุนเวียนตามลำดับด้านล่าง · ถ้าบาง${K.daily ? 'วัน' : 'สัปดาห์'}สลับเวร เลือกชื่อในตารางได้ (ว่าง = ตามลำดับ) · เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร${K.daily && !R.order.length ? ' · <b>ยังไม่มีคนขับที่ติ๊ก "คนขับหอพัก"</b> — ติ๊กในหน้าพนักงานขับรถก่อน หรือเลือกชื่อด้านล่าง' : ''}</p>
         <div class="field"><label>ลำดับเวร</label><div class="stack rs-order" style="gap:6px">${[0, 1, 2, 3, 4].map(i => `<div class="row" style="gap:8px"><b style="width:22px">${i + 1}.</b><select class="input" name="o${i}">${opt(R.order[i], i < 1 ? '' : '— ไม่มี —')}</select></div>`).join('')}</div></div>
         <div class="field"><label>${K.startLabel}</label><input type="date" name="start" value="${esc(R.start)}"></div>
         <div class="field"><label>${K.daily ? '21 วันข้างหน้า' : '12 สัปดาห์ข้างหน้า'}</label><div class="tbl-wrap"><table class="tbl" style="min-width:0"><thead><tr><th>${K.daily ? 'วันที่' : key === 'eveRoster' ? 'สัปดาห์' : 'วันอาทิตย์'}</th><th>ตามลำดับ</th><th>สลับเวร</th></tr></thead>
           <tbody>${list.map(s => `<tr class="${K.daily && [0, 6].includes(dayStart(s).getDay()) ? 'we' : ''}"><td class="nw">${K.daily ? dLabel(s) : weekLabel(s, key)}</td><td>${esc(C.dName(dutyOf(s, { ...R, swaps: {} })))}</td><td><select class="input" data-sw="${s}">${opt((R.swaps || {})[s], '— ตามลำดับ —')}</select></td></tr>`).join('')}</tbody></table></div></div>
-      </form>`,
-      onOpen(el, close) { el.querySelectorAll('[data-rk]').forEach(b => b.addEventListener('click', () => { if (b.dataset.rk === key) return; close(null); setTimeout(() => rosterModal(b.dataset.rk).then(r => { if (r) App.render(); }), 280); })); },
+      </form>`;
+    };
+    return UI.modal({
+      title: `${icon('calendar')} <span class="rs-ttl">${ROSTERS[key].title}</span>`, size: 'lg',
+      body: `<div id="rsBox">${build(key)}</div>`,
+      onOpen(el) { el.addEventListener('click', e => { const b = e.target.closest('[data-rk]'); if (!b || b.dataset.rk === key) return; const box = el.querySelector('#rsBox'); box.innerHTML = build(b.dataset.rk); el.querySelector('.rs-ttl').textContent = K.title; el.querySelector('.modal-body').scrollTop = 0; }); },
       actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกตารางเวร', kind: 'btn-primary', icon: 'check', onClick: async el => {
         const f = UI.formData(el.querySelector('#rsF'));
         const order = [0, 1, 2, 3, 4].map(i => f['o' + i]).filter(Boolean);

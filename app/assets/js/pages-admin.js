@@ -375,6 +375,7 @@
             <div class="field"><label>${icon('flag')} หมวดงาน <span class="hint" style="font-weight:400">(แก้ได้ถ้าผู้ขอเลือกผิด)</span></label>${catSelect(r.category, r.categoryOther)}</div>
             ${driverDay(r)}
           </div>
+          ${S.WAIT_CATS.includes(r.category) ? `<div class="field wait-pick"><label>${icon('clock')} ระหว่างทำธุระ <span class="hint" style="font-weight:400">(บอกคนขับ · หมวด${esc(S.catName(r))})</span></label><div class="row" style="gap:8px;flex-wrap:wrap">${Object.entries(S.WAIT_MODES).map(([k, l]) => `<label class="check"><input type="radio" name="waitMode" value="${k}" ${(r.waitMode || 'stay') === k ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>` : ''}
           <div class="label" style="margin-bottom:8px">เลือกรถ (เลือกได้หลายคัน) · คนขับ · หมายเหตุรายคัน</div>
           ${vehiclePickerHTML(r, r.assignments)}
           <div class="field" style="margin-top:14px"><label>${icon('mail')} หมายเหตุถึงผู้ขอใช้รถ ${canDecide ? '(จำเป็นเมื่อไม่อนุมัติ/ส่งกลับแก้ไข)' : ''}</label><textarea id="dNote" rows="3" placeholder="เช่น ขอให้มาถึงจุดนัดก่อนเวลา 15 นาที / รถตู้ 1 คันไม่พอ จัดรถบัสให้แทน">${esc(r.decision && r.decision.action === 'approve' ? r.decision.note : '')}</textarea></div>
@@ -461,7 +462,8 @@
               const warn = [miss ? `ยังไม่ระบุคนขับ ${miss} คัน` : '', conf.length ? 'มีรถที่ชนเวลากับงานอื่น/ซ่อมบำรุง' : '', dconf.length ? 'มีคนขับที่ติดงานอื่นในช่วงเวลานี้' : '', S.seatsOf(assignments) < S.passengers(r) ? 'ที่นั่งรวมน้อยกว่าจำนวนผู้เดินทาง' : ''].filter(Boolean);
               if (warn.length && !(await UI.confirm(`<b>โปรดตรวจสอบ:</b><br>• ${warn.join('<br>• ')}<br><br>ต้องการบันทึกต่อหรือไม่?`, { title: 'คำเตือน', ok: 'บันทึกต่อ' }))) return;
             } else if (!note) return UI.toast(action === 'reject' ? 'กรุณาระบุเหตุผลที่ไม่อนุมัติในช่องหมายเหตุ' : 'กรุณาระบุสิ่งที่ต้องการให้แก้ไขในช่องหมายเหตุ', 'error');
-            return UI.busy(dec, () => S.decide(r.id, { action, note, assignments, category, categoryOther })).then(() => { UI.toast(action === 'approve' ? (canDecide ? 'อนุมัติและมอบหมายรถแล้ว' : 'บันทึกการเปลี่ยนแปลงแล้ว') : action === 'reject' ? 'บันทึกไม่อนุมัติแล้ว' : 'ส่งกลับให้ผู้ขอแก้ไขแล้ว'); App.render(); }).catch(() => {});
+            const wm = root.querySelector('[name=waitMode]:checked'), waitMode = wm ? wm.value : undefined;
+            return UI.busy(dec, () => S.decide(r.id, { action, note, assignments, category, categoryOther, waitMode })).then(() => { UI.toast(action === 'approve' ? (canDecide ? 'อนุมัติและมอบหมายรถแล้ว' : 'บันทึกการเปลี่ยนแปลงแล้ว') : action === 'reject' ? 'บันทึกไม่อนุมัติแล้ว' : 'ส่งกลับให้ผู้ขอแก้ไขแล้ว'); App.render(); }).catch(() => {});
           }
           // แอดมินบันทึกแทนคนขับ: ต้องระบุเหตุผล (บันทึกในประวัติ) · นอกเวลาที่กำหนดต้องยืนยันเพิ่ม
           const go = e.target.closest('[data-go]');

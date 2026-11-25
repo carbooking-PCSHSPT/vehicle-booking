@@ -19,7 +19,7 @@
 }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { font-size: 106.25%; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { font-size: 106.25%; scrollbar-gutter: stable; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--cream); line-height: 1.65; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 body.modal-open { overflow: hidden; }
 h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.3; margin: 0; color: var(--ink); }
@@ -2429,3 +2429,8 @@ html.fs-2 { font-size: 131.25%; }
 .vp-tbl td small { display: block; color: var(--muted); font-size: .78rem; line-height: 1.45; }
 .vp-tbl tr.vp-miss td { background: #fff7ed; }
 .vp-tbl select { min-width: 170px; }
+/* รอที่นั่น / ส่งแล้วกลับ (หมายเหตุถึงคนขับ) */
+.wait-pick { margin-bottom: 12px; }
+.job-info .wait-call { background: #fff7ea; } .job-info .wait-stay { background: #eef4ff; }
+.wait-tag { display: inline-block; width: max-content; margin-top: 2px; padding: 1px 8px; border-radius: 99px; font-size: .74rem; font-weight: 600; }
+.wait-tag.call { background: #fdf0d8; color: #9a5800; } .wait-tag.stay { background: #e8eefc; color: #26307a; }

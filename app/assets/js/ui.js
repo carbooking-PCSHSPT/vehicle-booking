@@ -69,12 +69,13 @@ const UI = (() => {
           ${actions.length ? `<footer class="modal-foot">${actions.map((a, i) => `<button class="btn ${a.kind || 'btn-ghost'}" data-act="${i}" type="button">${a.icon ? icon(a.icon) : ''}${esc(a.label)}</button>`).join('')}</footer>` : ''}
         </div>`;
       document.body.appendChild(el);
+      if (!modalStack && !(window.CSS && CSS.supports && CSS.supports('scrollbar-gutter', 'stable'))) { const sw = window.innerWidth - document.documentElement.clientWidth; if (sw > 0) document.body.style.paddingRight = sw + 'px'; }
       document.body.classList.add('modal-open');
       modalStack++;
       requestAnimationFrame(() => el.classList.add('show'));
       const close = (v) => {
         el.classList.remove('show');
-        setTimeout(() => { el.remove(); modalStack--; if (!modalStack) { document.body.classList.remove('modal-open'); document.dispatchEvent(new Event('ui:modal-closed')); } }, 250);
+        setTimeout(() => { el.remove(); modalStack--; if (!modalStack) { document.body.classList.remove('modal-open'); document.body.style.paddingRight = ''; document.dispatchEvent(new Event('ui:modal-closed')); } }, 250);
         document.removeEventListener('keydown', onKey);
         resolve(v);
       };

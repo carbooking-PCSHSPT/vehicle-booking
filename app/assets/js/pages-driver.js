@@ -455,6 +455,7 @@
           <div class="full"><small>ผู้ขอใช้รถ</small>${esc(r.requester.name)} · <a class="link" href="tel:${esc(r.contactPhone || r.requester.phone)}">${esc(r.contactPhone || r.requester.phone || '')}</a></div>
           ${(r.destinations || []).length ? `<div class="full"><small>ปลายทาง <span class="muted">· กดชื่อสถานที่เพื่อเปิด Google Maps</span></small>${r.destinations.map((d, k) => `<a class="gm-dest" href="${C.gmapPlace(d)}" target="_blank" rel="noopener">${icon('pin')}<span><b>${r.destinations.length > 1 ? `${k + 1}. ` : ''}${esc(d.name)}</b>${d.address || d.province ? `<small>${esc(d.address || d.province)}</small>` : ''}<small class="gm-ll">${C.hasLL(d) ? `ตามพิกัดที่ครูปัก ${(+d.lat).toFixed(5)}, ${(+d.lng).toFixed(5)}` : 'ไม่มีพิกัด — ค้นจากชื่อสถานที่'}</small></span>${icon('arrowUR')}</a>`).join('')}${r.totalKm ? `<span class="muted">ระยะทางรวมประมาณ ${fmt.num(r.totalKm, 0)} กม. (ไป + กลับ)</span>` : ''}
             <a class="btn btn-ghost btn-sm gm-nav" href="${C.gmapRoute(r.destinations)}" target="_blank" rel="noopener">${icon('navigation')} นำทางด้วย Google Maps${r.destinations.length > 1 ? ` (ทุกจุด ${r.destinations.length} แห่ง)` : ''}</a></div>` : ''}
+          ${r.waitMode ? `<div class="full wait-${r.waitMode}"><small>ระหว่างทำธุระ</small><b>${esc(S.WAIT_MODES[r.waitMode])}</b>${r.waitMode === 'call' ? ` · ผู้ขอจะโทรเรียก <a class="link" href="tel:${esc(r.contactPhone || r.requester.phone)}">${esc(r.contactPhone || r.requester.phone || '')}</a>` : ''}</div>` : ''}
           ${a.note ? `<div class="full" style="background:var(--gold-50)"><small>หมายเหตุจากแอดมิน</small>${esc(a.note)}</div>` : ''}
           ${S.tripTag(r) ? `<div class="full"><small>ลักษณะการเดินทาง</small>${S.tripTag(r).text}${S.tripType(r) === 'daily' ? ` · ออก ${fmt.time(r.startAt)} กลับ ${fmt.time(r.endAt)} น. ทุกวัน` : ''}${r.lodging ? ' · ที่พัก ' + esc(r.lodging) : ''}</div>` : ''}
           ${others.length ? `<div class="full"><small>รถคันอื่นในทริปเดียวกัน</small>${others.map(o => `${esc(C.vName(o.vehicleId))} · ${esc(C.dName(o.driverId))}`).join('<br>')}</div>` : ''}
@@ -561,7 +562,7 @@
     const kind = t === 'overnight' ? 'ค้างคืน' : t === 'daily' ? 'ไป-กลับทุกวัน' : t === 'oneway' ? (r.onewayDir === 'pick' ? 'ไปรับ' : r.onewayDir === 'drop' ? 'ไปส่ง' : 'ไปส่ง/ไปรับ') : '';
     return `<a class="dh-row ${tone(j)}" style="--c:${TONE_C[tone(j)]}" href="${jobHref(j)}">
       <span class="dh-t num">${time}</span>
-      <span class="dh-m"><b>${esc(S.destName(r))}</b><small>${multi ? `${nDays(r)} วัน · ${fmt.dayMonth(s)} – ${fmt.dayMonth(e)}` : 'ไป-กลับวันเดียว'}${kind && t !== 'day' ? ` · ${kind}` : ''}</small><small>${icon(kindIcon((S.vehicle(a.vehicleId) || {}).kind))} ${esc(C.vName(a.vehicleId))}</small></span>
+      <span class="dh-m"><b>${esc(S.destName(r))}</b><small>${multi ? `${nDays(r)} วัน · ${fmt.dayMonth(s)} – ${fmt.dayMonth(e)}` : 'ไป-กลับวันเดียว'}${kind && t !== 'day' ? ` · ${kind}` : ''}</small><small>${icon(kindIcon((S.vehicle(a.vehicleId) || {}).kind))} ${esc(C.vName(a.vehicleId))}</small>${r.waitMode ? `<small class="wait-tag ${r.waitMode}">${esc(S.WAIT_MODES[r.waitMode])}</small>` : ''}</span>
       <span class="dh-s"><span class="pill tone-${tone(j) === 'live' ? 'live pulse' : tone(j)}">${S.ASSIGN[a.status]}</span>${icon('chevR')}</span></a>`;
   }
   function overview(jobs, { mode, ref, link }) {
@@ -581,7 +582,7 @@
       const startSoon = !onTrip && UI.sameDay(r.startAt, now);
       return `<div class="dh-next ${onTrip ? 'live' : ''}">
         <a class="dh-next-main" href="${jobHref(next)}"><small>${onTrip ? '● กำลังเดินทางอยู่' : 'งานถัดไป · ' + (relDay(r.startAt) || dShort(r.startAt))}</small><h3>${esc(S.destName(r))}</h3>
-          <div class="dh-chips"><span>${icon('clock')} ${fmt.time(r.startAt).replace(' น.', '')} – ${multi ? dShort(r.endAt) + ' ' : ''}${fmt.time(r.endAt)}</span>${multi ? `<span>${icon('calendar')} ${nDays(r)} วัน</span>` : ''}<span>${icon('van')} ${esc(C.vName(next.a.vehicleId))}</span></div></a>
+          <div class="dh-chips"><span>${icon('clock')} ${fmt.time(r.startAt).replace(' น.', '')} – ${multi ? dShort(r.endAt) + ' ' : ''}${fmt.time(r.endAt)}</span>${multi ? `<span>${icon('calendar')} ${nDays(r)} วัน</span>` : ''}<span>${icon('van')} ${esc(C.vName(next.a.vehicleId))}</span>${r.waitMode ? `<span>${icon('clock')} ${esc(S.WAIT_MODES[r.waitMode])}</span>` : ''}</div></a>
         ${onTrip ? `<button class="btn btn-ok" data-go="returned" data-r="${r.id}" data-i="${next.i}">${icon('home')} กลับถึงโรงเรียนแล้ว</button>` : startSoon ? departBtn(r, next.i, 'btn btn-gold') : ''}
         ${(onTrip || startSoon) && C.gmapRoute(r.destinations) ? `<a class="btn btn-ghost dh-nav" href="${C.gmapRoute(r.destinations)}" target="_blank" rel="noopener">${icon('navigation')} นำทาง Google Maps</a>` : ''}
       </div>`; })() : '';

@@ -1163,7 +1163,7 @@ const Store = (() => {
       });
     },
     // แอดมิน: อนุมัติ (มอบหมายรถหลายคัน) / ไม่อนุมัติ / ส่งกลับให้แก้ไข
-    async decide(id, { action, note, assignments, category, categoryOther }) {
+    async decide(id, { action, note, assignments, category, categoryOther, waitMode }) {
       needAdmin();
       if (!request(id)) throw new Error('ไม่พบคำขอ');
       note = String(note || '').trim();
@@ -1178,6 +1178,7 @@ const Store = (() => {
           });
           const was = r.status;
           r.status = 'approved';
+          if (waitMode !== undefined) r.waitMode = ['stay', 'call'].includes(waitMode) ? waitMode : '';
           r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note };
           r.history.push(H(['approved', 'ontrip'].includes(was) ? 'reassign' : 'approve', note));
         } else if (action === 'reject' || action === 'revise') {
@@ -1260,6 +1261,9 @@ const Store = (() => {
     },
     hospitals: () => (db.settings.hospitals && db.settings.hospitals.length ? db.settings.hospitals : HOSPITALS),
     selfTrip, noMemo,
+    // หมวดที่บอกเวลาเสร็จไม่แน่ชัด → แอดมินบอกคนขับว่า "รอที่นั่น" หรือ "ส่งแล้วกลับ รอโทรเรียกไปรับ" (หมายเหตุถึงคนขับเท่านั้น)
+    WAIT_CATS: ['finance', 'goods', 'medical', 'guest', 'docs'],
+    WAIT_MODES: { stay: 'คนขับรอที่นั่น', call: 'ส่งแล้วกลับ · รอโทรเรียกไปรับ' },
     // ═══ ออกซื้อ/รับของ (ฝ่ายบริการสั่งซื้อ): คนขับกดออกเองเหมือนงานฉุกเฉิน · ไม่ต้องให้ใครลงชื่อ · ใช้ได้เฉพาะรถที่กำหนด ═══
     supplyVehicles() {
       const ids = db.settings.supplyVehicles || [];
