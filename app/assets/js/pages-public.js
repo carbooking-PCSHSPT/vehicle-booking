@@ -311,7 +311,8 @@
         </div></div>
       <div class="form-section"><h3><span class="n">2</span>สถานที่ปลายทาง</h3>
         <div class="dest-list" id="dests"></div>
-        <button type="button" class="btn btn-ghost" id="addDest" style="margin-top:12px">${icon('plus')} เพิ่มสถานที่${Maps.enabled ? ' (ค้นหา/ปักหมุด)' : ''}</button>
+        <button type="button" class="btn btn-ghost" id="addDest" style="margin-top:12px">${icon('plus')} <span id="addDestT">เพิ่มสถานที่</span>${Maps.enabled ? ' (ค้นหา/ปักหมุด)' : ''}</button>
+        <p class="hint" id="destHint" style="margin-top:6px">ไปหลายที่ในครั้งเดียว: กด <b>เพิ่มจุดแวะถัดไป</b> ได้เรื่อย ๆ · เรียงตามลำดับที่จะไป (กดลูกศรเพื่อสลับ) · ระบบคิดระยะทางรวม โรงเรียน → จุดที่ 1 → 2 → … → โรงเรียน</p>
         <p class="hint" id="kmInfo" style="margin-top:10px"></p></div>
       <div class="form-section"><h3><span class="n">3</span>วันและเวลา</h3>
         <div class="field"><label>ลักษณะการเดินทาง <b class="req">*</b></label>
@@ -374,7 +375,8 @@
     const getFiles = C.bindFilePicker(root, 'att', (r && r.attachments) || [], { pdf: true });
     const form = root.querySelector('form') || root;
     const drawDests = async () => {
-      $('#dests', root).innerHTML = dests.map((d, i) => `<div class="dest"><span class="n">${i + 1}</span><div style="min-width:0"><b>${esc(d.name)}</b><small>${esc(d.address || d.province || '')}${d.km ? ` · ${d.km} กม. จากโรงเรียน` : ''}${d.mins ? ` · ~${d.mins} นาที` : ''}</small></div><div class="row" style="gap:4px"><button type="button" class="icon-btn sm" data-ed="${i}" aria-label="แก้ไข">${icon('edit')}</button><button type="button" class="icon-btn sm" data-del="${i}" aria-label="ลบ">${icon('trash')}</button></div></div>`).join('') || `<div class="empty" style="padding:22px">${icon('pin')}<p>ยังไม่ได้เลือกสถานที่ปลายทาง</p></div>`;
+      const at = $('#addDestT', root); if (at) at.textContent = dests.length ? 'เพิ่มจุดแวะถัดไป' : 'เพิ่มสถานที่';
+      $('#dests', root).innerHTML = dests.map((d, i) => `<div class="dest"><span class="n">${i + 1}</span><div style="min-width:0"><b>${esc(d.name)}</b><small>${esc(d.address || d.province || '')}${d.km ? ` · ${d.km} กม. จากโรงเรียน` : ''}${d.mins ? ` · ~${d.mins} นาที` : ''}</small></div><div class="row" style="gap:4px">${i ? `<button type="button" class="icon-btn sm" data-up="${i}" aria-label="เลื่อนขึ้น" title="เลื่อนขึ้น"><span style="display:inline-block;transform:rotate(180deg)">${icon('chev')}</span></button>` : ''}<button type="button" class="icon-btn sm" data-ed="${i}" aria-label="แก้ไข">${icon('edit')}</button><button type="button" class="icon-btn sm" data-del="${i}" aria-label="ลบ">${icon('trash')}</button></div></div>`).join('') || `<div class="empty" style="padding:22px">${icon('pin')}<p>ยังไม่ได้เลือกสถานที่ปลายทาง</p></div>`;
       if (dests.length) { $('#kmInfo', root).textContent = 'กำลังคำนวณระยะทางรวม…'; total = await Maps.tripTotal(dests); $('#kmInfo', root).innerHTML = `${icon('route')} ระยะทางรวมไป-กลับ ${total.estimated ? 'ประมาณ ' : ''}<b>${fmt.num(total.km, 1)} กม.</b>${total.mins ? ` · เวลาเดินทางเที่ยวเดียว ~${fmt.dur(total.mins * 6e4)}` : ''}`; }
       else $('#kmInfo', root).textContent = '';
     };
@@ -466,6 +468,7 @@
       if (e.target.closest('#addDest')) { const p = await Maps.pick(); if (p) { dests.push(p); drawDests(); } }
       const ed = e.target.closest('[data-ed]'); if (ed) { const p = await Maps.pick(dests[+ed.dataset.ed]); if (p) { dests[+ed.dataset.ed] = p; drawDests(); } }
       const del = e.target.closest('[data-del]'); if (del) { dests.splice(+del.dataset.del, 1); drawDests(); }
+      const up = e.target.closest('[data-up]'); if (up) { const i = +up.dataset.up; [dests[i - 1], dests[i]] = [dests[i], dests[i - 1]]; drawDests(); }
     });
     form.addEventListener('input', e => { if (/teachers|students|others/.test(e.target.name)) drawPax(); });
     drawDests(); drawDays(); drawPax();

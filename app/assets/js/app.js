@@ -466,7 +466,7 @@ const C = (() => {
       depName: m.depName || ud.name || byPos(/รองผู้อำนวยการ/), depPos: m.depPos || 'รองผู้อำนวยการฝ่ายบริหารงานทั่วไป'
     };
   }
-  const canMemo = r => !r.medical && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);   // งานฉุกเฉินนำส่งผู้ป่วยไม่มีบันทึกข้อความ
+  const canMemo = r => !Store.noMemo(r) && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status);   // งานฉุกเฉินนำส่งผู้ป่วยไม่มีบันทึกข้อความ
   const MEMO_PAGE = { margin: '12mm 20mm 10mm 30mm', pageNo: false, fitWidth: '160mm', fitPage: 272 };   // ขอบตามหนังสือราชการ: ซ้าย 3 ซม. ขวา 2 ซม.
   // โหลดลายเซ็นที่ต้องใช้ล่วงหน้า (ผู้ขอที่ส่งคำขอเอง + ผู้ลงนามอิเล็กทรอนิกส์) — อ่านไม่ได้ (ไม่มีสิทธิ์) = แสดงเป็นข้อความแทน
   const sigEmails = list => list.flatMap(r => [r.createdBy === r.requester.email ? r.requester.email : '', ((r.esign || {}).head || {}).email, ((r.esign || {}).deputy || {}).email]).filter(Boolean);
@@ -707,7 +707,7 @@ const App = (() => {
   function navHTML(path) {
     const me = Store.me, inn = Store.authState === 'in';
     const act = p => (p === '/' ? path === '/' : path.startsWith(p)) ? 'active' : '';
-    const back = Store.isBack(me), drv = Store.isDriver(me), onlyDriver = drv && !Store.has(me, 'teacher') && !back;
+    const back = Store.isBack(me), drv = Store.isDriver(me), onlyDriver = Store.isOnlyDriver(me);
     // แสดงเฉพาะรายการใหม่ + งานที่ยังต้องทำ (อ่านแล้ว = หายไป)
     const notifs = inn ? Store.notifications().filter(n => n.unread || n.task) : [];
     const unread = notifs.filter(n => n.unread).length;
@@ -715,8 +715,9 @@ const App = (() => {
     return `
     <header class="nav ${path === '/' ? '' : 'solid'}" id="nav">
       <div class="nav-inner">
-        <a class="brand" href="#/" aria-label="หน้าแรก">${C.atom()}<span><strong>ระบบยานพาหนะ</strong><small>PCSHS PATHUM THANI</small></span></a>
-        <nav class="menu" id="menu" aria-label="เมนูหลัก">
+        <a class="brand" href="${inn && onlyDriver ? '#/driver' : '#/'}" aria-label="หน้าแรก">${C.atom()}<span><strong>ระบบยานพาหนะ</strong><small>PCSHS PATHUM THANI</small></span></a>
+        ${inn && onlyDriver ? `<nav class="menu drv-only" id="menu" aria-label="เมนูหลัก"><a class="menu-link active" href="#/driver">งานขับรถ</a></nav>` : `<nav class="menu" id="menu" aria-label="เมนูหลัก">`}
+        ${inn && onlyDriver ? '' : `
           <a class="menu-link ${act('/') }" href="#/">หน้าแรก</a>
           ${onlyDriver ? '' : `<a class="menu-link ${act('/request')}" href="#/request">ขอใช้รถ</a>`}
           <div class="dd" data-open="false">
@@ -731,7 +732,7 @@ const App = (() => {
           ${drv ? `<a class="menu-link ${act('/driver')}" href="#/driver">งานขับรถ</a>` : ''}
           <a class="menu-link ${act('/contact')}" href="#/contact">ติดต่อเรา</a>
           ${back ? `<a class="menu-link back ${act('/admin')}" href="#/admin">${icon('shield')} ระบบหลังบ้าน${pendingAdmin ? ` <span class="pill tone-bad" style="padding:0 8px">${pendingAdmin}</span>` : ''}</a>` : ''}
-        </nav>
+        </nav>`}
         <div class="nav-actions">${inn ? `
           <div class="dd" data-open="false">
             <button class="icon-btn" data-dd data-bell aria-label="การแจ้งเตือน ${unread} รายการใหม่" aria-expanded="false">${icon('bell')}${unread ? `<span class="bell-count">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
@@ -757,7 +758,7 @@ const App = (() => {
               <button class="dd-item" data-logout><span class="dd-ic">${icon('logout')}</span><span><strong>ออกจากระบบ</strong></span></button>
             </div>
           </div>` : `<a class="btn btn-primary btn-sm" href="#/login">${icon('login')}<span>เข้าสู่ระบบ</span></a>`}</div>
-        <button class="icon-btn nav-toggle" data-menu-toggle aria-label="เปิดเมนู" aria-expanded="false" aria-controls="menu">${icon('menu')}</button>
+        ${inn && onlyDriver ? '' : `<button class="icon-btn nav-toggle" data-menu-toggle aria-label="เปิดเมนู" aria-expanded="false" aria-controls="menu">${icon('menu')}</button>`}
       </div>
     </header>`;
   }
@@ -783,7 +784,19 @@ const App = (() => {
   // โหลดข้อมูลในหน้า: ถนนเส้นประ + รถวิ่งไป-กลับใต้แถบเมนู · หน้าแรกหลังเข้าสู่ระบบมีโครงร่างรายการระหว่างรอข้อมูลชุดแรก
   const skelHTML = () => `<div class="ld-skel" aria-hidden="true"><div class="container"><div class="sk" style="height:18px;width:30%;margin-bottom:6px"></div>${'<div class="sk-card"><span class="sk ph"></span><div class="sk-lines"><span class="sk"></span><span class="sk"></span></div></div>'.repeat(4)}</div></div>`;
   let loadingSince = 0;
+  // แถบสถานะอินเทอร์เน็ต: ออฟไลน์ / มีรายการรอส่ง (บันทึกไว้ในเครื่องแล้ว ส่งเองเมื่อมีเน็ต)
+  function syncNet() {
+    const off = Store.offline(), n = Store.pendingWrites();
+    let bar = document.getElementById('netBar');
+    if (!off && !n) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement('div'); bar.id = 'netBar'; bar.className = 'net-bar no-print'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+    bar.classList.toggle('off', off);
+    bar.innerHTML = off
+      ? `${icon('alert')} <span><b>ไม่มีอินเทอร์เน็ต</b> · กดออกเดินทาง/กลับถึงได้ตามปกติ ระบบเก็บไว้ในเครื่อง${n ? ` (รอส่ง ${n} รายการ)` : ''} แล้วส่งเองเมื่อมีสัญญาณ</span>`
+      : `${icon('refresh')} <span>กำลังส่งข้อมูลที่บันทึกไว้ตอนไม่มีเน็ต (${n} รายการ)…</span>`;
+  }
   function syncLoading() {
+    syncNet();
     const busy = Store.authState === 'in' && (Store.dataLoading() || Store.histLoading());
     document.documentElement.classList.toggle('is-loading', busy);
     let road = document.getElementById('ldRoad');
@@ -809,6 +822,7 @@ const App = (() => {
     if (m.auth === 'back' && !Store.isBack(me)) return go('#/');
     if (m.auth === 'driver' && !Store.isDriver(me) && !Store.isAdmin(me)) return go('#/');
     if (m.page === 'adminHome' && Store.isExec(me) && !Store.isAdmin(me)) return go('#/admin/stats');
+    if (inn && Store.isOnlyDriver(me) && !['driverHome', 'driverJob', 'profile', 'password', 'help', 'login'].includes(m.page)) return go('#/driver');
 
     const page = Pages[m.page];
     if (!page) { app().innerHTML = `<div class="page container">${UI.empty('ไม่พบหน้านี้')}</div>`; return; }

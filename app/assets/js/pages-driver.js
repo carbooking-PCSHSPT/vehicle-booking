@@ -247,6 +247,107 @@
       } }]
     }).then(r => { if (r) UI.toast(admin ? `บันทึกงานฉุกเฉิน ${r.id} แล้ว` : 'บันทึกออกงานฉุกเฉินแล้ว — แจ้งแอดมินแล้ว · กลับถึงแล้วกด "กลับถึง" และให้ผู้ดูแลลงชื่อ', 'ok'); return r; });
   };
+  // ═══ ออกซื้อ/รับของ: เลือกรถ · ร้าน · ฝ่ายที่สั่ง (ไม่บังคับ) → ออกเลย · กลับถึงไม่ต้องให้ใครลงชื่อ ═══
+  Pages._supplyModal = async ({ admin = false, driverId = '' } = {}) => {
+    const myD = S.driverOfUser(S.me);
+    const mem = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+    const onTrip = id => S.db.requests.some(r => (r.assignments || []).some(a => a.vehicleId === id && a.status === 'ontrip'));
+    const vs = S.supplyVehicles().sort((a, b) => (a.kind === 'van' ? 0 : 1) - (b.kind === 'van' ? 0 : 1) || (+a.no || 0) - (+b.no || 0));
+    if (!vs.length) { UI.toast('ยังไม่ได้ตั้งค่ารถที่ใช้ออกซื้อ/รับของ — แจ้งแอดมิน', 'error'); return null; }
+    const forD = driverId || (myD && myD.id);
+    const mine = forD && (S.db.vehicles.find(v => v.driverId === forD) || {}).id;
+    const defV = [mine, mem('vb-sup-v', '')].find(id => id && vs.some(v => v.id === id) && !onTrip(id)) || (vs.find(v => !onTrip(v.id)) || {}).id || '';
+    const shops = S.shops(), lastShop = mem('vb-sup-shop', '');
+    const depts = [...new Set(S.db.requests.filter(r => r.supply && r.supply.dept).map(r => r.supply.dept).concat(S.db.users.map(u => u.dept)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+    const nowL = fmt.local(new Date()), minL = fmt.local(new Date(Date.now() - 24 * 36e5));
+    const drivers = S.db.drivers.filter(d => d.active !== false && !d.standby);
+    return UI.modal({
+      title: `<span class="sp-ttl">${icon('package')} ออกซื้อ / รับของ</span>`, size: 'lg',
+      body: `<form id="spF" class="stack em-form sp-form">
+        <div class="note-box warn-y">${icon('info')}<div>งานประจำของฝ่ายบริการ · <b>ไม่ต้องขอ/รออนุมัติ</b> · กลับถึงแล้วกด "กลับถึง" ได้เลย ไม่ต้องให้ใครเซ็น</div></div>
+        ${admin ? `<div class="field"><label>คนขับ <b class="req">*</b></label><select name="driverId"><option value="">— เลือกคนขับ —</option>${drivers.map(d => `<option value="${d.id}" ${d.id === driverId ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></div>` : ''}
+        <div class="field"><label>รถที่ใช้ <b class="req">*</b></label>
+          <div class="em-veh">${vs.map(v => { const busy = onTrip(v.id); return `<label class="em-v ${busy ? 'is-busy' : ''}"><input type="radio" name="vehicleId" value="${v.id}" ${v.id === defV ? 'checked' : ''} ${busy ? 'disabled' : ''}><span><b>${esc(v.name)}</b><small>${esc(v.plate || '')}</small>${busy ? '<em class="bad">กำลังเดินทาง</em>' : ''}</span></label>`; }).join('')}</div></div>
+        <div class="field"><label>ไปที่ร้าน / สถานที่ <b class="req">*</b></label>
+          <div class="em-hos">${[...shops, '_'].map(h => `<label class="em-h"><input type="radio" name="shopSel" value="${esc(h)}" ${h === lastShop ? '' : ''}><span>${h === '_' ? 'อื่น ๆ (พิมพ์เอง)' : esc(h)}</span></label>`).join('')}</div>
+          <input name="shopOther" class="em-hos-other" placeholder="ชื่อร้าน / สถานที่ *" hidden></div>
+        <div class="grid2">
+          <div class="field"><label>ฝ่ายที่สั่งซื้อ <span class="hint">(ไม่บังคับ)</span></label><input name="dept" list="spDept" autocomplete="off" placeholder="เช่น ฝ่ายบริการ"><datalist id="spDept">${depts.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
+          <div class="field"><label>เลขไมล์ตอนออก</label><input name="odoStart" type="number" inputmode="numeric" min="0" placeholder="ไม่บังคับ"></div>
+          <div class="field"><label>เวลาออก</label>${admin ? `<input name="departAt" type="datetime-local" value="${nowL}" max="${nowL}">` : `<label class="check em-late"><input type="checkbox" name="late"> ลืมกดตอนออก (บันทึกย้อนหลัง ไม่เกิน 24 ชม.)</label><input name="departAt" type="datetime-local" value="${nowL}" min="${minL}" max="${nowL}" hidden>`}</div>
+          <div class="field"><label>หมายเหตุ</label><input name="note" placeholder="เช่น รับพัสดุ / ซื้ออุปกรณ์ทำความสะอาด"></div>
+        </div>
+      </form>`,
+      onOpen(el) {
+        const f = el.querySelector('#spF');
+        const odoOf = () => { const v = (f.querySelector('[name=vehicleId]:checked') || {}).value; const o = v ? lastOdo(v) : null; if (o != null) f.odoStart.placeholder = `ล่าสุด ${fmt.num(o)}`; };
+        f.addEventListener('change', e => {
+          if (e.target.name === 'vehicleId') odoOf();
+          if (e.target.name === 'shopSel') { const o = e.target.value === '_'; f.shopOther.hidden = !o; if (o) f.shopOther.focus(); }
+          if (e.target.name === 'late') f.departAt.hidden = !e.target.checked;
+        });
+        odoOf();
+      },
+      actions: [{ label: 'ยกเลิก', value: null }, { label: admin ? 'บันทึก' : 'ออกเดินทาง', kind: 'btn-gold', icon: 'navigation', onClick: async el => {
+        const f = el.querySelector('#spF'), g = n => (f.querySelector(`[name=${n}]:checked`) || f.querySelector(`[name=${n}]:not([type=radio])`) || {}).value || '';
+        const ss = g('shopSel'), shop = ss === '_' ? f.shopOther.value.trim() : ss;
+        const departAt = admin || (f.late && f.late.checked) ? f.departAt.value : '';
+        const r = await S.createSupply({ vehicleId: g('vehicleId'), shop, dept: f.dept.value, odoStart: f.odoStart.value, departAt, note: f.note.value, ...(admin ? { driverId: f.driverId.value } : {}) });
+        try { localStorage.setItem('vb-sup-v', r.assignments[0].vehicleId); localStorage.setItem('vb-sup-shop', shop); } catch (e) { /* ไม่จำก็ได้ */ }
+        return r;
+      } }]
+    }).then(r => { if (r) UI.toast(admin ? `บันทึกงานซื้อ/รับของ ${r.id} แล้ว` : 'บันทึกออกซื้อ/รับของแล้ว — กลับถึงแล้วกด "กลับถึงโรงเรียนแล้ว"', 'ok'); return r; });
+  };
+
+  // ═══ รถขนขยะ: ปุ่มใหญ่ปุ่มเดียว "ออกไปทิ้งขยะ" ↔ "กลับถึงโรงเรียน" · วันละหลายรอบ · ไม่คิดค่าล่วงเวลา ═══
+  const gbRuns = vid => S.db.requests.filter(r => r.garbage && (r.assignments || []).some(a => a.vehicleId === vid)).sort((a, b) => b.startAt.localeCompare(a.startAt));
+  function garbagePanel(d, adminView) {
+    const v = S.garbageVehicle();
+    if (!v || !(v.driverId === d.id || adminView)) return '';
+    const runs = gbRuns(v.id), open = runs.find(r => r.assignments[0].status === 'ontrip');
+    const today = runs.filter(r => UI.sameDay(r.startAt, new Date()));
+    const mins = open ? Math.round((Date.now() - new Date(open.assignments[0].departedAt)) / 6e4) : 0;
+    const last = runs.find(r => r.assignments[0].status === 'returned');
+    return `<section class="gb-card ${open ? 'live' : ''}">
+      <div class="gb-head">${icon('truck')}<div><b>${esc(v.name)}</b><small>${esc(v.plate || '')} · ไป ${esc(S.garbagePlace())}</small></div><span class="gb-n">วันนี้ <b>${today.length}</b> รอบ</span></div>
+      ${open ? `<p class="gb-now">● ออกไปตั้งแต่ ${fmt.time(open.assignments[0].departedAt)} (${mins < 60 ? mins + ' นาที' : Math.floor(mins / 60) + ' ชม. ' + (mins % 60) + ' นาที'})</p>
+        <button type="button" class="gb-btn back" data-gb="back" data-r="${open.id}">${icon('home')}<span>กลับถึงโรงเรียนแล้ว</span></button>`
+        : `<button type="button" class="gb-btn out" data-gb="out" ${adminView ? `data-drv="${d.id}"` : ''}>${icon('navigation')}<span>ออกไปทิ้งขยะ</span></button>`}
+      ${today.length ? `<ol class="gb-list">${today.slice().reverse().map((r, k) => { const a = r.assignments[0]; return `<li><b>รอบ ${k + 1}</b> ${fmt.time(a.departedAt)} – ${a.returnedAt ? fmt.time(a.returnedAt) : 'ยังไม่กลับ'}</li>`; }).join('')}</ol>` : ''}
+      ${last || open ? `<button type="button" class="btn btn-ghost gb-fuel" data-fuel data-r="${(open || last).id}" data-v="${v.id}">${icon('fuel')} บันทึกค่าน้ำมันรถขยะ</button>` : ''}
+    </section>`;
+  }
+  async function garbageAction(kind, el) {
+    const back = kind === 'back', r = back ? S.request(el.dataset.r) : null;
+    const v = S.garbageVehicle() || {};
+    const def = back ? '' : (lastOdo(v.id) ?? '');
+    const res = await UI.modal({
+      title: back ? `${icon('home')} กลับถึงโรงเรียน` : `${icon('truck')} ออกไปทิ้งขยะ`,
+      body: `<div class="stack gb-modal"><p class="gb-q">${back ? 'ยืนยัน <b>กลับถึงโรงเรียน</b> แล้ว?' : `ยืนยัน <b>ออกไปทิ้งขยะ</b> ด้วย${esc(v.name || 'รถขนขยะ')}?`}</p>
+        <div class="field"><label>เลขไมล์ <span class="hint">(ไม่บังคับ)</span></label><input id="gbOdo" type="number" inputmode="numeric" min="0" value="${def}"></div>
+        <details class="gb-more"><summary>ลืมกด / ไม่มีเน็ต — แก้เวลา</summary>
+          <div class="field"><label>เวลา${back ? 'กลับถึง' : 'ออก'}จริง</label><input id="gbAt" type="datetime-local" value="${fmt.local(new Date())}" min="${fmt.local(new Date(Date.now() - 24 * 36e5))}" max="${fmt.local(new Date(Date.now() + 5 * 6e4))}"></div>
+          <div class="field"><label>เหตุผล</label><input id="gbLate" list="lateList" placeholder="เช่น ไม่มีอินเทอร์เน็ต / ลืมกด"><datalist id="lateList"><option value="ไม่มีอินเทอร์เน็ต"><option value="ลืมกด"></datalist></div></details></div>`,
+      actions: [{ label: 'ยกเลิก', value: null }, { label: back ? 'กลับถึงแล้ว' : 'ออกเลย', kind: back ? 'btn-ok' : 'btn-gold', icon: 'check', onClick: async m => {
+        const at = m.querySelector('#gbAt').value, late = m.querySelector('#gbLate').value.trim(), odo = m.querySelector('#gbOdo').value;
+        const moved = at && Math.abs(Date.now() - new Date(at).getTime()) > 15 * 6e4;
+        if (moved && !late) { UI.toast('แก้เวลาย้อนหลัง กรุณาใส่เหตุผล', 'error'); return false; }
+        if (back) await S.tripStatus(r.id, 0, 'returned', { odo, at: moved ? at : '', late: moved ? late : '' });
+        else await S.createGarbage({ odoStart: odo, departAt: moved ? at : '', late, ...(el.dataset.drv ? { driverId: el.dataset.drv } : {}) });
+        return true;
+      } }]
+    });
+    if (res) UI.toast((S.offline() ? 'ไม่มีเน็ต — บันทึกไว้ในเครื่องแล้ว · ' : '') + (back ? 'บันทึกกลับถึงแล้ว' : 'บันทึกออกไปทิ้งขยะแล้ว'), 'ok');
+  }
+
+  // ขนาดตัวอักษร (สำหรับคนขับ · จำไว้ในเครื่อง)
+  const FS = ['', 'fs-1', 'fs-2'];
+  const fsGet = () => { try { return +localStorage.getItem('vb-fs') || 0; } catch (e) { return 0; } };
+  const fsApply = () => { const k = fsGet(); FS.forEach(c => c && document.documentElement.classList.toggle(c, c === FS[k])); };
+  fsApply();
+  Pages._fsApply = fsApply;
+  const fsBar = () => `<div class="fs-bar" role="group" aria-label="ขนาดตัวอักษร"><span>ขนาดตัวอักษร</span>${['ก', 'ก+', 'ก++'].map((l, k) => `<button type="button" class="${fsGet() === k ? 'on' : ''}" data-fs="${k}" style="font-size:${1 + k * .18}em">${l}</button>`).join('')}</div>`;
+
   // ตรวจสภาพรถก่อนออกเดินทาง (คนขับต้องติ๊กครบ หรือแจ้งปัญหาที่พบ — แอดมินเห็นในหน้าภาพรวม)
   const CHECKS = ['น้ำมันเพียงพอสำหรับการเดินทาง', 'ลมยางและสภาพยางปกติ', 'ไฟหน้า ไฟเลี้ยว ไฟเบรก ใช้งานได้', 'เบรก พวงมาลัย ไม่มีไฟเตือนบนหน้าปัด', 'น้ำมันเครื่อง น้ำหล่อเย็น ระดับปกติ', 'อุปกรณ์ฉุกเฉินและเอกสารประจำรถครบ', 'ห้องโดยสารสะอาด เข็มขัดนิรภัยใช้งานได้'];
 
@@ -257,8 +358,8 @@
     const admin = S.isAdmin(S.me) && !!override, dep = status === 'ontrip';
     if (dep && !override && !departState(r).ok) return UI.toast(departState(r).late ? departState(r).msg : `ยังไม่ถึงเวลา — ${departState(r).msg} (กดได้ก่อนเวลาออก 3 ชั่วโมง)`, 'error');
     if (!dep && a.status !== 'ontrip' && !override) return UI.toast(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้', 'error');
-    const med = !!r.medical;
-    const early = !dep && !med && earlyReturn(r);
+    const med = !!r.medical, noSign = !!(r.supply || r.garbage);
+    const early = !dep && !S.selfTrip(r) && earlyReturn(r);
     const def = dep ? (a.odoStart ?? lastOdo(a.vehicleId) ?? '') : (a.odoEnd ?? '');
     const res = await UI.modal({
       title: dep ? `${icon('navigation')} ตรวจรถและออกเดินทาง` : `${icon('home')} ยืนยันกลับถึงโรงเรียน`,
@@ -269,16 +370,20 @@
           <div class="field" style="margin-top:8px"><label>พบปัญหา / ข้อสังเกต <span class="hint">(ถ้ามีข้อที่ไม่ผ่าน ต้องระบุ — แจ้งแอดมินอัตโนมัติ)</span></label><input id="chkNote" placeholder="เช่น ไฟเลี้ยวขวาไม่ติด"></div></div>` : ''}
         ${early ? `<div class="note-box warn-y">${icon('alert')}<div><b>กลับก่อนเวลาที่ขอ</b> (กำหนดกลับ ${fmt.when(r.endAt)}) — ระบุเหตุผล เช่น ภารกิจเสร็จเร็ว</div></div>
           <div class="field"><label>เหตุผลที่กลับก่อนเวลา <b class="req">*</b></label><input id="earlyNote" placeholder="เช่น ส่งเอกสารเสร็จเร็วกว่ากำหนด"></div>` : ''}
-        ${!dep ? `<div class="ps-box"><div class="chk-head"><b>${icon('edit')} ${med ? 'ผู้ดูแลที่ไปด้วย (ครู/พยาบาล) ลงชื่อ' : 'ครูผู้ร่วมเดินทางลงชื่อ'}</b><span class="hint">ยืนยันเวลากลับถึง</span></div>
+        ${!dep && !noSign ? `<div class="ps-box"><div class="chk-head"><b>${icon('edit')} ${med ? 'ผู้ดูแลที่ไปด้วย (ครู/พยาบาล) ลงชื่อ' : 'ครูผู้ร่วมเดินทางลงชื่อ'}</b><span class="hint">ยืนยันเวลากลับถึง</span></div>
           <div class="ps-opt" ${med ? 'hidden' : ''}><label><input type="radio" name="psHas" value="1" ${med ? 'checked' : ''}> มีครูไปด้วย</label><label><input type="radio" name="psHas" value="0"> ไม่มีครูไปด้วย</label></div>
           <div id="psWrap" ${med ? '' : 'hidden'}><div class="field"><label>${med ? 'ชื่อผู้ดูแล' : 'ชื่อครูที่ลงชื่อ'} <b class="req">*</b></label><input id="psName" list="psList" value="${esc(med ? ((r.medical.carer || {}).name || '') : r.requester.name)}" autocomplete="off"><datalist id="psList">${[r.requester.name, ...String(r.passengerNames || '').split(/[,\n،]+/)].map(x => x.trim()).filter(x => x && !/^[-–.\s]+$/.test(x)).map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
             <div class="sig-pad"><canvas id="psPad" aria-label="ช่องเซ็นชื่อครู"></canvas><span class="sig-base">ครูลงชื่อบนเส้นนี้</span><span class="sig-x">✕</span></div>
             <div class="row between" style="margin-top:6px"><span class="hint">ส่งมือถือให้ครูเซ็น</span><button type="button" class="btn btn-ghost btn-sm" id="psClear">${icon('trash')} ล้าง</button></div></div></div>` : ''}        <div class="field"><label>เลขไมล์${dep ? 'ตอนออก' : 'ตอนกลับ'} (กม.)</label><input id="odoIn" type="number" inputmode="numeric" min="0" value="${def}" placeholder="ไม่บังคับ — กรอกภายหลังได้"></div>
         ${!dep && a.odoStart != null ? `<p class="hint">เลขไมล์ตอนออก ${fmt.num(a.odoStart)} กม.</p>` : ''}
-        <div class="field"><label>เวลา</label><input id="atIn" type="datetime-local" value="${fmt.local(new Date())}" max="${fmt.local(new Date(Date.now() + 5 * 6e4))}"></div>
+        <div class="field"><label>เวลา${dep ? 'ออก' : 'กลับถึง'} <span class="hint">ลืมกด/ไม่มีเน็ต แก้เป็นเวลาจริงได้ ย้อนหลังไม่เกิน 24 ชม.</span></label><input id="atIn" type="datetime-local" value="${fmt.local(new Date())}" min="${fmt.local(new Date(Date.now() - 24 * 36e5))}" max="${fmt.local(new Date(Date.now() + 5 * 6e4))}"></div>
+        <div class="field" id="lateWrap" hidden><label>เหตุผลที่บันทึกย้อนหลัง <b class="req">*</b></label><input id="lateNote" list="lateList" placeholder="เช่น ไม่มีอินเทอร์เน็ต / ลืมกด"><datalist id="lateList"><option value="ไม่มีอินเทอร์เน็ต"><option value="ลืมกด"><option value="มือถือแบตหมด"></datalist></div>
       </div>`,
       onOpen(el) {
-        if (dep) return;
+        const at = el.querySelector('#atIn'), lw = el.querySelector('#lateWrap');
+        const syncLate = () => { lw.hidden = !(at.value && Date.now() - new Date(at.value).getTime() > 15 * 6e4); };
+        at.addEventListener('input', syncLate); at.addEventListener('change', syncLate);
+        if (dep || noSign) return;
         let pad = null; const wrap = el.querySelector('#psWrap');
         if (med) { pad = UI.signaturePad(el.querySelector('#psPad')); el._ps = pad; }
         el.addEventListener('change', e => { if (e.target.name !== 'psHas') return; wrap.hidden = e.target.value !== '1'; if (!wrap.hidden && !pad) { pad = UI.signaturePad(el.querySelector('#psPad')); el._ps = pad; } });
@@ -294,7 +399,7 @@
         }
         if (early) { note = el.querySelector('#earlyNote').value.trim(); if (!note && !admin) { UI.toast('กรุณาระบุเหตุผลที่กลับก่อนเวลา', 'error'); return false; } }
         let paxSign = null;
-        if (!dep) {
+        if (!dep && !noSign) {
           const has = (el.querySelector('[name=psHas]:checked') || {}).value;
           if (!has && !admin) { UI.toast('กรุณาเลือกว่ามีครูไปด้วยหรือไม่', 'error'); return false; }
           if (has === '1') {
@@ -304,16 +409,18 @@
             paxSign = { has: true, name: nm, img: pad.toPNG(), at: new Date().toISOString() };
           } else if (has === '0') paxSign = { has: false, at: new Date().toISOString() };
         }
-        await S.tripStatus(r.id, idx, status, { odo: el.querySelector('#odoIn').value, at: el.querySelector('#atIn').value, check, note, override, paxSign });
+        const late = el.querySelector('#lateWrap').hidden ? '' : el.querySelector('#lateNote').value.trim();
+        if (!el.querySelector('#lateWrap').hidden && !late && !admin) { UI.toast('กรุณาระบุเหตุผลที่บันทึกย้อนหลัง', 'error'); el.querySelector('#lateNote').focus(); return false; }
+        await S.tripStatus(r.id, idx, status, { odo: el.querySelector('#odoIn').value, at: el.querySelector('#atIn').value, check, note, override, paxSign, late });
         return true;
       } }]
     });
-    if (res) UI.toast(dep ? 'บันทึกออกเดินทางแล้ว เดินทางปลอดภัยนะครับ' : 'บันทึกกลับถึงแล้ว (ปิดงานอัตโนมัติ) — บันทึกค่าใช้จ่ายย้อนหลังได้ภายใน 30 วัน');
+    if (res) UI.toast((S.offline() ? 'ไม่มีเน็ต — บันทึกไว้ในเครื่องแล้ว จะส่งเองเมื่อมีสัญญาณ · ' : '') + (dep ? 'บันทึกออกเดินทางแล้ว เดินทางปลอดภัยนะครับ' : 'บันทึกกลับถึงแล้ว (ปิดงานอัตโนมัติ) — บันทึกค่าใช้จ่ายย้อนหลังได้ภายใน 30 วัน'));
   };
 
   function myJobs(driverId) {
     const out = [];
-    S.db.requests.forEach(r => (r.assignments || []).forEach((a, i) => { if (a.driverId === driverId && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status)) out.push({ r, a, i }); }));
+    S.db.requests.forEach(r => (r.assignments || []).forEach((a, i) => { if (!r.garbage && a.driverId === driverId && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status)) out.push({ r, a, i }); }));
     return out.sort((x, y) => x.r.startAt.localeCompare(y.r.startAt));
   }
   function jobCard(j, { detail = false } = {}) {
@@ -352,6 +459,9 @@
   function bindJobs(root) {
     root.addEventListener('click', async e => {
       const em = e.target.closest('[data-emgo]'); if (em) { const r = await Pages._medicalModal(em.dataset.drv ? { admin: true, driverId: em.dataset.drv } : {}); if (r) App.render(); return; }
+      const sp = e.target.closest('[data-spgo]'); if (sp) { const r = await Pages._supplyModal(sp.dataset.drv ? { admin: true, driverId: sp.dataset.drv } : {}); if (r) App.render(); return; }
+      const gb = e.target.closest('[data-gb]'); if (gb) { await garbageAction(gb.dataset.gb, gb); App.render(); return; }
+      const fz = e.target.closest('[data-fs]'); if (fz) { try { localStorage.setItem('vb-fs', fz.dataset.fs); } catch (er) { /* ข้าม */ } fsApply(); App.render(); return; }
       const g = e.target.closest('[data-go]');
       if (g) { const r = S.request(g.dataset.r); return Pages._tripAction(r, +g.dataset.i, g.dataset.go); }
       const f = e.target.closest('[data-fuel]');
@@ -446,7 +556,7 @@
     const next = live || jobs.find(j => j.a.status === 'assigned' && new Date(j.r.endAt) >= now);
     const late = jobs.filter(j => j.a.status === 'assigned' && new Date(j.r.startAt) < today0);
     // งานที่กลับแล้วใน 30 วัน แต่ยังไม่มีค่าใช้จ่ายของรถคันนี้ → เตือนให้บันทึกย้อนหลัง (ถ้ามี)
-    const noExp = jobs.filter(j => isDone(j) && !(j.r.expenses || []).some(e => e.vehicleId === j.a.vehicleId) && now - new Date(j.a.returnedAt || j.r.endAt) < 30 * 864e5).slice(-5).reverse();
+    const noExp = jobs.filter(j => isDone(j) && !j.r.supply && !(j.r.expenses || []).some(e => e.vehicleId === j.a.vehicleId) && now - new Date(j.a.returnedAt || j.r.endAt) < 30 * 864e5).slice(-5).reverse();
     const left = m => jobs.filter(j => inRange(j, rangeOf(m, now)) && !isDone(j)).length;
     const groups = new Map();
     list.forEach(j => { const k = fmt.localDate(new Date(j.r.startAt) < R[0] ? R[0] : new Date(j.r.startAt)); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(j); });
@@ -498,7 +608,10 @@
         ${adminView ? `<a class="btn btn-ghost btn-sm back-admin" href="#/admin">${icon('arrowL')} กลับระบบหลังบ้าน</a>
           <div class="note-box navy adm-pick" style="margin-bottom:14px">${icon('shield')}<div><span class="nw">มุมมองแอดมิน — เลือกคนขับ</span><div class="adm-pick-row"><select class="input" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><a class="link nw" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div></div>` : ''}
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
-        <button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
+        ${fsBar()}
+        ${garbagePanel(d, adminView)}
+        <div class="go-btns"><button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
+        ${d.standby ? '' : `<button type="button" class="em-go sp-go" data-spgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('package')}<span><b>ออกซื้อ / รับของ</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)}` : 'งานประจำฝ่ายบริการ — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>`}</div>
         ${(() => { const t = Pages._todayDuty && Pages._todayDuty(d.id); return t ? `<div class="note-box navy duty-today">${icon('clock')}<div><b>${t}</b></div></div>` : ''; })()}
         ${tabs}
         ${tab === 'ot' ? Pages._otDriver(d, query, adminView) : tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}

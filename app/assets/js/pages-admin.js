@@ -40,11 +40,12 @@
     return `<div class="admin">
       <aside class="side no-print">
         <button type="button" class="side-toggle" data-side-toggle aria-expanded="false">${icon(cur ? cur.ic : 'grid')}<span><small>เมนูหลังบ้าน</small><b>${cur ? cur.t : 'เลือกเมนู'}</b></span>${pending && admin ? `<span class="cnt">${pending}</span>` : ''}${icon('chev', 'chev')}</button>
-        <div class="side-links">${links}</div>
+        <div class="side-links"><button type="button" class="side-order" data-ordernew>${icon('send')}<span class="sl">${admin ? 'บันทึกคำสั่ง ผอ.' : 'สั่งงานรถ'}</span></button>${links}</div>
       </aside>
       <div class="page-enter" style="min-width:0">${html}</div>
     </div>`;
   };
+  document.addEventListener('click', async e => { const o = e.target.closest('[data-ordernew]'); if (!o) return; const r = await Pages._orderModal({ admin: S.isAdmin(S.me) }); if (r && S.isAdmin(S.me)) location.hash = '#/admin/requests/' + r.id; });
   document.addEventListener('click', e => { const t = e.target.closest('[data-side-toggle]'); if (!t) return; const s = t.closest('.side'); s.classList.toggle('open'); t.setAttribute('aria-expanded', s.classList.contains('open')); });
   const head = (eyebrow, title, sub = '', right = '') => `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="row">${right}</div>` : ''}</div>`;
 
@@ -57,6 +58,7 @@
     const alerts = [];
     rs.filter(r => r.status === 'ontrip').forEach(r => r.assignments.forEach(a => { if (a.status === 'ontrip' && now - new Date(r.endAt) > 30 * 6e4) alerts.push({ red: true, ic: 'clock', t: `${C.vName(a.vehicleId)} เลยเวลากลับแล้ว ${fmt.dur(now - new Date(r.endAt))} (ยังไม่กดกลับถึง)`, h: `#/admin/requests/${r.id}` }); }));
     rs.filter(r => r.status === 'approved' && r.assignments.some(a => a.status === 'assigned') && now - new Date(r.startAt) > 60 * 6e4).forEach(r => alerts.push({ ic: 'navigation', t: `${r.id} ถึงเวลาออกเดินทางแล้วแต่คนขับยังไม่กดออกเดินทาง`, h: `#/admin/requests/${r.id}` }));
+    rs.filter(r => r.order && r.status === 'pending').forEach(r => alerts.push({ red: true, ic: 'send', t: `${r.id} คำสั่งงานจาก ${esc(r.order.byName)} — รอจัดรถ/คนขับ`, h: `#/admin/requests/${r.id}` }));
     rs.filter(r => r.medical && !r.medical.ack).forEach(r => alerts.push({ red: true, ic: 'alert', t: `${r.id} งานฉุกเฉินนำส่งผู้ป่วย (${esc(C.vName((r.assignments[0] || {}).vehicleId))} · ${esc(C.dName((r.assignments[0] || {}).driverId))}) — รอแอดมินรับทราบ`, h: `#/admin/requests/${r.id}` }));
     rs.filter(r => r.status === 'approved' && r.assignments.some(a => !a.driverId)).forEach(r => alerts.push({ ic: 'wheel', t: `${r.id} ยังไม่ได้ระบุคนขับ`, h: `#/admin/requests/${r.id}` }));
     // คนขับแจ้งปัญหาตอนตรวจรถก่อนออกเดินทาง (3 วันล่าสุด)
@@ -166,10 +168,13 @@
 
   // ═════════ รายการคำขอ ═════════
   Pages.adminRequests = ({ query }) => {
-    const f = query.md || query.em ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', df = query.df || '', dt = query.dt || '', cf = query.c || '', sg = query.sg || '', md = query.md || '', em = query.em || '';
+    const kq = query.k || (query.em ? 'em' : '');
+    const f = query.md || kq ? 'all' : (query.f || 'pending'), q = (query.q || '').trim(), m = query.m || '', df = query.df || '', dt = query.dt || '', cf = query.c || '', sg = query.sg || '', md = query.md || '', em = query.em || '';
     // กลับถึงโรงเรียน = ปิดงานอัตโนมัติ (ไม่มีแท็บ "รอปิดงาน" · ข้อมูลเก่าสถานะ returned รวมอยู่ใน "ปิดงานแล้ว")
     const G = { pending: ['pending'], revise: ['revise'], approved: ['approved'], ontrip: ['ontrip'], closed: ['returned', 'closed'], rejected: ['rejected', 'cancelled'], all: null };
-    let list = S.db.requests.filter(r => !G[f] || G[f].includes(r.status));
+    const KIND = { em: r => !!r.medical, sp: r => !!r.supply, gb: r => !!r.garbage, or: r => !!r.order };
+    let list = S.db.requests.filter(r => (!G[f] || G[f].includes(r.status)) && (kq === 'gb' || !r.garbage));
+    if (KIND[kq]) list = list.filter(KIND[kq]);
     if (m) list = list.filter(r => r.startAt.slice(0, 7) === m);
     // ช่วงวันที่เดินทาง (ตั้งแต่ – ถึง) · เลือกวันเดียวก็ได้
     if (df) list = list.filter(r => fmt.localDate(r.endAt) >= df);
@@ -183,18 +188,21 @@
     if (md) list = list.filter(S.needsMemo);
     // งานฉุกเฉินนำส่งผู้ป่วย
     const emN = S.db.requests.filter(r => r.medical).length, emWait = S.db.requests.filter(r => r.medical && !r.medical.ack).length;
-    if (em) list = list.filter(r => r.medical);
     if (q) list = list.filter(r => [r.id, r.purpose, r.requester.name, r.requester.dept, S.destName(r)].join(' ').toLowerCase().includes(q.toLowerCase()));
     list.sort(S.byNewest);   // ทุกแท็บ: ส่งคำขอล่าสุดก่อน
-    const cnt = k => S.db.requests.filter(r => !G[k] || G[k].includes(r.status)).length;
-    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, df, dt, c: cf, sg, md, em, ...o });
+    const cnt = k => S.db.requests.filter(r => !r.garbage && (!G[k] || G[k].includes(r.status))).length;
+    const qs = o => '#/admin/requests?' + new URLSearchParams({ f, q, m, df, dt, c: cf, sg, md, k: kq, ...o });
+    const kN = k => S.db.requests.filter(KIND[k]).length, orWait = S.db.requests.filter(r => r.order && r.status === 'pending').length;
     const printable = list;
     return {
       layout: 'admin',
       html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a><button class="btn btn-danger btn-sm" id="medNew">${icon('alert')} บันทึกงานฉุกเฉิน (นำส่งผู้ป่วย)</button>`)}
-        <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '' })}"><button class="${f === k && !md ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
-          ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', em: '', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}
-          <a class="chip-debt chip-em ${em ? 'on' : ''}" href="${qs({ em: em ? '' : '1', md: '', f: em ? 'pending' : 'all' })}">${icon('alert')} งานฉุกเฉิน <b>${emN}</b>${emWait ? `<span class="em-wait">รอรับทราบ ${emWait}</span>` : ''}</a></div>
+        <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '', k: '' })}"><button class="${f === k && !md && !kq ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
+          ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', k: '', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}
+          <a class="chip-debt chip-em ${kq === 'em' ? 'on' : ''}" href="${qs({ k: kq === 'em' ? '' : 'em', md: '', f: kq === 'em' ? 'pending' : 'all' })}">${icon('alert')} งานฉุกเฉิน <b>${emN}</b>${emWait ? `<span class="em-wait">รอรับทราบ ${emWait}</span>` : ''}</a>
+          <a class="chip-debt chip-or ${kq === 'or' ? 'on' : ''}" href="${qs({ k: kq === 'or' ? '' : 'or', md: '', f: kq === 'or' ? 'pending' : 'all' })}">${icon('send')} คำสั่ง ผอ. <b>${kN('or')}</b>${orWait ? `<span class="em-wait">รอจัดรถ ${orWait}</span>` : ''}</a>
+          <a class="chip-debt chip-sp ${kq === 'sp' ? 'on' : ''}" href="${qs({ k: kq === 'sp' ? '' : 'sp', md: '', f: kq === 'sp' ? 'pending' : 'all' })}">${icon('package')} ซื้อ/รับของ <b>${kN('sp')}</b></a>
+          <a class="chip-debt chip-gb ${kq === 'gb' ? 'on' : ''}" href="${qs({ k: kq === 'gb' ? '' : 'gb', md: '', f: kq === 'gb' ? 'pending' : 'all' })}">${icon('truck')} รถขยะ <b>${kN('gb')}</b></a></div>
         <div class="toolbar"><div class="search-in">${icon('search')}<input class="input" id="q" placeholder="ค้นหา เลขที่ ผู้ขอ ฝ่าย ปลายทาง" value="${esc(q)}"></div><div class="dr-pick" title="ช่วงวันที่เดินทาง"><label>ตั้งแต่<input class="input" type="date" id="df" value="${esc(df)}"></label><span>–</span><label>ถึง<input class="input" type="date" id="dt" value="${esc(dt)}" ${df ? `min="${esc(df)}"` : ''}></label>${df || dt || m ? `<a class="chip-x" href="${qs({ df: '', dt: '', m: '' })}" title="ล้างช่วงวันที่">${icon('x')}</a>` : `<a class="chip-x today" href="${qs({ df: fmt.localDate(new Date()), dt: fmt.localDate(new Date()) })}">วันนี้</a>`}</div><select class="input" id="cf" style="width:auto"><option value="">ทุกหมวดงาน</option>${S.categories(true).map(c => `<option value="${c.id}" ${c.id === cf ? 'selected' : ''}>${esc(c.id === 'other' ? 'อื่น ๆ' : c.name)}</option>`).join('')}<option value="none" ${cf === 'none' ? 'selected' : ''}>ไม่ระบุหมวด</option></select>
           <select class="input" id="sg" style="width:auto" title="บันทึกข้อความฉบับลงนาม"><option value="">ฉบับลงนาม: ทั้งหมด</option><option value="no" ${sg === 'no' ? 'selected' : ''}>ยังไม่มีฉบับลงนาม</option><option value="yes" ${sg === 'yes' ? 'selected' : ''}>เก็บฉบับลงนามแล้ว</option></select>
           <button class="btn btn-primary btn-sm" id="memoBatch" ${printable.length ? '' : 'disabled'}>${icon('printer')} <span>พิมพ์ / PDF</span></button><button class="btn btn-ghost btn-sm" id="xls">${icon('download')} Excel</button></div>
@@ -203,7 +211,7 @@
           <thead><tr><th class="ck">${printable.length ? `<input type="checkbox" id="pickAll" aria-label="เลือกทั้งหมด">` : ''}</th><th>เลขที่</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>ผู้เดินทาง</th><th>รถ / คนขับ</th><th>สถานะ</th></tr></thead>
           <tbody>${list.map(r => `<tr class="click rs-${r.status}" data-href="#/admin/requests/${r.id}">
             <td class="ck"><input type="checkbox" data-pick="${r.id}" aria-label="เลือก ${r.id}"></td>
-            <td><b style="white-space:nowrap">${r.id}</b>${r.medical ? `<small style="color:var(--bad)">ฉุกเฉิน · นำส่งผู้ป่วย${r.medical.ack ? '' : ' · รอรับทราบ'}</small>` : r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}${C.canMemo(r) ? (hasSig(r) ? '<small style="color:var(--ok)">✓ มีฉบับลงนาม</small>' : '<small style="color:var(--gold-700)">ยังไม่มีฉบับลงนาม</small>') : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
+            <td><b style="white-space:nowrap">${r.id}</b>${r.medical ? `<small style="color:var(--bad)">ฉุกเฉิน · นำส่งผู้ป่วย${r.medical.ack ? '' : ' · รอรับทราบ'}</small>` : r.emergency ? '<small style="color:var(--bad)">เร่งด่วน</small>' : ''}${r.order ? `<small><span class="kind-tag or">คำสั่ง ผอ.</span></small>` : r.supply ? '<small><span class="kind-tag sp">ซื้อ/รับของ</span></small>' : r.garbage ? '<small><span class="kind-tag gb">รถขยะ</span></small>' : ''}${S.needsMemo(r) ? '<small style="color:var(--bad)">ค้างบันทึกข้อความ</small>' : ''}${C.canMemo(r) ? (hasSig(r) ? '<small style="color:var(--ok)">✓ มีฉบับลงนาม</small>' : '<small style="color:var(--gold-700)">ยังไม่มีฉบับลงนาม</small>') : ''}<small>ส่ง ${fmt.date(r.createdAt)}</small></td>
             <td><b>${fmt.date(r.startAt)}</b><small>${fmt.time(r.startAt)} – ${fmt.when(r.endAt)}</small>${S.tripTag(r) ? `<small>${S.tripTag(r).text}</small>` : ''}</td>
             <td><b>${esc(S.destName(r))}</b><small>${esc(r.purpose)}</small><small style="color:var(--gold-700)">${esc(S.catName(r))}</small></td>
             <td>${esc(r.requester.name)}<small>${esc(r.requester.dept || '')}</small></td>
@@ -348,6 +356,9 @@
           ${Pages._changeDiff(r.changeReq)}<p style="margin-top:8px"><b>เหตุผล:</b> ${esc(r.changeReq.reason)}</p>
           ${r.changeReq.data.startAt || r.changeReq.data.endAt ? `<p class="hint" style="margin-top:6px">${icon('alert')} เปลี่ยนวันเวลา — ตรวจว่ารถ/คนขับที่จัดไว้ยังว่างในช่วงใหม่ ถ้าไม่ว่าง ให้อนุมัติแล้วปรับรถด้านล่าง</p>` : ''}
           <div class="row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-chg="1">${icon('check')} อนุมัติการแก้ไข</button><button class="btn btn-ghost btn-sm" data-chg="0">${icon('xCircle')} ไม่อนุมัติ</button></div></div>` : ''}
+        ${r.order ? `<div class="note-box navy" style="margin-bottom:18px">${icon('send')}<div><b>คำสั่งงานรถจาก ${esc(r.order.byName)}</b> · ${fmt.dt(r.order.at)}${r.order.enteredByName ? ` · บันทึกแทนโดย ${esc(r.order.enteredByName)}` : ''}<br>ไม่ต้องมีบันทึกข้อความ · ${r.status === 'pending' ? '<b>เลือกรถ/คนขับ แล้วกดอนุมัติได้เลย</b>' : 'จัดรถแล้ว'}</div></div>` : ''}
+        ${r.supply ? `<div class="note-box warn-y" style="margin-bottom:18px">${icon('package')}<div><b>ออกซื้อ/รับของ</b> · ${esc(r.supply.shop)}${r.supply.dept ? ` · สั่งโดย ${esc(r.supply.dept)}` : ''}${r.supply.backdated ? ' · บันทึกย้อนหลัง' : ''}${r.supply.adminEntry ? ' · แอดมินบันทึกแทน' : ''}</div></div>` : ''}
+        ${r.garbage ? `<div class="note-box green" style="margin-bottom:18px">${icon('truck')}<div><b>รถขนขยะ</b> · ไป ${esc(S.destName(r))} · งานประจำวัน ไม่คิดค่าล่วงเวลา</div></div>` : ''}
         ${r.medical ? `<div class="card med-card"><div class="card-head"><h3>${icon('alert')} งานฉุกเฉิน · นำส่งผู้ป่วย</h3>${r.medical.ack ? `<span class="pill tone-free">${icon('check')} รับทราบแล้ว</span>` : `<button class="btn btn-danger btn-sm" id="medAck">${icon('check')} รับทราบ / ตรวจแล้ว</button>`}</div>
           <div class="med-grid"><div><small>สถานพยาบาล</small><b>${esc(S.destName(r))}</b></div><div><small>ผู้ป่วย</small><b>${r.medical.patients} คน</b></div><div><small>ผู้ดูแลที่ไปด้วย</small><b>${esc((r.medical.carer || {}).name || '-')}</b></div><div><small>บันทึกโดย</small><b>${esc(r.medical.byName || r.medical.by)}</b></div></div>
           ${r.medical.backdated ? `<p class="hint" style="margin-top:8px">${icon('clock')} บันทึกย้อนหลัง (คนขับลืมกดตอนออก)</p>` : ''}${(r.medical.clash || []).length ? `<div class="note-box warn-y" style="margin-top:10px">${icon('alert')}<div>อาจกระทบงานที่จัดไว้: ${r.medical.clash.map(id => `<a class="link" href="#/admin/requests/${id}">${id}</a>`).join(', ')} — ตรวจรถ/คนขับ</div></div>` : ''}
@@ -1467,6 +1478,10 @@
             <div class="field"><label>งาน</label><input name="unit" value="${esc(s.unit)}"></div>
             <div class="field"><label>ต้องขอใช้รถล่วงหน้าอย่างน้อย (วัน)</label><input name="leadDays" type="number" min="0" value="${s.leadDays}"></div>
             <div class="field full"><label>${icon('alert')} สถานพยาบาลสำหรับงานฉุกเฉิน (นำส่งผู้ป่วย) <span class="hint" style="font-weight:400">บรรทัดละแห่ง · เรียงตามที่ใช้บ่อย</span></label><textarea name="hospitals" rows="4">${esc(S.hospitals().join('\n'))}</textarea></div>
+            <div class="field full"><label>${icon('package')} รถที่ใช้ออกซื้อ/รับของได้ <span class="hint" style="font-weight:400">ไม่ติ๊กเลย = รถตู้ทุกคัน + กระบะ 09</span></label><div class="chk-grid">${S.db.vehicles.filter(v => v.active !== false).map(v => `<label class="check"><input type="checkbox" name="supplyVehicles" value="${v.id}" ${(s.supplyVehicles || []).includes(v.id) ? 'checked' : ''}> ${esc(v.name)}</label>`).join('')}</div><span class="hint">ตอนนี้ใช้ได้: ${esc(S.supplyVehicles().map(v => v.name).join(', ') || '-')}</span></div>
+            <div class="field full"><label>${icon('package')} ร้าน/สถานที่ที่ไปซื้อ/รับของบ่อย <span class="hint" style="font-weight:400">บรรทัดละแห่ง · ร้านที่คนขับพิมพ์เองจะต่อท้ายให้อัตโนมัติ</span></label><textarea name="shops" rows="3">${esc((s.shops && s.shops.length ? s.shops : S.shops().slice(0, 5)).join('\n'))}</textarea></div>
+            <div class="field"><label>${icon('truck')} รถขนขยะ</label><select name="garbageVehicleId"><option value="">— อัตโนมัติ (รถที่ชื่อมีคำว่า "ขยะ") —</option>${S.db.vehicles.map(v => `<option value="${v.id}" ${s.garbageVehicleId === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select><span class="hint">คนขับประจำรถคันนี้จะเห็นปุ่มใหญ่ "ออกไปทิ้งขยะ" ในหน้างานขับรถ</span></div>
+            <div class="field"><label>${icon('pin')} สถานที่ทิ้งขยะ</label><input name="garbagePlace" value="${esc(s.garbagePlace || '')}" placeholder="จุดทิ้งขยะ"></div>
             <div class="field"><label>งานประจำ: ขอก่อนเวลาออกอย่างน้อย (ชั่วโมง)</label><input name="quickLeadHours" type="number" min="0" step="0.5" value="${S.quickHours()}"><span class="hint">ใช้กับหมวดที่ติ๊ก "งานประจำ" ด้านล่าง — ขอในวันได้ ไม่ต้องแนบบันทึกข้อความ</span></div>
           </div></div>
           <div class="form-section"><h3>${icon('file')} บันทึกข้อความขอใช้รถ <span class="hint" style="font-weight:400">(เอกสารที่พิมพ์ให้ลงนามหลังอนุมัติ · เว้นชื่อว่าง = ใช้ชื่อจากคณะทำงานด้านล่าง)</span></h3>
@@ -1528,7 +1543,7 @@
           const f = UI.formData($('#sf', root));
           const committee = $$('[data-ci]', root).map(row => { const i = +row.dataset.ci; const o = { ...(cm[i] || { id: 'c' + Date.now() + i }) }; $$('[data-k]', row).forEach(el => { o[el.dataset.k] = el.dataset.k === 'level' ? +el.value : el.value; }); o.photo = (photoGetters[i] ? photoGetters[i]() : [])[0] || ''; return o; });
           const categories = $$('[data-ci2]', root).map((row, i) => { const c = { ...cats[+row.dataset.ci2] }; c.name = row.querySelector('[data-ck=name]').value.trim() || c.name; c.icon = row.querySelector('[data-ck=icon]').value; c.active = row.querySelector('[data-ck=active]').checked; c.quick = c.id !== 'other' && row.querySelector('[data-ck=quick]').checked; c.order = i; return c; });
-          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), hospitals: String(f.hospitals || '').split('\n').map(x => x.trim()).filter(Boolean), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactName: (f.contactName || '').trim(), contactPhone: f.contactPhone, contactEmail: (f.contactEmail || '').trim(), contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
+          return { schoolName: f.schoolName, schoolNameEn: f.schoolNameEn, division: f.division, unit: f.unit, leadDays: +f.leadDays || 0, quickLeadHours: Math.max(0, +f.quickLeadHours || 0), hospitals: String(f.hospitals || '').split('\n').map(x => x.trim()).filter(Boolean), shops: String(f.shops || '').split('\n').map(x => x.trim()).filter(Boolean), supplyVehicles: $$('[name=supplyVehicles]:checked', root).map(x => x.value), garbageVehicleId: f.garbageVehicleId || '', garbagePlace: String(f.garbagePlace || '').trim(), school: { ...s.school, lat: +f.lat, lng: +f.lng }, contactName: (f.contactName || '').trim(), contactPhone: f.contactPhone, contactEmail: (f.contactEmail || '').trim(), contactRoom: f.contactRoom, contactNote: f.contactNote, committee, categories,
             memo: { headEmail: f.m_headEmail || '', depEmail: f.m_depEmail || '', to: f.m_to.trim(), noPrefix: f.m_noPrefix.trim(), headName: f.m_headName.trim(), headPos: f.m_headPos.trim(), depName: f.m_depName.trim(), depPos: f.m_depPos.trim() } };
         };
         const saveCats = async mut => { const x = collect(); mut(x.categories); x.categories.forEach((c, i) => { c.order = i; }); await S.saveSettings(x); App.render(); };
@@ -1544,5 +1559,51 @@
         $('#sf', root).addEventListener('submit', e => { e.preventDefault(); UI.busy(e.target.querySelector('[type=submit]'), () => S.saveSettings(collect())).then(() => UI.toast('บันทึกการตั้งค่าแล้ว')).catch(() => {}); });
       }
     };
+  };
+
+  // ═════════ คำสั่งงานรถจากผู้อำนวยการ (ผอ.สั่งเอง / แอดมินบันทึกแทน) — ไม่ต้องมีบันทึกข้อความ แอดมินแค่จัดรถ/คนขับ ═════════
+  Pages._orderModal = async ({ admin = false } = {}) => {
+    const execs = S.db.users.filter(u => u.active !== false && (u.roles || []).includes('executive')).sort((a, b) => (/ผู้อำนวยการ/.test(b.position || '') && !/รอง/.test(b.position || '')) - (/ผู้อำนวยการ/.test(a.position || '') && !/รอง/.test(a.position || '')));
+    if (admin && !execs.length) { UI.toast('ยังไม่มีผู้ใช้ที่มีสิทธิ์ผู้บริหาร — ตั้งสิทธิ์ในหน้าผู้ใช้ก่อน', 'error'); return null; }
+    let dests = [];
+    const t0 = new Date(); t0.setMinutes(0, 0, 0); t0.setHours(t0.getHours() + 1);
+    const t1 = new Date(t0.getTime() + 3 * 36e5);
+    const draw = el => {
+      el.querySelector('#odList').innerHTML = dests.map((d, i) => `<div class="dest"><span class="n">${i + 1}</span><div style="min-width:0"><b>${esc(d.name)}</b><small>${esc(d.address || d.province || '')}${d.km ? ` · ${d.km} กม.` : ''}</small></div><div class="row" style="gap:4px">${i ? `<button type="button" class="icon-btn sm" data-up="${i}" aria-label="เลื่อนขึ้น"><span style="display:inline-block;transform:rotate(180deg)">${icon('chev')}</span></button>` : ''}<button type="button" class="icon-btn sm" data-del="${i}" aria-label="ลบ">${icon('trash')}</button></div></div>`).join('') || `<p class="hint">ยังไม่ได้เลือกสถานที่</p>`;
+    };
+    return UI.modal({
+      title: `${icon('send')} ${admin ? 'บันทึกคำสั่งงานรถจาก ผอ.' : 'สั่งงานรถ'}`, size: 'lg',
+      body: `<form id="odF" class="stack">
+        <div class="note-box navy">${icon('info')}<div>ไม่ต้องแนบบันทึกข้อความ · ไม่ต้องรออนุมัติ · แอดมินได้รับแจ้งทันทีแล้วจัดรถ/คนขับให้</div></div>
+        ${admin ? `<div class="field"><label>ผู้สั่งการ <b class="req">*</b></label><select name="by">${execs.map(u => `<option value="${esc(u.email)}">${esc(u.name)}${u.position ? ' · ' + esc(u.position) : ''}</option>`).join('')}</select></div>` : ''}
+        <div class="field"><label>ภารกิจ <b class="req">*</b></label><input name="purpose" placeholder="เช่น ประชุมที่ สพฐ. / รับวิทยากร"></div>
+        <div class="field"><label>สถานที่ปลายทาง <b class="req">*</b> <span class="hint">หลายแห่งได้ เรียงตามลำดับที่ไป</span></label><div class="dest-list" id="odList"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="odAdd" style="margin-top:8px">${icon('plus')} เพิ่มจุดแวะ</button></div>
+        <div class="grid2">
+          <div class="field"><label>ออกเดินทาง <b class="req">*</b></label><input name="startAt" type="datetime-local" value="${fmt.local(t0)}"></div>
+          <div class="field"><label>กลับถึง (โดยประมาณ) <b class="req">*</b></label><input name="endAt" type="datetime-local" value="${fmt.local(t1)}"></div>
+          <div class="field"><label>ครู/บุคลากร</label><input name="teachers" type="number" min="0" inputmode="numeric" value="1"></div>
+          <div class="field"><label>นักเรียน</label><input name="students" type="number" min="0" inputmode="numeric" value="0"></div>
+          <div class="field"><label>จุดขึ้นรถ</label><input name="pickup" value="โรงเรียน"></div>
+          <div class="field"><label>เบอร์ติดต่อผู้เดินทาง</label><input name="contactPhone" inputmode="tel"></div>
+          <div class="field full"><label>ผู้เดินทาง / หมายเหตุถึงแอดมิน</label><input name="note" placeholder="เช่น ผอ.ไปเอง · ขอรถตู้คันใหญ่"></div>
+        </div></form>`,
+      onOpen(el) {
+        draw(el);
+        el.querySelector('#odAdd').addEventListener('click', async () => { const p = await Maps.pick(); if (p) { dests.push(p); draw(el); } });
+        el.querySelector('#odList').addEventListener('click', e => {
+          const up = e.target.closest('[data-up]'), del = e.target.closest('[data-del]');
+          if (up) { const i = +up.dataset.up; [dests[i - 1], dests[i]] = [dests[i], dests[i - 1]]; draw(el); }
+          if (del) { dests.splice(+del.dataset.del, 1); draw(el); }
+        });
+      },
+      actions: [{ label: 'ยกเลิก', value: null }, { label: admin ? 'บันทึกคำสั่ง' : 'ส่งคำสั่ง', kind: 'btn-primary', icon: 'send', onClick: async el => {
+        const f = el.querySelector('#odF');
+        if (!dests.length) { UI.toast('กรุณาเพิ่มสถานที่ปลายทาง', 'error'); return false; }
+        const total = await Maps.tripTotal(dests).catch(() => ({ km: 0, mins: 0 }));
+        return S.createOrder({ purpose: f.purpose.value, destinations: dests, totalKm: total.km, totalMins: total.mins, startAt: f.startAt.value, endAt: f.endAt.value, tripType: 'day',
+          teachers: f.teachers.value, students: f.students.value, others: 0, pickup: f.pickup.value, contactPhone: f.contactPhone.value, note: f.note.value }, { by: admin ? f.by.value : '' });
+      } }]
+    }).then(r => { if (r) UI.toast(admin ? `บันทึกคำสั่ง ${r.id} แล้ว — เลือกรถ/คนขับได้เลย` : `ส่งคำสั่ง ${r.id} แล้ว — แอดมินจะจัดรถ/คนขับให้`, 'ok'); return r; });
   };
 })();

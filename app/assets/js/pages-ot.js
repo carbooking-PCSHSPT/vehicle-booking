@@ -4,9 +4,10 @@
    กติกา (ตกลงกับงานยานพาหนะ 24 พ.ย. 2569):
    - จ.–ศ. และอาทิตย์: ช่วงเช้า 00.00–05.00 (นับจากเวลากดออกถึง 05.00) หรือช่วงเย็นหลัง 16.30 (นับ 16.30 ถึงเวลากดกลับถึง)
      ได้ช่วงเดียวต่อวัน (ช่วงที่ได้มากกว่า) · ชม.ละ 50 บาท · ไม่เกิน 3 ชม./วัน (รวมทุกเที่ยว) = 150 บาท
-     เศษชั่วโมง ตั้งแต่ 40 นาทีปัดขึ้น ต่ำกว่าปัดลง
+     เศษชั่วโมง ตั้งแต่ 30 นาทีปัดขึ้น ต่ำกว่าปัดลง (ปรับตามที่ประชุม 25 พ.ย. 2569)
    - เสาร์: ขับรถวันนั้น เหมา 200 บาท
-   - งานฉุกเฉินนำส่งผู้ป่วย: คนขับหอพัก (ติ๊กไว้ในหน้าพนักงานขับรถ) จ.–ศ. ออกหลัง 18.00 หรือหลังเที่ยงคืน และ ส.–อา. ทั้งวัน เหมา 150 บาท/วัน
+   - งานฉุกเฉินนำส่งผู้ป่วย: คนขับหอพัก (ติ๊กไว้ในหน้าพนักงานขับรถ) จ.–ศ. ออกหลัง 18.00 ถึง 05.00 เหมา 150 บาท/คืน · ส.–อา. เหมา 200 บาท/วัน
+     (งานที่ออกก่อน 05.00 นับเป็นเวรของคืนก่อนหน้า เช่น ออกตี 2 วันจันทร์ = เวรคืนวันอาทิตย์)
      คนขับทั่วไป นับตั้งแต่ 18.00 (หรือตั้งแต่เวลาออกถ้าออกหลัง 18.00/หลังเที่ยงคืน) ถึงเวลากลับถึง ไม่เกิน 3 ชม. (กลับก่อน 18.00 = 0)
      วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า (ไม่รวมกัน)
    - เวรเย็น จ.–ศ. (สัปดาห์ละ 1 คน อยู่ถึง 18.00) และเวรวันอาทิตย์ (อยู่ถึง 16.30): เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร
@@ -16,18 +17,18 @@
   'use strict';
   const { esc, fmt, $, $$ } = UI;
   const S = Store;
-  const RATE = 50, CAP_H = 3, SAT_FLAT = 200, MED_NIGHT = 150;
+  const RATE = 50, CAP_H = 3, SAT_FLAT = 200, MED_NIGHT = 150, MED_WEEKEND = 200;
   const MORN_END = 5 * 60, EVE_START = 16 * 60 + 30, MED_NIGHT_FROM = 18 * 60, MED_EVE_START = 18 * 60;
   const WD = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
   const ROSTER_ANCHOR = '2026-11-29';   // วันอาทิตย์ตั้งต้น (ใช้เมื่อแอดมินยังไม่ได้ตั้งเวร)
   const dayStart = date => new Date(date + 'T00:00:00');
   const minOfDay = d => d.getHours() * 60 + d.getMinutes();
-  const hoursOf = m => Math.floor(m / 60) + (m % 60 >= 40 ? 1 : 0);
+  const hoursOf = m => Math.floor(m / 60) + (m % 60 >= 30 ? 1 : 0);
   const hm = m => `${Math.floor(m / 60)} ชม. ${m % 60} นาที`;
   const money = n => (+n || 0).toLocaleString('th-TH');
   const isNightDep = t => minOfDay(t.dep) >= MED_NIGHT_FROM || minOfDay(t.dep) < MORN_END;
-  // งานฉุกเฉินที่ได้เหมา 150: คนขับหอพัก · จ.–ศ. ออกหลัง 18.00/หลังเที่ยงคืน · ส.–อา. ทั้งวัน
-  const isMedFlat = (t, dorm) => t.med && dorm && (isNightDep(t) || [0, 6].includes(t.dep.getDay()));
+  // งานฉุกเฉินที่ได้เหมา (คนขับหอพัก): วัน ส.–อา. (ตามวันเวร) ทั้งวัน 200 · จ.–ศ. กลางคืน (หลัง 18.00 ถึง 05.00) 150
+  const isMedFlat = (t, dorm, wd) => t.med && dorm && (isNightDep(t) || [0, 6].includes(wd));
   // รวมช่วงเวลาที่ซ้อนกัน (หลายเที่ยวในวันเดียว ไม่นับซ้ำ) → นาที
   const unionMin = iv => {
     const xs = iv.filter(x => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
@@ -39,14 +40,16 @@
 
   // ── เที่ยวที่คนขับกลับถึงแล้ว (นับตามวันที่กดออกเดินทาง) ──
   function tripsOf(driverId) {
-    const out = [];
+    const out = [], dorm = !!(S.driver(driverId) || {}).dorm;
     S.db.requests.forEach(r => {
       if (['cancelled', 'rejected'].includes(r.status)) return;
       (r.assignments || []).forEach((a, i) => {
         if (a.driverId !== driverId || !a.departedAt || !a.returnedAt) return;
         const dep = new Date(a.departedAt), ret = new Date(a.returnedAt);
+        if (r.garbage) return;   // รถขนขยะ: ไม่คิดค่าล่วงเวลา
         const multi = !r.medical && fmt.localDate(r.startAt) !== fmt.localDate(r.endAt);   // งานค้างคืน/หลายวัน → ไม่คิด
-        out.push({ r, a, i, dep, ret, multi, med: !!r.medical, day: fmt.localDate(dep) });
+        const night = !!r.medical && dorm && minOfDay(dep) < MORN_END;   // คนขับหอพัก: ออกก่อน 05.00 = เวรของคืนก่อนหน้า
+        out.push({ r, a, i, dep, ret, multi, med: !!r.medical, day: fmt.localDate(night ? new Date(dep.getTime() - 864e5) : dep) });
       });
     });
     return out.sort((x, y) => x.dep - y.dep);
@@ -67,15 +70,16 @@
       const mins = Math.max(evening, morning), hours = Math.min(CAP_H, hoursOf(mins));
       N = { amount: hours * RATE, basis: !mins ? '' : evening >= morning ? 'evening' : 'morning', mins, hours, morning, evening };
     }
-    // ฝั่งงานฉุกเฉิน: คนขับหอพักเหมา 150 (จ.–ศ. หลัง 18.00/หลังเที่ยงคืน · ส.–อา. ทั้งวัน) · นอกนั้นนับตั้งแต่ 18.00 (หรือเวลาออกถ้าออกหลัง 18.00/หลังเที่ยงคืน) ถึงกลับถึง
+    // ฝั่งงานฉุกเฉิน: คนขับหอพัก ส.–อา. เหมา 200 · จ.–ศ. กลางคืนเหมา 150 · นอกนั้นนับตั้งแต่ 18.00 (หรือเวลาออกถ้าออกหลัง 18.00/หลังเที่ยงคืน) ถึงกลับถึง
     let M = { amount: 0, basis: '', mins: 0, hours: 0, medEve: 0 };
     if (med.length) {
-      const medEve = unionMin(med.filter(t => !isMedFlat(t, dorm)).map(t => [isNightDep(t) ? t.dep.getTime() : Math.max(t.dep.getTime(), t0 + MED_EVE_START * 6e4), t.ret.getTime()]));
+      const medEve = unionMin(med.filter(t => !isMedFlat(t, dorm, wd)).map(t => [isNightDep(t) ? t.dep.getTime() : Math.max(t.dep.getTime(), t0 + MED_EVE_START * 6e4), t.ret.getTime()]));
       const hours = Math.min(CAP_H, hoursOf(medEve));
-      M = med.some(t => isMedFlat(t, dorm)) ? { amount: MED_NIGHT, basis: 'mednight', mins: 0, hours: 0, medEve } : { amount: hours * RATE, basis: medEve ? 'medevening' : '', mins: medEve, hours, medEve };
+      const weekend = [0, 6].includes(wd);
+      M = med.some(t => isMedFlat(t, dorm, wd)) ? { amount: weekend ? MED_WEEKEND : MED_NIGHT, basis: weekend ? 'medweekend' : 'mednight', mins: 0, hours: 0, medEve } : { amount: hours * RATE, basis: medEve ? 'medevening' : '', mins: medEve, hours, medEve };
     }
     const W = M.amount > N.amount ? M : N;
-    return { ...base, morning: N.morning, evening: N.evening, medEve: M.medEve, mins: W.mins, basis: W.basis, hours: W.hours, amount: W.basis === 'sat' ? SAT_FLAT : Math.min(W.amount, CAP_H * RATE) };
+    return { ...base, morning: N.morning, evening: N.evening, medEve: M.medEve, mins: W.mins, basis: W.basis, hours: W.hours, amount: W.basis === 'sat' ? SAT_FLAT : W.basis === 'medweekend' ? MED_WEEKEND : Math.min(W.amount, CAP_H * RATE) };
   }
   // ── รายวันของคนขับในช่วงเวลา (รวมรายการที่แอดมินปรับ/เพิ่มเอง) ──
   function daysOf(driverId, from, to) {
@@ -89,12 +93,13 @@
   }
   const sumOf = days => ({
     days: days.filter(x => x.amount > 0).length, hours: days.reduce((s, x) => s + (+x.hours || 0), 0), amount: days.reduce((s, x) => s + (+x.amount || 0), 0),
-    sat: days.filter(x => x.basis === 'sat' && !x.ov).length, med: days.filter(x => x.basis === 'mednight' && !x.ov).length, ov: days.filter(x => x.ov).length
+    sat: days.filter(x => x.basis === 'sat' && !x.ov).length, med: days.filter(x => ['mednight', 'medweekend'].includes(x.basis) && !x.ov).length, ov: days.filter(x => x.ov).length
   });
   const basisText = x => {
     if (x.ov) return `แอดมินปรับ${x.ov.note ? `: ${x.ov.note}` : ''}`;
     if (x.basis === 'sat') return 'วันเสาร์ เหมาจ่าย';
-    if (x.basis === 'mednight') return 'งานฉุกเฉิน (คนขับหอพัก) เหมาจ่าย';
+    if (x.basis === 'mednight') return 'งานฉุกเฉินกลางคืน (คนขับหอพัก) เหมาจ่าย';
+    if (x.basis === 'medweekend') return 'งานฉุกเฉินเสาร์–อาทิตย์ (คนขับหอพัก) เหมาจ่าย';
     if (x.basis === 'medevening') return `งานฉุกเฉิน หลัง 18.00 · ${hm(x.medEve)}`;
     if (x.basis === 'evening') return `ช่วงเย็น หลัง 16.30 · ${hm(x.evening)}`;
     if (x.basis === 'morning') return `ช่วงเช้า ก่อน 05.00 · ${hm(x.morning)}`;
@@ -267,7 +272,7 @@
         <tbody>${rows.length ? rows.map((x, i) => { const s = sumOf(x.days); return `<tr><td class="c">${i + 1}</td><td class="nw">${esc(x.d.name)}</td><td class="r">${s.days}</td><td class="r">${s.hours}</td><td class="r">${s.sat}</td><td class="r">${s.med}</td><td class="r nw">${money(s.amount)}</td></tr>`; }).join('') : '<tr><td colspan="7" class="c">ไม่มีค่าล่วงเวลาในเดือนนี้</td></tr>'}</tbody>
         <tfoot><tr><td colspan="6">รวมทั้งสิ้น</td><td class="r nw">${money(tot)}</td></tr></tfoot></table>
       <p class="pd-words">จำนวนเงินรวม ${money(tot)} บาท (${UI.bahtText(tot)})</p>
-      <p class="ot-rule">หลักเกณฑ์: วันจันทร์–ศุกร์และวันอาทิตย์ ชั่วโมงละ ${RATE} บาท ไม่เกิน ${CAP_H} ชั่วโมงต่อวัน (ช่วง 00.00–05.00 หรือหลัง 16.30 อย่างใดอย่างหนึ่ง · เศษตั้งแต่ 40 นาทีนับเป็น 1 ชั่วโมง) · วันเสาร์เหมาจ่าย ${SAT_FLAT} บาท · งานฉุกเฉินนำส่งผู้ป่วย คนขับหอพัก (จ.–ศ. หลัง 18.00, ส.–อา. ทั้งวัน) เหมาจ่าย ${MED_NIGHT} บาท คนขับทั่วไปนับตั้งแต่ 18.00 ไม่เกิน ${CAP_H} ชั่วโมง</p>
+      <p class="ot-rule">หลักเกณฑ์: วันจันทร์–ศุกร์และวันอาทิตย์ ชั่วโมงละ ${RATE} บาท ไม่เกิน ${CAP_H} ชั่วโมงต่อวัน (ช่วง 00.00–05.00 หรือหลัง 16.30 อย่างใดอย่างหนึ่ง · เศษตั้งแต่ 30 นาทีนับเป็น 1 ชั่วโมง) · วันเสาร์เหมาจ่าย ${SAT_FLAT} บาท · งานฉุกเฉินนำส่งผู้ป่วย คนขับหอพัก จ.–ศ. หลัง 18.00 ถึง 05.00 เหมาจ่าย ${MED_NIGHT} บาท ส.–อา. เหมาจ่าย ${MED_WEEKEND} บาท คนขับทั่วไปนับตั้งแต่ 18.00 ไม่เกิน ${CAP_H} ชั่วโมง</p>
       <div class="pd-sign ot-sign"><div><p class="pd-line">ลงชื่อ ....................................</p><p>(${esc(S.me.name || '....................................')})</p><p>ผู้จัดทำ</p></div>${headSign}</div></section>`;
     const pages = rows.map(({ d, days }) => { const s = sumOf(days); return `<section class="ot-page ot-break">${top}
       <h1 class="pd-title">รายละเอียดการปฏิบัติงานนอกเวลา</h1>
@@ -305,9 +310,9 @@
         <div class="toolbar"><div class="seg"><a href="${qs({ view: 'list' })}"><button tabindex="-1">${icon('clipboard')} รายการ</button></a><a href="${qs({ view: 'stats' })}"><button tabindex="-1">${icon('chart')} สรุปสถิติค่าน้ำมัน</button></a><a href="${qs({})}"><button class="on" tabindex="-1">${icon('clock')} ค่าล่วงเวลา</button></a></div></div>
         <details class="ot-rules"><summary>${icon('info')} หลักเกณฑ์การคิดค่าล่วงเวลา</summary><ul>
           <li>จันทร์–ศุกร์ และอาทิตย์: ช่วงเช้า <b>00.00–05.00</b> (นับจากเวลากดออกเดินทาง) หรือช่วงเย็น <b>หลัง 16.30</b> (นับถึงเวลากดกลับถึง) — ได้ช่วงเดียวต่อวัน (ช่วงที่มากกว่า)</li>
-          <li>ชั่วโมงละ <b>${RATE} บาท</b> ไม่เกิน <b>${CAP_H} ชม./วัน</b> (${CAP_H * RATE} บาท) รวมทุกเที่ยว · เศษตั้งแต่ 40 นาทีปัดขึ้น ต่ำกว่าปัดลง</li>
+          <li>ชั่วโมงละ <b>${RATE} บาท</b> ไม่เกิน <b>${CAP_H} ชม./วัน</b> (${CAP_H * RATE} บาท) รวมทุกเที่ยว · เศษตั้งแต่ 30 นาทีปัดขึ้น ต่ำกว่าปัดลง</li>
           <li>วันเสาร์: ขับงานปกติวันนั้น เหมา <b>${SAT_FLAT} บาท</b></li>
-          <li>งานฉุกเฉินนำส่งผู้ป่วย: <b>คนขับหอพัก</b> จ.–ศ. ออกหลัง 18.00/หลังเที่ยงคืน และ ส.–อา. ทั้งวัน เหมา <b>${MED_NIGHT} บาท</b> · คนขับทั่วไปนับตั้งแต่ <b>18.00</b> ถึงเวลากลับถึง ไม่เกิน ${CAP_H} ชม. (กลับก่อน 18.00 ไม่ได้) · วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า</li>
+          <li>งานฉุกเฉินนำส่งผู้ป่วย: <b>คนขับหอพัก</b> จ.–ศ. ออกหลัง 18.00 ถึง 05.00 เหมา <b>${MED_NIGHT} บาท/คืน</b> · ส.–อา. เหมา <b>${MED_WEEKEND} บาท/วัน</b> (ออกก่อน 05.00 นับเป็นเวรคืนก่อนหน้า) · คนขับทั่วไปนับตั้งแต่ <b>18.00</b> ถึงเวลากลับถึง ไม่เกิน ${CAP_H} ชม. (กลับก่อน 18.00 ไม่ได้) · วันที่มีทั้งงานปกติและงานฉุกเฉิน ใช้ฝั่งที่ได้มากกว่า</li>
           <li>เวรเย็น จ.–ศ. (ถึง 18.00) และเวรวันอาทิตย์ (ถึง 16.30) เป็นตารางเวรเท่านั้น ไม่มีค่าตอบแทนจากการอยู่เวร</li>
           <li>งานค้างคืน/หลายวัน ไม่คิดค่าล่วงเวลา (เจ้าของงานเบิกเบี้ยเลี้ยงคนขับ) · แอดมินปรับ/เพิ่มรายการได้ คนขับดูได้อย่างเดียว</li></ul></details>
         <div class="kpis" style="margin-bottom:16px">

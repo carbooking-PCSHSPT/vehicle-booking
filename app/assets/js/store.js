@@ -79,7 +79,8 @@ const Store = (() => {
   let authError = '';
   const listeners = new Set();
   function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [], ot: [], feedback: [], errlog: [] }; }
-  const TRASH_DAYS = 30;   // ข้อมูลที่ล้างแล้วอยู่ในถังขยะกี่วันก่อนลบถาวร
+  const TRASH_DAYS = 30;
+  const SHOPS = ['แม็คโคร', 'โลตัส', 'บิ๊กซี', 'ร้านวัสดุก่อสร้าง', 'ไปรษณีย์'];   // ร้านที่ไปบ่อย (แอดมินแก้ได้ในตั้งค่า)   // ข้อมูลที่ล้างแล้วอยู่ในถังขยะกี่วันก่อนลบถาวร
   function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
 
   function defaultSettings() {
@@ -208,7 +209,7 @@ const Store = (() => {
   const quickHours = () => (db.settings.quickLeadHours != null ? +db.settings.quickLeadHours : 2);
   // คำขอที่ค้างบันทึกข้อความ: แอดมินบันทึกแทน (เร่งด่วน) · ไม่ใช่งานประจำ · ยังไม่มีไฟล์แนบ · ไม่ได้ยกเลิก/ไม่อนุมัติ
   // (คำขอที่ครูส่งเองต้องแนบตั้งแต่ตอนส่งอยู่แล้ว)
-  const needsMemo = r => !!r && !!r.emergency && !r.medical && !isQuickCat(r.category) && !(r.attachments || []).length && !r.memoWaived && !['cancelled', 'rejected'].includes(r.status);
+  const needsMemo = r => !!r && !!r.emergency && !r.medical && !r.order && !isQuickCat(r.category) && !(r.attachments || []).length && !r.memoWaived && !['cancelled', 'rejected'].includes(r.status);
   // จับคู่ชื่อที่แอดมินพิมพ์เอง กับบัญชีผู้ใช้ (ตัดคำนำหน้าและช่องว่าง) — ใช้ติดตามบันทึกข้อความค้าง
   const nameKey = s => String(s || '').replace(/\s+/g, '').replace(/^(นางสาว|น\.ส\.|นาย|นาง|ดร\.|ว่าที่ร้อยตรี|ว่าที่ร\.ต\.)/, '');
   const userByName = n => { const k = nameKey(n); if (k.length < 3) return null; const m = db.users.filter(u => nameKey(u.name) === k); return m.length === 1 ? m[0] : null; };
@@ -219,7 +220,10 @@ const Store = (() => {
   // ผู้ลงนามในบันทึกข้อความ (ตั้งค่า → บันทึกข้อความขอใช้รถ)
   const memoSigners = () => { const m = db.settings.memo || {}; return { head: String(m.headEmail || '').toLowerCase(), deputy: String(m.depEmail || '').toLowerCase() }; };
   const signerRoles = u => { if (!u) return []; const s = memoSigners(); return [s.head === u.email && 'head', s.deputy === u.email && 'deputy'].filter(Boolean); };
-  const needsMySign = (r, role) => ['approved', 'ontrip', 'returned', 'closed'].includes(r.status) && !((r.esign || {})[role]) && (role === 'head' || !!(r.esign || {}).head);
+  // งานที่คนขับเปิดเอง (ไม่ต้องขอ/อนุมัติ): ฉุกเฉินนำส่งผู้ป่วย · ซื้อ/รับของ · รถขนขยะ
+  const selfTrip = r => !!(r && (r.medical || r.supply || r.garbage));
+  const noMemo = r => selfTrip(r) || !!(r && r.order);
+  const needsMySign = (r, role) => !noMemo(r) && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status) && !((r.esign || {})[role]) && (role === 'head' || !!(r.esign || {}).head);
   const memoDebts = email => email ? db.requests.filter(r => r.requester && r.requester.email === email && needsMemo(r)).sort((a, b) => a.startAt.localeCompare(b.startAt)) : [];
   const catName = r => { if (!r || !r.category) return 'ไม่ระบุ'; if (r.category === 'other') return r.categoryOther ? `อื่น ๆ: ${r.categoryOther}` : 'อื่น ๆ'; const c = catOf(r.category); return c ? c.name : 'ไม่ระบุ'; };
   const seatsOf = list => (list || []).reduce((s, a) => s + (+(vehicle(a.vehicleId) || {}).seats || 0), 0);
@@ -241,6 +245,8 @@ const Store = (() => {
   const isExec = u => has(u, 'executive');
   const isDriver = u => has(u, 'driver');
   const isBack = u => isAdmin(u) || isExec(u);
+  // คนขับล้วน (ไม่มีบทบาทครู/หลังบ้าน) → ล็อกไว้หน้างานขับรถ
+  const isOnlyDriver = u => !!u && isDriver(u) && !has(u, 'teacher') && !isBack(u);
   // คนขับของบัญชีนี้ — ต้องมีสิทธิ์คนขับ · ยึด driverId ที่แอดมินผูกไว้ก่อน (กันรูป/ข้อมูลคนขับคนเดิมค้าง) แล้วค่อยดูจากอีเมล
   const driverOfUser = u => { if (!u || !has(u, 'driver')) return null; return (u.driverId && db.drivers.find(d => d.id === u.driverId)) || db.drivers.find(d => d.email && d.email === u.email) || null; };
 
@@ -255,7 +261,7 @@ const Store = (() => {
     const myDriver = driverOfUser(me);
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
-      medical: 'รถออกงานฉุกเฉิน (นำส่งผู้ป่วย)', medicalack: 'แอดมินรับทราบงานฉุกเฉินแล้ว',
+      medical: 'รถออกงานฉุกเฉิน (นำส่งผู้ป่วย)', medicalack: 'แอดมินรับทราบงานฉุกเฉินแล้ว', supply: 'รถออกซื้อ/รับของ', order: 'คำสั่งงานรถจากผู้อำนวยการ — รอจัดรถ',
       depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน',
       memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว', memowaive: 'แอดมินยกเว้นบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้',
       changereq: 'มีคำขอแก้ไขข้อมูล รอพิจารณา', changeok: 'แอดมินอนุมัติการแก้ไขข้อมูลแล้ว', changeno: 'แอดมินไม่อนุมัติการแก้ไขข้อมูล'
@@ -265,7 +271,7 @@ const Store = (() => {
         if (h.by === me.email) return;
         let mine = false, link = '';
         if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive', 'changeok', 'changeno'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
-        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq', 'medical'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
+        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq', 'medical', 'supply', 'order'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen && h.at <= nowStr });
       });
@@ -601,8 +607,18 @@ const Store = (() => {
       if (/aborted|failed-precondition/.test(c)) return new Error('มีผู้อื่นแก้ไขรายการนี้พร้อมกัน กรุณาลองใหม่');
       return e;
     };
+    // เน็ตหลุด: ไม่รอเซิร์ฟเวอร์ตอบ — Firestore เก็บการเขียนไว้ในเครื่อง (enablePersistence) แล้วส่งเองเมื่อกลับมาออนไลน์
+    const isOff = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+    const offErr = e => /unavailable/.test(String((e && e.code) || '')) || /offline/i.test(String((e && e.message) || ''));
+    const waitSync = () => { if (!pendWait) pendWait = fs.waitForPendingWrites().then(() => { pendingN = 0; pendWait = null; emit(); }, () => { pendWait = null; }); };
+    const queued = p => {
+      pendingN++; emit();
+      p.catch(e => { if (api.logError) api.logError({ kind: 'firestore', msg: 'offline write: ' + ((e && e.code) || '') + ' ' + ((e && e.message) || '') }); });
+      waitSync();
+    };
+    if (typeof window !== 'undefined') ['online', 'offline'].forEach(ev => window.addEventListener(ev, () => { emit(); if (ev === 'online' && pendingN) waitSync(); }));
     const guard = p => p.catch(e => { if (e && e.code && typeof api !== 'undefined' && api.logError) api.logError({ kind: 'firestore', msg: `${e.code}: ${e.message || ''}`, stack: e.stack || '' }); throw friendly(e); });
-    let unsubs = [], reqMaps = {}, rateMaps = {}, profileUnsub = null, warned = false;
+    let unsubs = [], reqMaps = {}, rateMaps = {}, profileUnsub = null, warned = false, pendingN = 0, pendWait = null;
     // ประหยัดโควตาอ่าน: แอดมิน/ผู้บริหารฟังเรียลไทม์เฉพาะคำขอ/ผลประเมิน ~13 เดือนล่าสุด
     // ข้อมูลเก่ากว่านั้นโหลดครั้งเดียวเมื่อหน้าที่ต้องใช้ขอ (needHistory) — histState: none | loading | done
     let histState = 'none', dataGen = 0;
@@ -730,7 +746,9 @@ const Store = (() => {
       loadHistory,
       async put(col, id, data) {
         if (col === 'settings') return guard(fs.collection('config').doc('settings').set(strip(data)));
-        await guard(fs.collection(colName[col]).doc(id).set(strip(data)));
+        const w = fs.collection(colName[col]).doc(id).set(strip(data));
+        if (isOff()) { queued(w); keepHistory(col, id, data); return; }
+        await guard(w);
         keepHistory(col, id, data);
       },
       // แก้เอกสารแบบธุรกรรม: อ่านฉบับล่าสุดจากเซิร์ฟเวอร์ → fn แก้ → เขียน
@@ -738,6 +756,17 @@ const Store = (() => {
       // fn ต้องไม่มี async และอาจถูกเรียกซ้ำ · also(col, id, data) = เขียนเอกสารอื่นในธุรกรรมเดียวกัน
       async update(col, id, fn) {
         const ref = fs.collection(colName[col]).doc(id);
+        const offline = () => {
+          const cur = (db[col] || []).find(x => x.id === id);
+          if (!cur) throw new Error('ไม่มีอินเทอร์เน็ต และไม่พบข้อมูลในเครื่อง — ลองใหม่เมื่อมีสัญญาณ');
+          const extra = [];
+          const next = fn(clone(cur), (c, i, d) => extra.push([c, i, d]));
+          extra.forEach(([c, i, d]) => queued(fs.collection(colName[c]).doc(i).set(strip(d))));
+          queued(ref.set(strip(next)));
+          keepHistory(col, id, next);
+          return next;
+        };
+        if (isOff()) return offline();
         const next = await guard(fs.runTransaction(async tx => {
           const s = await tx.get(ref);
           if (!s.exists) throw new Error('ไม่พบข้อมูล อาจถูกลบไปแล้ว');
@@ -746,16 +775,20 @@ const Store = (() => {
           extra.forEach(([c, i, d]) => tx.set(fs.collection(colName[c]).doc(i), strip(d)));
           tx.set(ref, strip(next));
           return next;
-        }));
+        }).catch(e => { if (offErr(e)) return { __off: true }; throw e; }));
+        if (next && next.__off) return offline();
         keepHistory(col, id, next);
         return next;
       },
+      offline: () => isOff(),
+      pendingWrites: () => pendingN,
       async getDoc(col, id) { const s = await guard(fs.collection(colName[col]).doc(id).get()); return s.exists ? s.data() : null; },
       async list(col) { const s = await guard(fs.collection(colName[col]).get()); return s.docs.map(d => d.data()); },
       async del(col, id) { return guard(fs.collection(colName[col]).doc(id).delete()); },
       async setCounter(y, n) { await guard(fs.collection('counters').doc(String(y)).set({ n })); },
       async getCounter(y) { const s = await guard(fs.collection('counters').doc(String(y)).get()); return (s.exists && s.data().n) || 0; },
       async nextId(d) {
+        if (isOff()) throw new Error('ไม่มีอินเทอร์เน็ต — การสร้างงานใหม่ต้องใช้อินเทอร์เน็ต (ออกงานไปก่อนได้ แล้วบันทึกย้อนหลังภายใน 24 ชม. เมื่อมีสัญญาณ)');
         const y = beYear(d || new Date());
         const ref = fs.collection('counters').doc(String(y));
         const n = await guard(fs.runTransaction(async tx => { const s = await tx.get(ref); const v = ((s.exists && s.data().n) || 0) + 1; tx.set(ref, { n: v }); return v; }));
@@ -919,7 +952,7 @@ const Store = (() => {
     start() { A = LOCAL ? makeLocal() : makeCloud(); return A.start(); },
     reset() { A.reset(); },
     // ค้นหา
-    vehicle, driver, user, request, has, isAdmin, isSuper, isExec, isDriver, isBack, driverOfUser, emailOf, usernameOf, isUsernameEmail,
+    vehicle, driver, user, request, has, isAdmin, isSuper, isExec, isDriver, isBack, isOnlyDriver, driverOfUser, emailOf, usernameOf, isUsernameEmail,
     categories, catOf, catName, CAT_ICONS, DEFAULT_CATS,
     vehicleState, vehicleConflicts, driverConflicts, destName, passengers, seatsOf, overlap, sameDay, rollup,
     TRIP, TRIP_UI, tripType, tripUI, tripLabel, windows, tripTag, paxText,
@@ -961,6 +994,8 @@ const Store = (() => {
     // คืนค่า true = ยังโหลดไม่เสร็จ (ให้หน้าแสดงว่ากำลังโหลด) · โหลดเสร็จระบบแจ้งให้หน้าวาดใหม่เอง
     // กำลังรอข้อมูล: ชุดแรกหลังเข้าสู่ระบบ · ข้อมูลย้อนหลัง
     dataLoading: () => !!(A && A.dataLoading && A.dataLoading()),
+    offline: () => !!(A && A.offline && A.offline()),
+    pendingWrites: () => (A && A.pendingWrites ? A.pendingWrites() : 0),
     histLoading: () => !!(A && A.histState() === 'loading'),
     needHistory(from) {
       if (!A || !me || !isBack(me)) return false;
@@ -1223,6 +1258,103 @@ const Store = (() => {
       return mutateReq(id, r => { if (!r.medical) return r; r.medical = { ...r.medical, ack: { by: me.email, byName: me.name || me.email, at: nowISO(), note: String(note || '').trim() } }; r.history.push(H('medicalack', note)); return r; });
     },
     hospitals: () => (db.settings.hospitals && db.settings.hospitals.length ? db.settings.hospitals : HOSPITALS),
+    selfTrip, noMemo,
+    // ═══ ออกซื้อ/รับของ (ฝ่ายบริการสั่งซื้อ): คนขับกดออกเองเหมือนงานฉุกเฉิน · ไม่ต้องให้ใครลงชื่อ · ใช้ได้เฉพาะรถที่กำหนด ═══
+    supplyVehicles() {
+      const ids = db.settings.supplyVehicles || [];
+      const vs = db.vehicles.filter(v => v.active !== false);
+      return ids.length ? vs.filter(v => ids.includes(v.id)) : vs.filter(v => v.kind === 'van' || (/กระบะ/.test(v.name || '') && /(^|\D)0?9(\D|$)/.test(v.name || '')));
+    },
+    shops() {
+      const cnt = new Map();
+      db.requests.forEach(r => { if (r.supply && r.supply.shop) cnt.set(r.supply.shop, (cnt.get(r.supply.shop) || 0) + 1); });
+      const base = db.settings.shops && db.settings.shops.length ? db.settings.shops : SHOPS;
+      return [...new Set([...base, ...[...cnt.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0])])].slice(0, 16);
+    },
+    async createSupply(o) {
+      const admin = isAdmin(me);
+      const drv = admin && o.driverId ? driver(o.driverId) : driverOfUser(me);
+      if (!drv) throw new Error(admin ? 'กรุณาเลือกคนขับ' : 'บัญชีนี้ยังไม่ได้ผูกกับรายชื่อพนักงานขับรถ — ติดต่อแอดมิน');
+      if (!admin && !isDriver(me)) throw new Error('เฉพาะพนักงานขับรถ');
+      const v = vehicle(o.vehicleId); if (!v) throw new Error('กรุณาเลือกรถ');
+      const shop = String(o.shop || '').trim(); if (!shop) throw new Error('กรุณาเลือกร้าน/สถานที่');
+      const dept = String(o.dept || '').trim();
+      const now = Date.now(), dep = o.departAt ? new Date(o.departAt) : new Date(now);
+      if (isNaN(dep)) throw new Error('เวลาออกไม่ถูกต้อง');
+      if (dep.getTime() > now + 5 * 6e4) throw new Error('เวลาออกต้องไม่เกินเวลาปัจจุบัน');
+      if (!admin && now - dep.getTime() > 24 * 36e5) throw new Error('เลย 24 ชั่วโมงแล้ว — ให้แอดมินบันทึกแทน');
+      if (db.requests.some(r => (r.assignments || []).some(a => a.vehicleId === v.id && a.status === 'ontrip'))) throw new Error(`${v.name} กำลังเดินทางอยู่ — เลือกคันอื่น`);
+      const back = now - dep.getTime() > 15 * 6e4;
+      const id = await A.nextId(dep);
+      const startAt = dep.toISOString(), endAt = new Date(dep.getTime() + 2 * 36e5).toISOString();
+      const odoS = o.odoStart === '' || o.odoStart == null ? null : +o.odoStart;
+      const r = {
+        id, createdAt: nowISO(), category: 'other', categoryOther: 'ซื้อ/รับของ', purpose: `ซื้อ/รับของ${dept ? ' ให้' + dept : ''}`, project: '',
+        destinations: [{ id: uid('pl'), name: shop, address: '', province: '', lat: null, lng: null, km: 0, mins: 0 }], totalKm: 0, totalMins: 0,
+        startAt, endAt, tripType: 'day', onewayDir: '', overnight: false, lodging: '',
+        teachers: 0, students: 0, others: 0, passengerNames: '', pickup: 'โรงเรียน', contactPhone: drv.phone || '', note: String(o.note || '').trim(), attachments: [],
+        requester: { email: drv.email || '', name: drv.name, dept: dept || 'งานยานพาหนะ', phone: drv.phone || '' },
+        status: 'ontrip', emergency: false, createdBy: me.email,
+        supply: { shop, dept, by: me.email, byName: me.name || me.email, backdated: back, adminEntry: admin && !!o.driverId },
+        decision: { by: me.email, byName: me.name || me.email, at: nowISO(), action: 'approve', note: 'ออกซื้อ/รับของ — งานประจำ ไม่ต้องขออนุญาตล่วงหน้า' },
+        assignments: [{ vehicleId: v.id, driverId: drv.id, note: '', status: 'ontrip', departedAt: startAt, returnedAt: '', odoStart: odoS, odoEnd: null, rated: false, ratingSkipped: true }],
+        driverEmails: drv.email ? [drv.email] : [], expenses: [],
+        history: [H('supply', `${v.name} · ${shop}${dept ? ' · ' + dept : ''}${back ? ' · บันทึกย้อนหลัง' : ''}${admin && o.driverId ? ` · แอดมินบันทึกแทน (คนขับ ${drv.name})` : ''}`), H('depart', v.name)]
+      };
+      await createReq(r);
+      return r;
+    },
+    // ═══ รถขนขยะ: ออกไปทิ้ง/กลับถึง วันละหลายรอบ · ไม่ใช้เลขคำขอ (GB-…) · ไม่คิดค่าล่วงเวลา · ใช้ได้แม้ไม่มีเน็ต ═══
+    garbageVehicle: () => db.vehicles.find(v => v.id === db.settings.garbageVehicleId) || db.vehicles.find(v => /ขยะ/.test(v.name || '')) || null,
+    garbagePlace: () => String(db.settings.garbagePlace || '').trim() || 'จุดทิ้งขยะ',
+    async createGarbage(o = {}) {
+      const admin = isAdmin(me);
+      const drv = admin && o.driverId ? driver(o.driverId) : driverOfUser(me);
+      if (!drv) throw new Error('บัญชีนี้ยังไม่ได้ผูกกับรายชื่อพนักงานขับรถ — ติดต่อแอดมิน');
+      const v = api.garbageVehicle(); if (!v) throw new Error('ยังไม่ได้ตั้งค่ารถขนขยะ — แจ้งแอดมิน');
+      if (db.requests.some(r => (r.assignments || []).some(a => a.vehicleId === v.id && a.status === 'ontrip'))) throw new Error('รถขนขยะยังไม่ได้กด "กลับถึง" ของรอบก่อน');
+      const now = Date.now(), dep = o.departAt ? new Date(o.departAt) : new Date(now);
+      if (isNaN(dep) || dep.getTime() > now + 5 * 6e4) throw new Error('เวลาออกไม่ถูกต้อง');
+      if (!admin && now - dep.getTime() > 24 * 36e5) throw new Error('บันทึกย้อนหลังได้ไม่เกิน 24 ชั่วโมง');
+      const back = now - dep.getTime() > 15 * 6e4;
+      const p2 = n => String(n).padStart(2, '0');
+      const id = `GB-${dep.getFullYear() + 543}${p2(dep.getMonth() + 1)}${p2(dep.getDate())}-${p2(dep.getHours())}${p2(dep.getMinutes())}-${Math.random().toString(36).slice(2, 5)}`;
+      const startAt = dep.toISOString(), place = api.garbagePlace();
+      const odoS = o.odoStart === '' || o.odoStart == null ? null : +o.odoStart;
+      const r = {
+        id, createdAt: nowISO(), category: 'other', categoryOther: 'ทิ้งขยะ', purpose: 'นำขยะไปทิ้ง', project: '',
+        destinations: [{ id: uid('pl'), name: place, address: '', province: '', lat: null, lng: null, km: 0, mins: 0 }], totalKm: 0, totalMins: 0,
+        startAt, endAt: new Date(dep.getTime() + 3 * 36e5).toISOString(), tripType: 'day', onewayDir: '', overnight: false, lodging: '',
+        teachers: 0, students: 0, others: 0, passengerNames: '', pickup: 'โรงเรียน', contactPhone: drv.phone || '', note: String(o.note || '').trim(), attachments: [],
+        requester: { email: drv.email || '', name: drv.name, dept: 'งานยานพาหนะ', phone: drv.phone || '' },
+        status: 'ontrip', emergency: false, createdBy: me.email,
+        garbage: { by: me.email, byName: me.name || me.email, backdated: back },
+        decision: { by: me.email, byName: me.name || me.email, at: nowISO(), action: 'approve', note: 'รถขนขยะ — งานประจำวัน' },
+        assignments: [{ vehicleId: v.id, driverId: drv.id, note: '', status: 'ontrip', departedAt: startAt, returnedAt: '', odoStart: odoS, odoEnd: null, rated: false, ratingSkipped: true }],
+        driverEmails: drv.email ? [drv.email] : [], expenses: [],
+        history: [H('depart', v.name + ' · ทิ้งขยะ' + (back ? ` · บันทึกย้อนหลัง${o.late ? ': ' + String(o.late).trim() : ''}` : ''))]
+      };
+      await createReq(r);
+      return r;
+    },
+    // ═══ คำสั่งงานรถจากผู้อำนวยการ: ผอ.สั่งเอง หรือแอดมินบันทึกแทน → ไม่ต้องมีบันทึกข้อความ ไม่ติดกฎขอล่วงหน้า → แอดมินจัดรถ/คนขับ ═══
+    async createOrder(input, { by = '' } = {}) {
+      const admin = isAdmin(me);
+      if (!admin && !isExec(me)) throw new Error('เฉพาะผู้บริหารหรือแอดมิน');
+      const x = cleanReqInput({ ...input, category: 'other', categoryOther: 'ภารกิจตามคำสั่งผู้อำนวยการ', attachments: [] });
+      if (!x.purpose) throw new Error('กรุณาระบุภารกิจ');
+      if (!x.destinations.length) throw new Error('กรุณาเลือกสถานที่ปลายทางอย่างน้อย 1 แห่ง');
+      if (isNaN(new Date(x.startAt)) || isNaN(new Date(x.endAt))) throw new Error('กรุณาระบุวันเวลาไป-กลับ');
+      if (new Date(x.endAt) <= new Date(x.startAt)) throw new Error('เวลากลับต้องหลังเวลาออกเดินทาง');
+      const ex = admin && by ? user(by) : me;
+      if (!ex) throw new Error('กรุณาเลือกผู้สั่งการ');
+      const id = await A.nextId(x.startAt);
+      const r = { id, createdAt: nowISO(), ...x, requester: { email: ex.email, name: ex.name, dept: ex.dept || 'ผู้บริหาร', phone: ex.phone || '' }, status: 'pending', emergency: false, createdBy: me.email,
+        order: { by: ex.email, byName: ex.name, at: nowISO(), enteredBy: ex.email === me.email ? '' : me.email, enteredByName: ex.email === me.email ? '' : (me.name || me.email) },
+        history: [H('order', ex.email === me.email ? '' : `แอดมินบันทึกแทน ${ex.name}`)], decision: null, assignments: [], expenses: [] };
+      await createReq(r); rememberPlaces(x.destinations);
+      return r;
+    },
     // คนขับสำรอง (ฉุกเฉินเท่านั้น): สร้างชื่อในพนักงานขับรถให้อัตโนมัติ (standby) · ไม่โผล่ตอนจัดรถ/ตารางงาน/ติดต่อเรา
     async setStandby(email, on) {
       needAdmin();
@@ -1238,14 +1370,19 @@ const Store = (() => {
       }
     },
     // คนขับ/แอดมิน: ออกเดินทาง / กลับถึง / เลขไมล์
-    async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '', paxSign = null } = {}) {
+    async tripStatus(id, idx, status, { odo, at, check = null, note = '', override = '', paxSign = null, late = '' } = {}) {
       const when = at ? new Date(at).toISOString() : nowISO();
+      // บันทึกย้อนหลัง (ลืมกด / ไม่มีเน็ต): ย้อนได้ไม่เกิน 24 ชม. · เกิน 15 นาทีต้องระบุเหตุผล
+      const lateMin = (Date.now() - new Date(when).getTime()) / 6e4;
+      late = String(late || '').trim();
       // ทุกคน: ออกเดินทางได้ตั้งแต่ 3 ชั่วโมงก่อนเวลาออก · เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน
       // ยกเว้นแอดมินบันทึกแทนจากหน้าหลังบ้าน (override = เหตุผล) หรือการย้อนสถานะ
       const ov = isAdmin(me) && String(override || '').trim();
       if (!ov && status !== 'assigned') {
         const cur = request(id);
-        if (status === 'ontrip' && cur && Date.now() < new Date(cur.startAt).getTime() - 180 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 3 ชั่วโมงที)');
+        if (status === 'ontrip' && cur && new Date(when).getTime() < new Date(cur.startAt).getTime() - 180 * 6e4) throw new Error('ยังไม่ถึงเวลาออกเดินทาง (กดได้ก่อนเวลาออก 3 ชั่วโมงที)');
+        if (lateMin > 24 * 60) throw new Error('บันทึกย้อนหลังได้ไม่เกิน 24 ชั่วโมง — ให้แอดมินบันทึกแทน');
+        if (lateMin > 15 && !late) throw new Error('เวลาที่ใส่ย้อนหลังเกิน 15 นาที — กรุณาระบุเหตุผล (เช่น ไม่มีอินเทอร์เน็ต / ลืมกด)');
         if (status === 'ontrip' && cur && Date.now() > new Date(cur.startAt).getTime() + 24 * 36e5) throw new Error('เลยกำหนดออกเดินทางเกิน 24 ชั่วโมง — ให้แอดมินบันทึกแทน');
         if (new Date(when).getTime() > Date.now() + 5 * 6e4) throw new Error('เวลาที่บันทึกต้องไม่เกินเวลาปัจจุบัน');
       }
@@ -1260,14 +1397,15 @@ const Store = (() => {
         if (status === 'ontrip') {
           a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo;
           if (check) a.check = { at: nowISO(), by: me.email, ok: !!check.ok, miss: check.miss || [], note: String(check.note || '').trim(), skipped: !!check.skipped };
-          r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
+          r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '') + (late ? ` · บันทึกย้อนหลัง: ${late}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         }
         else if (status === 'returned') {
           // ต้องกด "ออกเดินทาง" ก่อนเสมอ (ยกเว้นแอดมินบันทึกแทนพร้อมเหตุผล)
           if (a.status !== 'ontrip' && !ov) throw new Error(a.status === 'returned' ? 'บันทึกกลับถึงแล้ว' : 'ต้องกด "ออกเดินทาง" ก่อน จึงจะกด "กลับถึงแล้ว" ได้');
+          if (a.departedAt && new Date(when).getTime() < new Date(a.departedAt).getTime() - 6e4) throw new Error('เวลากลับถึงต้องหลังเวลาออกเดินทาง (' + new Date(a.departedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.)');
           if (odo != null && odo !== '' && a.odoStart != null && +odo < +a.odoStart) throw new Error('เลขไมล์ตอนกลับต้องมากกว่าตอนออก');
           if (paxSign) a.paxSign = paxSign.has ? { has: true, name: String(paxSign.name || '').trim(), img: String(paxSign.img || ''), at: paxSign.at || nowISO() } : { has: false, at: paxSign.at || nowISO() };
-          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (r.medical) r.endAt = when; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
+          a.status = 'returned'; a.returnedAt = when; if (!a.departedAt) a.departedAt = r.startAt; if (selfTrip(r)) r.endAt = when; if (odo != null && odo !== '') a.odoEnd = +odo; r.history.push(H('return', vName + (note ? ` · กลับก่อนเวลา: ${String(note).trim()}` : '') + (late ? ` · บันทึกย้อนหลัง: ${late}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         } else if (status === 'assigned') { a.status = 'assigned'; a.departedAt = ''; a.returnedAt = ''; r.history.push(H('undo', vName)); }
         return r;
       });

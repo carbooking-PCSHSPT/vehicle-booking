@@ -2359,3 +2359,57 @@ html.is-loading .ld-road { opacity: 1; }
 .dt-tag { font-size: .7rem; line-height: 1.3; padding: 2px 8px; border-radius: 999px; background: #eef0fb; color: var(--navy, #1e2a5a); }
 .dt-tag.dorm { background: #fde8e8; color: #b91c1c; font-weight: 500; }
 .dt-tag.duty { background: #fdf3d8; color: #8a5a00; }
+
+/* ===== ขนาดตัวอักษร (คนขับเลือกเอง) ===== */
+html.fs-1 { font-size: 118.75%; }
+html.fs-2 { font-size: 131.25%; }
+.fs-bar { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: 12px 0 0; font-size: .84rem; color: var(--muted); }
+.fs-bar span { margin-right: 4px; }
+.fs-bar button { min-width: 46px; height: 38px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-family: var(--font-display); font-weight: 600; cursor: pointer; }
+.fs-bar button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* ===== ปุ่มงานที่คนขับเปิดเอง: ฉุกเฉิน + ซื้อ/รับของ ===== */
+.go-btns { display: grid; gap: 10px; margin-top: 14px; }
+.go-btns .em-go { margin-top: 0; }
+.em-go.sp-go { background: linear-gradient(135deg, #e08a00, #c26a00); box-shadow: 0 14px 26px -16px rgba(194, 106, 0, .9); }
+.sp-ttl { color: #b45309; }
+
+/* ===== รถขนขยะ ===== */
+.gb-card { margin-top: 14px; padding: 18px; border-radius: 24px; background: #effaf3; border: 2px solid #bfe6cc; }
+.gb-card.live { background: #fff7ed; border-color: #fdcf9c; }
+.gb-head { display: flex; align-items: center; gap: 12px; }
+.gb-head > .i { width: 44px; height: 44px; padding: 9px; border-radius: 14px; background: #15803d; color: #fff; box-sizing: border-box; flex: none; }
+.gb-head div { flex: 1; min-width: 0; display: grid; } .gb-head b { font: 600 1.15rem var(--font-display); } .gb-head small { color: var(--muted); }
+.gb-n { font-size: .9rem; color: var(--muted); white-space: nowrap; } .gb-n b { font-size: 1.3rem; color: var(--ink); }
+.gb-now { margin: 12px 0 0; font-weight: 600; color: #c2410c; }
+.gb-btn { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 84px; margin-top: 14px; border: 0; border-radius: 20px; color: #fff; font: 700 1.35rem var(--font-display); cursor: pointer; }
+.gb-btn .i { width: 32px; height: 32px; }
+.gb-btn.out { background: linear-gradient(135deg, #16a34a, #15803d); box-shadow: 0 16px 28px -18px rgba(21, 128, 61, .9); }
+.gb-btn.back { background: linear-gradient(135deg, #ea580c, #c2410c); box-shadow: 0 16px 28px -18px rgba(194, 65, 12, .9); }
+.gb-btn:active { transform: scale(.99); }
+.gb-list { margin: 14px 0 0; padding-left: 0; list-style: none; display: grid; gap: 4px; font-size: .95rem; }
+.gb-list li { padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, .7); }
+.gb-fuel { width: 100%; margin-top: 10px; justify-content: center; }
+.gb-q { font-size: 1.1rem; }
+.gb-more summary { cursor: pointer; color: var(--muted); font-size: .9rem; padding: 6px 0; }
+
+/* ===== แถบสถานะอินเทอร์เน็ต ===== */
+.net-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100% - 24px)); padding: 10px 16px; border-radius: 16px; background: #1e3a8a; color: #fff; font-size: .86rem; box-shadow: 0 12px 28px -12px rgba(0, 0, 0, .45); }
+.net-bar.off { background: #b45309; }
+.net-bar .i { width: 20px; height: 20px; flex: none; }
+
+/* ===== ป้ายประเภทงาน (หลังบ้าน) ===== */
+.kind-tag { display: inline-block; font-size: .72rem; padding: 1px 8px; border-radius: 999px; font-weight: 500; }
+.kind-tag.sp { background: #fdf0d8; color: #9a5800; }
+.kind-tag.gb { background: #def5e5; color: #166534; }
+.kind-tag.or { background: #e8ebfb; color: var(--navy); }
+.chip-debt.chip-sp.on { background: #c26a00; border-color: #c26a00; }
+.chip-debt.chip-gb.on { background: #15803d; border-color: #15803d; }
+.chip-debt.chip-or.on { background: var(--navy); border-color: var(--navy); }
+.chip-debt.chip-sp { background: #fff7ea; border-color: #f6d39b; color: #9a5800; }
+.chip-debt.chip-gb { background: #effaf3; border-color: #bfe6cc; color: #166534; }
+.chip-debt.chip-or { background: #f0f2fd; border-color: #cdd3f3; color: var(--navy); }
+.chip-debt.chip-sp.on, .chip-debt.chip-gb.on, .chip-debt.chip-or.on { color: #fff; }
+.chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; margin: 4px 0 6px; }
+.side-order { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 10px; padding: 11px 14px; border: 0; border-radius: 14px; background: linear-gradient(135deg, var(--navy), #3a48a8); color: #fff; font: 600 .9rem var(--font-display); cursor: pointer; text-align: left; }
+.side-order .i { width: 18px; height: 18px; flex: none; }

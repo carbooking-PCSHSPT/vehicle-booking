@@ -82,10 +82,12 @@ service cloud.firestore {
                         && request.resource.data.emergency == false
                         && request.resource.data.assignments.size() == 0
                         && request.resource.data.decision == null)
-                    // คนขับ: ออกงานฉุกเฉินนำส่งผู้ป่วยเอง (ไม่ต้องขอ/อนุมัติ) — ต้องเป็นคนขับของงานนั้นเอง 1 คัน สถานะกำลังเดินทาง
+                    // คนขับ: เปิดงานเอง (ไม่ต้องขอ/อนุมัติ) — ฉุกเฉินนำส่งผู้ป่วย · ออกซื้อ/รับของ · รถขนขยะ
+                    // ต้องเป็นคนขับของงานนั้นเอง 1 คัน สถานะกำลังเดินทาง
                     || (role('driver')
-                        && request.resource.data.get('medical', null) != null
-                        && request.resource.data.emergency == true
+                        && ((request.resource.data.get('medical', null) != null && request.resource.data.emergency == true)
+                            || (request.resource.data.get('supply', null) != null && request.resource.data.emergency == false)
+                            || (request.resource.data.get('garbage', null) != null && request.resource.data.emergency == false))
                         && request.resource.data.status == 'ontrip'
                         && request.resource.data.requester.email == email()
                         && request.resource.data.driverEmails == [email()]
@@ -126,8 +128,8 @@ service cloud.firestore {
                         && resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && request.resource.data.status in ['approved', 'ontrip', 'returned', 'closed']
                         && (changedOnly(['assignments', 'expenses', 'history', 'status', 'closedAt', 'updatedAt'])
-                            // งานฉุกเฉิน: กลับถึงแล้วปรับเวลากลับ (endAt) ตามจริง
-                            || (resource.data.get('medical', null) != null
+                            // งานที่เปิดเอง (ฉุกเฉิน/ซื้อของ/รถขยะ): กลับถึงแล้วปรับเวลากลับ (endAt) ตามจริง
+                            || ((resource.data.get('medical', null) != null || resource.data.get('supply', null) != null || resource.data.get('garbage', null) != null)
                                 && changedOnly(['assignments', 'expenses', 'history', 'status', 'closedAt', 'updatedAt', 'endAt'])))
                         && asgAllOnly(['status', 'departedAt', 'returnedAt', 'odoStart', 'odoEnd', 'check', 'paxSign']));
       allow delete: if admin();
