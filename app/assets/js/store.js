@@ -610,7 +610,7 @@ const Store = (() => {
     // เน็ตหลุด: ไม่รอเซิร์ฟเวอร์ตอบ — Firestore เก็บการเขียนไว้ในเครื่อง (enablePersistence) แล้วส่งเองเมื่อกลับมาออนไลน์
     const isOff = () => typeof navigator !== 'undefined' && navigator.onLine === false;
     const offErr = e => /unavailable/.test(String((e && e.code) || '')) || /offline/i.test(String((e && e.message) || ''));
-    const queued = p => {
+    const queueWrite = p => {   // (ชื่อต้องไม่ซ้ำกับ queued ของคิวโหลดไฟล์ Drive)
       pendingN++; emit();
       p.catch(e => {
         if (api.logError) api.logError({ kind: 'firestore', msg: 'offline write: ' + ((e && e.code) || '') + ' ' + ((e && e.message) || '') });
@@ -748,7 +748,7 @@ const Store = (() => {
       async put(col, id, data) {
         if (col === 'settings') return guard(fs.collection('config').doc('settings').set(strip(data)));
         const w = fs.collection(colName[col]).doc(id).set(strip(data));
-        if (isOff()) { queued(w); keepHistory(col, id, data); return; }
+        if (isOff()) { queueWrite(w); keepHistory(col, id, data); return; }
         await guard(w);
         keepHistory(col, id, data);
       },
@@ -762,8 +762,8 @@ const Store = (() => {
           if (!cur) throw new Error('ไม่มีอินเทอร์เน็ต และไม่พบข้อมูลในเครื่อง — ลองใหม่เมื่อมีสัญญาณ');
           const extra = [];
           const next = fn(clone(cur), (c, i, d) => extra.push([c, i, d]));
-          extra.forEach(([c, i, d]) => queued(fs.collection(colName[c]).doc(i).set(strip(d))));
-          queued(ref.set(strip(next)));
+          extra.forEach(([c, i, d]) => queueWrite(fs.collection(colName[c]).doc(i).set(strip(d))));
+          queueWrite(ref.set(strip(next)));
           keepHistory(col, id, next);
           return next;
         };
