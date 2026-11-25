@@ -80,6 +80,25 @@ const Store = (() => {
   const listeners = new Set();
   function emptyDb() { return { settings: defaultSettings(), vehicles: [], drivers: [], users: [], requests: [], places: [], ratings: [], vprivate: {}, signatures: {}, trash: [], ot: [], feedback: [], errlog: [] }; }
   const TRASH_DAYS = 30;
+  const DOC_KINDS = { act: 'พ.ร.บ.', tax: 'ภาษีรถ', ins: 'ประกันภัย', lic: 'ใบขับขี่' };
+  const docExpOf = p => ({ act: (p && p.actExpiry) || '', tax: (p && p.taxExpiry) || '', ins: (p && p.insurance && p.insurance.expiry) || '' });
+  const daysLeft = d => Math.ceil((new Date(d + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 864e5);
+  // รายการเอกสารที่ใกล้หมดอายุ (ภายใน within วัน รวมที่หมดแล้ว) — แอดมินใช้ข้อมูลเชิงลึก · คนอื่นใช้สำเนาในข้อมูลรถ
+  function renewItems(within = 60, { vehicleIds = null, driverIds = null } = {}) {
+    const out = [];
+    db.vehicles.forEach(v => {
+      if (vehicleIds && !vehicleIds.includes(v.id)) return;
+      const e = isBack(me) && db.vprivate[v.id] ? docExpOf(db.vprivate[v.id]) : (v.docExp || {});
+      ['act', 'tax', 'ins'].forEach(k => { if (!e[k]) return; const n = daysLeft(e[k]); if (n <= within) out.push({ key: `${v.id}_${k}`, kind: k, label: DOC_KINDS[k], who: v.name, sub: v.plate || '', exp: e[k], days: n, vid: v.id }); });
+    });
+    db.drivers.forEach(d => {
+      if (d.active === false || !d.licenseExpiry || (driverIds && !driverIds.includes(d.id))) return;
+      const n = daysLeft(d.licenseExpiry); if (n <= within) out.push({ key: `${d.id}_lic`, kind: 'lic', label: DOC_KINDS.lic, who: d.name, sub: 'พนักงานขับรถ', exp: d.licenseExpiry, days: n, did: d.id });
+    });
+    return out.sort((a, b) => a.days - b.days);
+  }
+  // เอกสารรถที่หมดอายุแล้ว (เตือนตอนออกเดินทาง)
+  const docWarn = vid => { const v = vehicle(vid) || {}, e = v.docExp || {}; return ['act', 'tax', 'ins'].filter(k => e[k] && daysLeft(e[k]) < 0).map(k => `${DOC_KINDS[k]}หมดอายุแล้ว (${new Date(e[k] + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })})`).join(' · '); };
   const SHOPS = ['แม็คโคร', 'โลตัส', 'บิ๊กซี', 'ร้านวัสดุก่อสร้าง', 'ไปรษณีย์'];   // ร้านที่ไปบ่อย (แอดมินแก้ได้ในตั้งค่า)   // ข้อมูลที่ล้างแล้วอยู่ในถังขยะกี่วันก่อนลบถาวร
   function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
 
@@ -222,7 +241,7 @@ const Store = (() => {
   const signerRoles = u => { if (!u) return []; const s = memoSigners(); return [s.head === u.email && 'head', s.deputy === u.email && 'deputy'].filter(Boolean); };
   // งานที่คนขับเปิดเอง (ไม่ต้องขอ/อนุมัติ): ฉุกเฉินนำส่งผู้ป่วย · ซื้อ/รับของ · รถขนขยะ
   const selfTrip = r => !!(r && (r.medical || r.supply || r.garbage));
-  const noMemo = r => selfTrip(r) || !!(r && r.order);
+  const noMemo = r => selfTrip(r) || !!(r && (r.order || r.imported));
   const needsMySign = (r, role) => !noMemo(r) && ['approved', 'ontrip', 'returned', 'closed'].includes(r.status) && !((r.esign || {})[role]) && (role === 'head' || !!(r.esign || {}).head);
   const memoDebts = email => email ? db.requests.filter(r => r.requester && r.requester.email === email && needsMemo(r)).sort((a, b) => a.startAt.localeCompare(b.startAt)) : [];
   const catName = r => { if (!r || !r.category) return 'ไม่ระบุ'; if (r.category === 'other') return r.categoryOther ? `อื่น ๆ: ${r.categoryOther}` : 'อื่น ๆ'; const c = catOf(r.category); return c ? c.name : 'ไม่ระบุ'; };
@@ -261,7 +280,7 @@ const Store = (() => {
     const myDriver = driverOfUser(me);
     const T = {
       approve: 'คำขอได้รับการอนุมัติ', reject: 'คำขอไม่ได้รับการอนุมัติ', revise: 'แอดมินส่งคำขอกลับให้แก้ไข', reassign: 'แอดมินปรับรถ/คนขับ',
-      medical: 'รถออกงานฉุกเฉิน (นำส่งผู้ป่วย)', medicalack: 'แอดมินรับทราบงานฉุกเฉินแล้ว', supply: 'รถออกซื้อ/รับของ', order: 'คำสั่งงานรถจากผู้อำนวยการ — รอจัดรถ',
+      medical: 'รถออกงานฉุกเฉิน (นำส่งผู้ป่วย)', medicalack: 'แอดมินรับทราบงานฉุกเฉินแล้ว', supply: 'รถออกซื้อ/รับของ', order: 'คำสั่งงานรถจากผู้อำนวยการ — รอจัดรถ', docwarn: '⚠ รถออกเดินทางขณะเอกสารหมดอายุ',
       depart: 'รถออกเดินทางแล้ว', return: 'รถกลับถึงโรงเรียนแล้ว', close: 'ปิดงานแล้ว', submit: 'มีคำขอใช้รถใหม่', resubmit: 'มีคำขอที่แก้ไขแล้วส่งใหม่', cancel: 'ผู้ขอยกเลิกคำขอ', emergency: 'แอดมินบันทึกคำขอเร่งด่วน',
       memo: 'ผู้ขอแนบบันทึกข้อความตามหลังแล้ว', memowaive: 'แอดมินยกเว้นบันทึกข้อความแล้ว — ขอใช้รถครั้งต่อไปได้',
       changereq: 'มีคำขอแก้ไขข้อมูล รอพิจารณา', changeok: 'แอดมินอนุมัติการแก้ไขข้อมูลแล้ว', changeno: 'แอดมินไม่อนุมัติการแก้ไขข้อมูล'
@@ -271,7 +290,7 @@ const Store = (() => {
         if (h.by === me.email) return;
         let mine = false, link = '';
         if (r.requester && r.requester.email === me.email && ['approve', 'reject', 'revise', 'reassign', 'depart', 'return', 'close', 'memowaive', 'changeok', 'changeno'].includes(h.action)) { mine = true; link = `#/my/${r.id}`; }
-        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq', 'medical', 'supply', 'order'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
+        if (isAdmin(me) && ['submit', 'resubmit', 'cancel', 'memo', 'changereq', 'medical', 'supply', 'order', 'docwarn'].includes(h.action)) { mine = true; link = `#/admin/requests/${r.id}`; }
         if (myDriver && ['approve', 'reassign', 'emergency'].includes(h.action) && (r.assignments || []).some(a => a.driverId === myDriver.id)) { mine = true; link = `#/driver`; }
         if (mine && T[h.action]) out.push({ id: r.id + h.at + h.action, at: h.at, title: T[h.action], body: `${r.id} · ${destName(r)}${h.note ? ' — ' + h.note : ''}`, link, unread: h.at > seen && h.at <= nowStr });
       });
@@ -281,6 +300,7 @@ const Store = (() => {
     const task = o => out.push({ ...o, task: true, unread: !seenTasks.includes(o.id) });
     // ผู้ลงนามอิเล็กทรอนิกส์: มีบันทึกข้อความรอลงนาม
     signerRoles(me).forEach(ro => { const n = db.requests.filter(r => needsMySign(r, ro)).length; if (n) task({ id: 'esign-' + ro + n, at: nowISO(), title: `บันทึกข้อความรอลงนาม ${n} ฉบับ`, body: ro === 'head' ? 'ในฐานะหัวหน้างานยานพาหนะ' : 'ในฐานะรองผู้อำนวยการฝ่ายบริหารงานทั่วไป', link: `#/admin/esign?role=${ro}` }); });
+    if (isAdmin(me)) renewItems(30).forEach(x => task({ id: `renew-${x.key}-${x.exp}-${x.days <= 7 ? 7 : 30}`, at: nowISO(), title: x.days < 0 ? `หมดอายุแล้ว: ${x.who} · ${x.label}` : `ใกล้หมดอายุ (อีก ${x.days} วัน): ${x.who} · ${x.label}`, body: `ครบ ${x.exp.split('-').reverse().join('/')} · กดเพื่อต่ออายุ`, link: '#/admin' }));
     memoDebts(me.email).forEach(r => task({ id: 'memo' + r.id, at: r.createdAt, title: 'ค้างบันทึกข้อความ — กรุณาแนบ', body: `${r.id} · ${destName(r)} · ต้องแนบก่อนจึงจะขอใช้รถครั้งต่อไปได้`, link: `#/my/${r.id}` }));
     pendingRatings().forEach(p => task({ id: 'rate' + p.r.id + p.i, at: p.a.returnedAt, title: 'ประเมินคนขับรถ', body: `${p.r.id} · ${destName(p.r)} · ${(driver(p.a.driverId) || {}).name || ''}`, link: `#/rate/${p.r.id}/${p.i}`, rate: true }));
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 40);
@@ -902,7 +922,8 @@ const Store = (() => {
     }
     if (d.email !== email) { await A.put('drivers', d.id, { ...d, email, updatedAt: nowISO() }); await syncDriverEmails(d.id, email); }
   }
-  const createReq = r => A.put('requests', r.id, finishReq(r)).then(() => r);
+  // งานที่ออกทันที (ฉุกเฉิน/ซื้อของ/รถขยะ) ด้วยรถที่เอกสารหมดอายุ → บันทึกเตือนในประวัติ (แจ้งแอดมิน)
+  const createReq = r => { (r.assignments || []).forEach(a => { if (a.status === 'ontrip') { const dw = docWarn(a.vehicleId); if (dw) r.history.push(H('docwarn', `${(vehicle(a.vehicleId) || {}).name || ''}: ${dw}`)); } }); return A.put('requests', r.id, finishReq(r)).then(() => r); };
   // แก้คำขอที่มีอยู่: ใช้ข้อมูลล่าสุดจากฐานข้อมูลกลางเสมอ (ธุรกรรม) → หลายเครื่องกดพร้อมกันไม่ทับกัน
   // fn(r, also) แก้ r แล้วคืนค่า · ตรวจสิทธิ์/สถานะใน fn อีกครั้งเพราะข้อมูลอาจเปลี่ยนจากเครื่องอื่น
   const mutateReq = (id, fn) => A.update('requests', id, (r, also) => finishReq(fn(r, also) || r));
@@ -1343,6 +1364,25 @@ const Store = (() => {
       return r;
     },
     // ═══ คำสั่งงานรถจากผู้อำนวยการ: ผอ.สั่งเอง หรือแอดมินบันทึกแทน → ไม่ต้องมีบันทึกข้อความ ไม่ติดกฎขอล่วงหน้า → แอดมินจัดรถ/คนขับ ═══
+    // ═══ นำเข้างานที่จองไว้จากระบบเดิม (ใบกระดาษ) — แอดมินเท่านั้น · มีรถ = อนุมัติ+จัดรถเลย · ไม่มีรถ = รอตรวจสอบ · ไม่ต้องตามบันทึกข้อความ ═══
+    async importRequest(x) {
+      needAdmin();
+      const c = cleanReqInput({ ...x, attachments: [] });
+      if (!c.destinations.length) throw new Error('ไม่มีปลายทาง');
+      if (isNaN(new Date(c.startAt)) || isNaN(new Date(c.endAt)) || new Date(c.endAt) <= new Date(c.startAt)) throw new Error('วันเวลาไป-กลับไม่ถูกต้อง');
+      const u = x.requester && x.requester.name ? (userByName(x.requester.name) || null) : null;
+      const id = await A.nextId(c.startAt);
+      const r = { id, createdAt: nowISO(), ...c, requester: { email: u ? u.email : '', name: String((x.requester || {}).name || '').trim() || 'ไม่ระบุ', dept: String((x.requester || {}).dept || (u && u.dept) || '').trim(), phone: String((x.requester || {}).phone || (u && u.phone) || '').trim() },
+        status: 'pending', emergency: false, createdBy: me.email, imported: { at: nowISO(), by: me.email, row: x.row || '' }, memoWaived: true,
+        history: [H('import', 'นำเข้าจากระบบเดิม (ใบกระดาษ)')], decision: null, assignments: [], expenses: [] };
+      if (x.vehicleId) {
+        r.assignments = [{ vehicleId: x.vehicleId, driverId: x.driverId || '', note: '', status: 'assigned', departedAt: '', returnedAt: '', odoStart: null, odoEnd: null, rated: false }];
+        r.status = 'approved'; r.decision = { by: me.email, byName: me.name, at: nowISO(), action: 'approve', note: 'นำเข้าจากระบบเดิม' };
+        r.history.push(H('approve', 'นำเข้าจากระบบเดิม'));
+      }
+      await createReq(r); rememberPlaces(c.destinations);
+      return r;
+    },
     async createOrder(input, { by = '' } = {}) {
       const admin = isAdmin(me);
       if (!admin && !isExec(me)) throw new Error('เฉพาะผู้บริหารหรือแอดมิน');
@@ -1402,6 +1442,7 @@ const Store = (() => {
         if (status === 'ontrip') {
           a.status = 'ontrip'; a.departedAt = when; if (odo != null && odo !== '') a.odoStart = +odo;
           if (check) a.check = { at: nowISO(), by: me.email, ok: !!check.ok, miss: check.miss || [], note: String(check.note || '').trim(), skipped: !!check.skipped };
+          { const dw = docWarn(a.vehicleId); if (dw) r.history.push(H('docwarn', `${vName}: ${dw}`)); }
           r.history.push(H('depart', vName + (check && !check.ok && !check.skipped ? ` · ⚠ พบปัญหา: ${[...(check.miss || []), check.note].filter(Boolean).join(', ')}` : '') + (late ? ` · บันทึกย้อนหลัง: ${late}` : '') + (ov ? ` · แอดมินบันทึกแทน: ${ov}` : '')));
         }
         else if (status === 'returned') {
@@ -1510,6 +1551,24 @@ const Store = (() => {
       d.docs = await A.upload(d.docs || [], { kind: 'vdoc', ref: vn, label: 'เอกสารรถ' });
       d.id = id; d.updatedAt = nowISO();
       await A.put('vprivate', id, d);
+      const v = vehicle(id), ex = docExpOf(d);
+      if (v && JSON.stringify(v.docExp || {}) !== JSON.stringify(ex)) await A.put('vehicles', id, { ...v, docExp: ex, updatedAt: nowISO() });
+    },
+    renewItems, docWarn, DOC_KINDS,
+    // ต่ออายุ: ใส่วันหมดอายุใหม่ (รถ = ข้อมูลเชิงลึก · ใบขับขี่ = ข้อมูลคนขับ)
+    async renewDoc(x, date) {
+      needAdmin();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw new Error('กรุณาเลือกวันหมดอายุใหม่');
+      if (x.kind === 'lic') { const d = driver(x.did); if (!d) throw new Error('ไม่พบคนขับ'); return api.saveDriver({ ...d, licenseExpiry: date }); }
+      const p = clone(db.vprivate[x.vid] || { id: x.vid, insurance: {}, repairs: [], maintenancePlan: [], accidents: [], docs: [], notes: '' });
+      p.insurance = p.insurance || {};
+      if (x.kind === 'act') p.actExpiry = date; else if (x.kind === 'tax') p.taxExpiry = date; else p.insurance.expiry = date;
+      return api.saveVehiclePrivate(x.vid, p);
+    },
+    // ข้อมูลเดิมที่บันทึกก่อนมีสำเนาในข้อมูลรถ → คัดลอกให้ครั้งเดียว (แอดมินเปิดหน้าภาพรวม)
+    async syncDocExp() {
+      if (!isAdmin(me)) return;
+      for (const v of db.vehicles) { const p = db.vprivate[v.id]; if (!p) continue; const ex = docExpOf(p); if (JSON.stringify(v.docExp || {}) !== JSON.stringify(ex)) await A.put('vehicles', v.id, { ...v, docExp: ex }); }
     },
     // ── คนขับ ──
     async saveDriver(d) {

@@ -2476,3 +2476,20 @@ html.fs-2 { font-size: 131.25%; }
 .lt640 .rs-step { padding: 10px; }
 .lt640 .rs-person { gap: 4px; } .lt640 .rs-person .icon-btn { width: 32px; height: 32px; }
 .lt640 .rs-wk .rs-pill { font-size: .84rem; padding: 3px 9px; }
+/* ===== ต่ออายุเอกสาร ===== */
+.rn-card { --red: #c62828; --red-50: #fdecec; --amb: #b45309; --amb-50: #fff4dc; --blu: #1d5bbf; --blu-50: #e8effc; }
+.rn-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.rn-sum div { border-radius: 14px; padding: 8px 12px; font-weight: 600; font-size: .84rem; }
+.rn-sum b { display: block; font: 700 1.4rem var(--font-display); }
+.rn-sum .rn-red { background: #fdecec; color: #c62828; } .rn-sum .rn-amb { background: #fff4dc; color: #b45309; } .rn-sum .rn-blu { background: #e8effc; color: #1d5bbf; }
+.rn-list { display: grid; gap: 8px; }
+.rn-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 14px; border: 1px solid var(--line); border-left: 5px solid var(--c); }
+.rn-row.rn-red { --c: #c62828; --c50: #fdecec; } .rn-row.rn-amb { --c: #b45309; --c50: #fff4dc; } .rn-row.rn-blu { --c: #1d5bbf; --c50: #e8effc; }
+.rn-days { min-width: 70px; text-align: center; border-radius: 12px; padding: 4px 6px; background: var(--c50); color: var(--c); font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.rn-days small { display: block; font-weight: 500; font-size: .72rem; }
+.rn-what b { display: block; } .rn-what small { color: var(--muted); font-size: .84rem; }
+.lt640 .rn-row { grid-template-columns: auto minmax(0, 1fr); } .lt640 .rn-row .btn { grid-column: 1 / -1; justify-content: center; }
+.lt640 .rn-sum { grid-template-columns: minmax(0, 1fr); }
+.rn-drv { margin-top: 12px; padding: 12px 14px; border-radius: 16px; display: grid; gap: 2px; background: var(--c50); border: 1px solid var(--c); }
+.rn-drv b { color: var(--c); } .rn-drv small { color: var(--muted); }
+.rn-drv.rn-red { --c: #c62828; --c50: #fdecec; } .rn-drv.rn-amb { --c: #b45309; --c50: #fff4dc; } .rn-drv.rn-blu { --c: #1d5bbf; --c50: #e8effc; }

@@ -380,6 +380,7 @@
       title: dep ? `${icon('navigation')} ตรวจรถและออกเดินทาง` : `${icon('home')} ยืนยันกลับถึงโรงเรียน`,
       body: `<div class="stack">
         <div class="note-box navy">${icon(kindIcon(v.kind))}<div><b>${esc(v.name)} · ${esc(v.plate)}</b><br>${esc(S.destName(r))} · ${fmt.range(r.startAt, r.endAt)}</div></div>
+        ${dep && S.docWarn(v.id) ? `<div class="note-box red">${icon('alert')}<div><b>เอกสารรถคันนี้หมดอายุ:</b> ${esc(S.docWarn(v.id))}<br>ยังออกได้ · ระบบแจ้งแอดมินอัตโนมัติ</div></div>` : ''}
         ${dep ? `<div class="chk-box"><div class="chk-head"><b>${icon('shield')} ตรวจสภาพรถก่อนออกเดินทาง</b>${admin ? '<span class="hint">แอดมินบันทึกแทน — ข้ามได้</span>' : '<span class="hint">ติ๊กให้ครบทุกข้อ</span>'}</div>
           ${CHECKS.map((c, k) => `<label class="chk-item"><input type="checkbox" data-chk="${k}"><span>${c}</span></label>`).join('')}
           <div class="field" style="margin-top:8px"><label>พบปัญหา / ข้อสังเกต <span class="hint">(ถ้ามีข้อที่ไม่ผ่าน ต้องระบุ — แจ้งแอดมินอัตโนมัติ)</span></label><input id="chkNote" placeholder="เช่น ไฟเลี้ยวขวาไม่ติด"></div></div>` : ''}
@@ -626,6 +627,9 @@
           <div class="note-box navy adm-pick" style="margin-bottom:14px">${icon('shield')}<div><span class="nw">มุมมองแอดมิน — เลือกคนขับ</span><div class="adm-pick-row"><select class="input" onchange="location.hash='#/driver?${tab === 'cal' ? 'tab=cal&' : ''}d='+this.value">${S.db.drivers.map(x => `<option value="${x.id}" ${x.id === d.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><a class="link nw" href="#/admin/roster">ตารางเวรรวมทุกคน</a></div></div></div>` : ''}
         <div class="drv-hello">${d.photo ? `<span class="avatar lg gold ph">${UI.img(d.photo, d.name)}</span>` : UI.avatar(d.name, 'lg gold')}<div><small>สวัสดีครับ</small><h2>${esc(d.name)}</h2><small>${fmt.dateLong(new Date())}</small></div></div>
         ${fsBar()}
+        ${(() => { const vids = S.db.vehicles.filter(v => v.driverId === d.id).map(v => v.id);
+          const xs = [...S.renewItems(30, { vehicleIds: vids, driverIds: [] }), ...S.renewItems(60, { vehicleIds: [], driverIds: [d.id] })];
+          return xs.map(x => `<div class="rn-drv rn-${x.days <= 7 ? 'red' : x.days <= 30 ? 'amb' : 'blu'}"><b>${x.kind === 'lic' ? 'ใบขับขี่ของคุณ' : esc(x.who) + ' · ' + x.label}${x.days < 0 ? ` หมดอายุแล้ว ${-x.days} วัน` : ` หมดอายุอีก ${x.days} วัน`}</b><small>ครบ ${fmt.date(x.exp)} · ${x.kind === 'lic' ? 'ต่อแล้วส่งรูปใบใหม่ให้แอดมิน' : 'แอดมินได้รับแจ้งแล้ว ไม่ต้องทำอะไร'}</small></div>`).join(''); })()}
         ${garbagePanel(d, adminView)}
         ${(S.garbageVehicle() || {}).driverId === d.id ? '' : `<div class="go-btns"><button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
         ${d.standby ? '' : `<button type="button" class="em-go sp-go" data-spgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('package')}<span><b>ออกซื้อ / รับของ</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)}` : 'งานประจำฝ่ายบริการ — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>`}</div>`}

@@ -51,6 +51,33 @@
   document.addEventListener('click', e => { const t = e.target.closest('[data-side-toggle]'); if (!t) return; const s = t.closest('.side'); s.classList.toggle('open'); t.setAttribute('aria-expanded', s.classList.contains('open')); });
   const head = (eyebrow, title, sub = '', right = '') => `<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="row">${right}</div>` : ''}</div>`;
 
+  // ═════════ ต่ออายุเอกสาร (พ.ร.บ. · ภาษี · ประกันภัย · ใบขับขี่) — เตือน 3 ระดับ: หมด/≤7 วัน · ≤30 วัน · ≤60 วัน ═════════
+  const RN_LV = n => n <= 7 ? 'red' : n <= 30 ? 'amb' : 'blu';
+  let docSynced = false;
+  function renewCard() {
+    const xs = S.renewItems(60);
+    // ยังไม่มีอะไรใกล้หมด → บอกฉบับที่จะหมดเร็วที่สุด 3 รายการ (ให้รู้ว่าระบบติดตามอยู่)
+    if (!xs.length) { const nx = S.renewItems(36500).slice(0, 3); return `<div class="card rn-card" style="margin-top:18px" id="renew"><div class="card-head"><h3>${icon('shield')} ต่ออายุเอกสาร</h3><span class="pill tone-free">${icon('check')} ไม่มีที่ใกล้หมดใน 60 วัน</span></div>${nx.length ? `<p class="hint">หมดอายุเร็วที่สุด: ${nx.map(x => `<b>${esc(x.who)} · ${x.label}</b> ${fmt.date(x.exp)} (อีก ${x.days} วัน)`).join(' · ')}</p>` : '<p class="hint">ยังไม่มีวันหมดอายุ พ.ร.บ./ภาษี/ประกัน ในระบบ — ใส่ได้ที่ ข้อมูลรถ → ข้อมูลเชิงลึก หรือปุ่มนำเข้าจาก Excel</p>'}<p class="hint">ระบบจะเตือนในการ์ดนี้ กระดิ่ง และหน้าคนขับ เมื่อเหลือไม่เกิน 60 / 30 / 7 วัน</p></div>`; }
+    const c = k => xs.filter(x => RN_LV(x.days) === k).length;
+    return `<div class="card rn-card" style="margin-top:18px" id="renew"><div class="card-head"><h3>${icon('shield')} ต่ออายุเอกสาร</h3><span class="hint">พ.ร.บ. · ภาษี · ประกันภัย · ใบขับขี่ ภายใน 60 วัน</span></div>
+      <div class="rn-sum">${[['red', 'ต้องรีบต่อ (หมด/≤7 วัน)'], ['amb', 'ภายใน 30 วัน'], ['blu', 'ภายใน 60 วัน']].map(([k, l]) => `<div class="rn-${k}"><b>${c(k)}</b>${l}</div>`).join('')}</div>
+      <div class="rn-list">${xs.map((x, i) => `<div class="rn-row rn-${RN_LV(x.days)}"><span class="rn-days">${x.days < 0 ? `เลย ${-x.days}` : x.days}<small>${x.days < 0 ? 'วันแล้ว' : 'วัน'}</small></span>
+        <span class="rn-what"><b>${esc(x.who)} · ${x.label}</b><small>${esc(x.sub)} · ครบ ${fmt.date(x.exp)}</small></span>
+        <button type="button" class="btn btn-primary btn-sm" data-renew="${i}">${icon('check')} ต่ออายุแล้ว</button></div>`).join('')}</div></div>`;
+  }
+  function bindRenew(root) {
+    if (!docSynced) { docSynced = true; S.syncDocExp().catch(() => {}); }
+    root.addEventListener('click', async e => {
+      const b = e.target.closest('[data-renew]'); if (!b) return;
+      const x = S.renewItems(60)[+b.dataset.renew]; if (!x) return;
+      const d = new Date(x.exp + 'T00:00:00'); d.setFullYear(d.getFullYear() + 1);
+      const r = await UI.modal({ title: `${icon('shield')} ต่ออายุ${x.label}`, body: `<div class="stack"><p><b>${esc(x.who)}</b> · ${esc(x.sub)}<br><span class="hint">หมดอายุเดิม ${fmt.date(x.exp)}</span></p>
+          <div class="field"><label>วันหมดอายุใหม่</label><input type="date" id="rnDate" value="${fmt.localDate(d)}"><span class="hint">ค่าเริ่มต้น = อีก 1 ปีจากวันหมดเดิม</span></div></div>`,
+        actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', icon: 'check', onClick: async el => { await S.renewDoc(x, el.querySelector('#rnDate').value); return true; } }] });
+      if (r) UI.toast(`บันทึกแล้ว: ${x.who} · ${x.label}`, 'ok');
+    });
+  }
+
   // ═════════ ภาพรวม ═════════
   Pages.adminHome = () => {
     const now = new Date(), rs = S.db.requests;
@@ -67,11 +94,8 @@
     rs.forEach(r => (r.assignments || []).forEach(a => { if (a.check && !a.check.ok && !a.check.skipped && now - new Date(a.check.at) < 3 * DAY) alerts.push({ red: true, ic: 'shield', t: `${C.vName(a.vehicleId)} · คนขับแจ้งปัญหาก่อนออกเดินทาง: ${[...(a.check.miss || []), a.check.note].filter(Boolean).join(', ')}`, h: `#/admin/requests/${r.id}` }); }));
     Object.values(S.db.vprivate).forEach(p => {
       const v = S.vehicle(p.id); if (!v) return;
-      [['actExpiry', 'พ.ร.บ.'], ['taxExpiry', 'ภาษีรถ']].forEach(([k, l]) => { if (p[k]) { const d = daysTo(p[k]); if (d <= 30) alerts.push({ red: d <= 7, ic: 'shield', t: `${v.name} · ${l} ${d < 0 ? `หมดอายุแล้ว ${-d} วัน` : `จะหมดอายุในอีก ${d} วัน`} (${fmt.date(p[k])})`, h: `#/admin/vehicles/${v.id}?tab=private` }); } });
-      if (p.insurance && p.insurance.expiry) { const d = daysTo(p.insurance.expiry); if (d <= 30) alerts.push({ red: d <= 7, ic: 'shield', t: `${v.name} · ประกันภัย ${d < 0 ? 'หมดอายุแล้ว' : `จะหมดอายุในอีก ${d} วัน`} (${fmt.date(p.insurance.expiry)})`, h: `#/admin/vehicles/${v.id}?tab=private` }); }
       svcStatus(v.id, p).filter(x => x.over || x.soon).forEach(x => alerts.push({ red: x.over, ic: 'wrench', t: `${v.name} · ${x.over ? 'ถึงกำหนด' : 'ใกล้ถึง'}${x.m.item || 'เช็คระยะ'} — ${x.text}${x.odo != null ? ` (ไมล์ล่าสุด ${fmt.num(x.odo)})` : ''}`, h: `#/admin/vehicles/${v.id}?tab=private` }));
     });
-    S.db.drivers.forEach(d => { if (d.licenseExpiry && daysTo(d.licenseExpiry) <= 30) alerts.push({ red: daysTo(d.licenseExpiry) <= 7, ic: 'user', t: `ใบขับขี่ ${d.name} ${daysTo(d.licenseExpiry) < 0 ? 'หมดอายุแล้ว' : `จะหมดอายุในอีก ${daysTo(d.licenseExpiry)} วัน`}`, h: '#/admin/drivers' }); });
     // กลับถึงแล้ว (ปิดงานอัตโนมัติ) แต่ยังไม่มีค่าน้ำมัน/ค่าใช้จ่าย ภายใน 3 วัน → เตือนให้บันทึก
     const toClose = rs.filter(r => ['returned', 'closed'].includes(r.status) && !(r.expenses || []).length && (r.status === 'returned' || (r.closedAt && Date.now() - new Date(r.closedAt) < 3 * DAY)));
     return {
@@ -84,6 +108,7 @@
           <div class="kpi" style="--kb:#ffe7d4;--kc:#c2410c"><span class="k-ic">${icon('activity')}</span><b class="num">${st.filter(k => k === 'ontrip').length}<em>คัน</em></b><span class="l">กำลังเดินทาง</span></div>
           <div class="kpi" style="--kb:#d9f5e8;--kc:#047857"><span class="k-ic">${icon('van')}</span><b class="num">${st.filter(k => k === 'free').length}<em>/ ${vs.length}</em></b><span class="l">รถว่างตอนนี้</span></div>
         </div>
+        ${renewCard()}
         ${alerts.length ? `<div class="card" style="margin-top:18px"><div class="card-head"><h3>${icon('alert')} ต้องดำเนินการ / แจ้งเตือน</h3><span class="pill tone-bad">${alerts.length}</span></div><div class="alert-list">${alerts.map(a => `<a class="alert-row ${a.red ? 'red' : ''}" href="${a.h}">${icon(a.ic)}<span>${esc(a.t)}</span>${icon('chevR')}</a>`).join('')}</div></div>` : ''}
         <div class="split" style="margin-top:18px">
           <div class="card"><div class="card-head"><h3>${icon('clipboard')} คำขอรอตรวจสอบ</h3><a class="link" href="#/admin/requests?f=pending">ดูทั้งหมด</a></div>
@@ -95,7 +120,7 @@
             <div class="stack">${today.map(r => `<a class="lot-row" href="#/admin/requests/${r.id}">${icon('clock')}<div style="min-width:0"><b>${fmt.time(r.startAt)}–${fmt.when(r.endAt)}</b><small>${esc(S.destName(r))} · ${(r.assignments || []).map(a => esc(C.vName(a.vehicleId))).join(', ') || 'รอจัดรถ'}</small></div>${C.statusPill(r)}</a>`).join('') || UI.empty('วันนี้ไม่มีรายการ', 'calendar')}</div>
           </div>
         </div>`,
-      mount(root) { $('#importBtn', root)?.addEventListener('click', e => UI.busy(e.currentTarget, () => S.importDefaults()).then(() => UI.toast('นำเข้าข้อมูลเริ่มต้นแล้ว')).catch(() => {})); }
+      mount(root) { bindRenew(root); $('#importBtn', root)?.addEventListener('click', e => UI.busy(e.currentTarget, () => S.importDefaults()).then(() => UI.toast('นำเข้าข้อมูลเริ่มต้นแล้ว')).catch(() => {})); }
     };
   };
 
@@ -198,7 +223,7 @@
     const printable = list;
     return {
       layout: 'admin',
-      html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a><button class="btn btn-danger btn-sm" id="medNew">${icon('alert')} บันทึกงานฉุกเฉิน (นำส่งผู้ป่วย)</button>`)}
+      html: `${head('คำขอใช้รถ', 'รายการคำขอใช้รถ', 'ตรวจบันทึกข้อความ อนุมัติ และมอบหมายรถ/คนขับ', `<button class="btn btn-ghost btn-sm" id="reqImport">${icon('upload')} นำเข้างานจาก Excel</button><button class="btn btn-ghost btn-sm" id="daySum">${icon('image')} สรุปรายวัน</button><a class="btn btn-primary btn-sm" href="#/admin/new">${icon('plus')} บันทึกคำขอเร่งด่วน</a><button class="btn btn-danger btn-sm" id="medNew">${icon('alert')} บันทึกงานฉุกเฉิน (นำส่งผู้ป่วย)</button>`)}
         <div class="toolbar"><div class="seg">${[['pending', 'รอตรวจสอบ'], ['revise', 'ส่งกลับแก้ไข'], ['approved', 'อนุมัติแล้ว'], ['ontrip', 'กำลังเดินทาง'], ['closed', 'ปิดงานแล้ว'], ['rejected', 'ไม่อนุมัติ/ยกเลิก'], ['all', 'ทั้งหมด']].map(([k, l]) => `<a href="${qs({ f: k, md: '', k: '' })}"><button class="${f === k && !md && !kq ? 'on' : ''}" tabindex="-1">${k !== 'all' ? `<i class="sd rs-${k}"></i>` : ''}${l} ${cnt(k)}</button></a>`).join('')}</div>
           ${debtN || md ? `<a class="chip-debt ${md ? 'on' : ''}" href="${qs({ md: md ? '' : '1', k: '', f: md ? 'pending' : 'all' })}">${icon('alert')} ค้างบันทึกข้อความ <b>${debtN}</b></a>` : ''}
           <a class="chip-debt chip-em ${kq === 'em' ? 'on' : ''}" href="${qs({ k: kq === 'em' ? '' : 'em', md: '', f: kq === 'em' ? 'pending' : 'all' })}">${icon('alert')} งานฉุกเฉิน <b>${emN}</b>${emWait ? `<span class="em-wait">รอรับทราบ ${emWait}</span>` : ''}</a>
@@ -238,6 +263,7 @@
         });
         $('#sg', root).addEventListener('change', e => { location.hash = qs({ sg: e.target.value }); });
         $('#daySum', root).addEventListener('click', () => dailySummary(new Date()));
+        $('#reqImport', root).addEventListener('click', () => Pages._reqImport());
         $('#medNew', root).addEventListener('click', async () => { const r = await Pages._medicalModal({ admin: true }); if (r) location.hash = '#/admin/requests/' + r.id; });
         $('#q', root).addEventListener('input', UI.debounce(e => { location.hash = qs({ q: e.target.value }); }, 450));
         $('#df', root).addEventListener('change', e => { const v = e.target.value, t = $('#dt', root).value; location.hash = qs({ m: '', df: v, dt: t && v && t < v ? v : t }); });
@@ -1704,6 +1730,102 @@
           await S.saveVehiclePrivate(r.vid, p);
         }
         UI.toast(`บันทึกข้อมูลเชิงลึก ${todo.length} คันแล้ว`, 'ok');
+        return true;
+      } }]
+    });
+  };
+
+  // ═════════ นำเข้างานที่ครูจองไว้ (ระบบเดิม/ใบกระดาษ) จาก Excel ═════════
+  // ดาวน์โหลดแบบฟอร์ม → กรอก 1 แถว = 1 งาน → เลือกไฟล์ → ตรวจตัวอย่าง → นำเข้า
+  const RQ_HEAD = ['ลำดับ', 'วันที่ไป', 'เวลาไป', 'วันที่กลับ', 'เวลากลับ', 'ปลายทาง', 'จังหวัด', 'ภารกิจ / วัตถุประสงค์', 'หมวดงาน', 'ผู้ขอใช้รถ', 'ฝ่าย / กลุ่มสาระ', 'เบอร์โทร', 'ครู', 'นักเรียน', 'อื่น ๆ', 'จุดขึ้นรถ', 'รถ', 'คนขับ', 'หมายเหตุ'];
+  const RQ_COL = { no: /ลำดับ/, d1: /วันที่ไป|วันไป/, t1: /เวลาไป|เวลาออก/, d2: /วันที่กลับ|วันกลับ/, t2: /เวลากลับ/, dest: /ปลายทาง|สถานที่/, prov: /จังหวัด/, purpose: /ภารกิจ|วัตถุประสงค์/, cat: /หมวด/, req: /ผู้ขอ/, dept: /ฝ่าย|กลุ่มสาระ/, phone: /เบอร์|โทร/, t: /^ครู/, s: /นักเรียน/, o: /อื่น/, pickup: /จุดขึ้น/, veh: /^รถ$|ทะเบียน/, drv: /คนขับ/, note: /หมายเหตุ/ };
+  // เวลา: เศษวันของ Excel (0.375) · "8:30" · "08.30" · "830"
+  const rqTime = x => {
+    if (blankCell(x)) return '';
+    if (typeof x === 'number') { const m = Math.round((x % 1) * 1440); return `${p2(Math.floor(m / 60))}:${p2(m % 60)}`; }
+    const m = String(x).trim().match(/^(\d{1,2})\s*[:.]?\s*(\d{2})?/); return m ? `${p2(+m[1])}:${p2(+(m[2] || 0))}` : '';
+  };
+  const nk = s => String(s || '').replace(/\s+/g, '').replace(/^(นาย|นางสาว|นาง|ครู)/, '');
+  function rqTemplate() {
+    const cats = S.categories(true).filter(c => c.active !== false);
+    UI.exportSheets('แบบฟอร์มนำเข้างานจองรถ', [
+      { name: 'งานที่จองไว้', head: RQ_HEAD, rows: [[1, '3/12/2569', '08:30', '3/12/2569', '16:00', 'สพม.ปทุมธานี; ศาลากลางจังหวัด', 'ปทุมธานี', 'ส่งเอกสารการเงิน (ตัวอย่าง — ลบแถวนี้)', 'การเงิน', 'ครูตัวอย่าง ใจดี', 'ฝ่ายบริหารงานทั่วไป', '081-000-0000', 1, 0, 0, 'หน้าอาคารอำนวยการ', (S.db.vehicles[0] || {}).name || 'รถตู้ 01', '', '']] },
+      { name: 'ตัวเลือก (ห้ามแก้)', head: ['หมวดงาน', 'รถ (ชื่อหรือทะเบียน)', 'คนขับ'], rows: Array.from({ length: Math.max(cats.length, S.db.vehicles.length, S.db.drivers.length) }, (_, i) => [cats[i] ? (cats[i].id === 'other' ? 'อื่น ๆ' : cats[i].name) : '', S.db.vehicles[i] ? `${S.db.vehicles[i].name} (${S.db.vehicles[i].plate || ''})` : '', S.db.drivers[i] && !S.db.drivers[i].standby ? S.db.drivers[i].name : '']) },
+      { name: 'วิธีกรอก', head: ['คำแนะนำ'], rows: [['1 แถว = 1 งาน · ใส่เฉพาะงานตั้งแต่ 1 ธ.ค. 2569 เป็นต้นไป (งานที่ผ่านมาแล้วระบบจะข้าม)'], ['วันที่: 3/12/2569 หรือ 3 ธ.ค. 69 หรือใช้รูปแบบวันที่ของ Excel ก็ได้ · เวลา: 08:30'], ['ไปหลายที่: คั่นด้วย ; เช่น สพม.ปทุมธานี; ศาลากลาง'], ['หมวดงาน: ใช้ชื่อตามชีต "ตัวเลือก" · ไม่ตรง = อื่น ๆ'], ['รถ/คนขับ: ไม่บังคับ · ใส่รถ = อนุมัติและจัดรถให้เลย · ว่าง = รอตรวจสอบ ให้แอดมินจัดรถในระบบ'], ['ไม่ต้องแนบบันทึกข้อความ (มีใบกระดาษแล้ว)']] }
+    ]);
+  }
+  function rqParse(buf) {
+    if (!window.XLSX) throw new Error('ตัวอ่าน Excel ยังโหลดไม่เสร็จ — ลองใหม่อีกครั้ง');
+    const wb = XLSX.read(buf), out = [];
+    const n0 = wb.SheetNames.find(n => /จอง|งาน/.test(n)) || wb.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[n0], { header: 1, raw: true, defval: '' });
+    const hi = rows.findIndex(r => r.some(c => /ปลายทาง|สถานที่/.test(String(c))) && r.some(c => /วันที่ไป|วันไป/.test(String(c))));
+    if (hi < 0) throw new Error('ไม่พบหัวตาราง (ต้องมีคอลัมน์ "วันที่ไป" และ "ปลายทาง") — ใช้แบบฟอร์มที่ดาวน์โหลดจากปุ่มนี้');
+    const hs = rows[hi].map(c => String(c).replace(/\s+/g, ''));
+    const ci = {}; Object.entries(RQ_COL).forEach(([k, re]) => { ci[k] = hs.findIndex(h => re.test(h)); });
+    const g = (r, k) => ci[k] >= 0 ? r[ci[k]] : '';
+    const cats = S.categories(true);
+    const now = Date.now();
+    rows.slice(hi + 1).forEach((r, k) => {
+      if (blankCell(g(r, 'dest')) && blankCell(g(r, 'd1'))) return;
+      const it = { row: hi + k + 2, errs: [], warns: [] };
+      const d1 = vpDate(g(r, 'd1')), d2 = vpDate(g(r, 'd2')) || d1, t1 = rqTime(g(r, 't1')) || '08:00', t2 = rqTime(g(r, 't2')) || '16:00';
+      if (!d1) it.errs.push('ไม่มีวันที่ไป');
+      it.startAt = d1 ? new Date(`${d1}T${t1}:00`).toISOString() : ''; it.endAt = d2 ? new Date(`${d2}T${t2}:00`).toISOString() : '';
+      if (it.startAt && it.endAt && new Date(it.endAt) <= new Date(it.startAt)) it.errs.push('เวลากลับต้องหลังเวลาไป');
+      if (it.startAt && new Date(it.startAt).getTime() < now) it.skip = 'วันที่ผ่านมาแล้ว';
+      const prov = String(g(r, 'prov') || '').trim();
+      it.destinations = String(g(r, 'dest') || '').split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(n => ({ name: n, address: '', province: prov, lat: null, lng: null, km: 0, mins: 0 }));
+      if (!it.destinations.length) it.errs.push('ไม่มีปลายทาง');
+      it.purpose = String(g(r, 'purpose') || '').trim() || 'ใช้รถตามใบขอเดิม';
+      const cn = String(g(r, 'cat') || '').trim(), cat = cn && cats.find(c => c.name.replace(/\s+/g, '') === cn.replace(/\s+/g, '') || c.name.includes(cn) || cn.includes(c.name.replace(/\s*\(.*\)/, '')));
+      it.category = cat ? cat.id : 'other'; it.categoryOther = cat ? '' : (cn || 'นำเข้าจากระบบเดิม');
+      it.requester = { name: String(g(r, 'req') || '').trim(), dept: String(g(r, 'dept') || '').trim(), phone: String(g(r, 'phone') || '').trim() };
+      if (!it.requester.name) it.warns.push('ไม่มีชื่อผู้ขอ');
+      it.teachers = +g(r, 't') || 0; it.students = +g(r, 's') || 0; it.others = +g(r, 'o') || 0;
+      it.pickup = String(g(r, 'pickup') || '').trim() || 'โรงเรียน'; it.note = String(g(r, 'note') || '').trim(); it.contactPhone = it.requester.phone;
+      it.tripType = d1 && d2 && d1 !== d2 ? 'overnight' : 'day';
+      const vn = String(g(r, 'veh') || '').trim(), dn = String(g(r, 'drv') || '').trim();
+      if (vn) { const key = plateKey(vn); const v = S.db.vehicles.find(x => x.name.replace(/\s+/g, '') === vn.replace(/\s*\(.*\)/, '').replace(/\s+/g, '') || (key.length >= 4 && plateKey(x.plate) === key)); if (v) it.vehicleId = v.id; else it.warns.push(`ไม่พบรถ "${vn}" → รอตรวจสอบ`); }
+      if (dn) { const d = S.db.drivers.find(x => nk(x.name) === nk(dn) || nk(x.name).startsWith(nk(dn))); if (d) it.driverId = d.id; else it.warns.push(`ไม่พบคนขับ "${dn}"`); }
+      if (it.vehicleId && it.startAt && it.endAt && S.vehicleConflicts(it.vehicleId, it.startAt, it.endAt, null).length) it.warns.push('รถชนเวลากับงานอื่นในระบบ');
+      out.push(it);
+    });
+    return out;
+  }
+  Pages._rqParse = rqParse;
+  Pages._reqImport = async (preset = null) => {
+    let rows = null;
+    const tbl = () => !rows ? '' : `<div class="tbl-wrap"><table class="tbl vp-tbl" data-nostack><thead><tr><th>แถว</th><th>วันเวลา</th><th>ปลายทาง / ภารกิจ</th><th>ผู้ขอ</th><th>รถ / คนขับ</th><th>ผล</th></tr></thead><tbody>${rows.map(it => {
+      const res = it.errs.length ? `<b style="color:var(--bad)">ข้าม: ${esc(it.errs.join(', '))}</b>` : it.skip ? `<span class="hint">ข้าม: ${it.skip}</span>` : it.vehicleId ? '<b style="color:var(--ok)">อนุมัติ + จัดรถ</b>' : '<b style="color:var(--gold-700)">รอตรวจสอบ</b>';
+      return `<tr class="${it.errs.length || it.skip ? 'vp-miss' : ''}"><td>${it.row}</td><td class="nw">${it.startAt ? fmt.date(it.startAt) : '-'}<small>${it.startAt ? fmt.time(it.startAt) : ''}${it.endAt ? ' – ' + fmt.when(it.endAt) : ''}</small></td>
+        <td><b>${esc(it.destinations.map(d => d.name).join(' → ') || '-')}</b><small>${esc(it.purpose)} · ${esc(it.category === 'other' ? it.categoryOther : S.catName(it))}</small></td>
+        <td>${esc(it.requester.name || '-')}<small>${esc(it.requester.dept)}</small></td>
+        <td>${it.vehicleId ? esc(C.vName(it.vehicleId)) : '—'}<small>${it.driverId ? esc(C.dName(it.driverId)) : ''}</small></td>
+        <td>${res}${it.warns.length ? `<small style="color:var(--gold-700)">⚠ ${esc(it.warns.join(' · '))}</small>` : ''}</td></tr>`; }).join('')}</tbody></table></div>`;
+    const ready = () => (rows || []).filter(it => !it.errs.length && !it.skip);
+    const body = () => `<div class="stack"><div class="note-box navy">${icon('info')}<div><b>1.</b> ดาวน์โหลดแบบฟอร์ม → <b>2.</b> กรอก 1 แถว = 1 งาน (เฉพาะงานตั้งแต่ 1 ธ.ค. 2569) → <b>3.</b> เลือกไฟล์ แล้วตรวจตัวอย่างก่อนกดนำเข้า<br><span class="hint">ใส่รถ = อนุมัติและจัดรถให้เลย · ไม่ใส่ = รอตรวจสอบ · ไม่ต้องแนบบันทึกข้อความ · ล้างข้อมูลทดลองและเริ่มเลขคำขอใหม่ก่อน แล้วค่อยนำเข้า</span></div></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-ghost" data-rq-tpl>${icon('download')} ดาวน์โหลดแบบฟอร์ม</button><button type="button" class="btn btn-primary" data-rq-file>${icon('upload')} เลือกไฟล์ที่กรอกแล้ว</button></div>
+      ${rows ? `<p><b>${rows.length}</b> แถว · นำเข้าได้ <b>${ready().length}</b> งาน (อนุมัติ ${ready().filter(x => x.vehicleId).length} · รอตรวจสอบ ${ready().filter(x => !x.vehicleId).length}) · ข้าม ${rows.length - ready().length}</p>${tbl()}` : ''}</div>`;
+    const load = buf => { try { rows = rqParse(buf); } catch (e) { UI.toast(e.message, 'error'); rows = null; } };
+    if (preset) load(preset);
+    return UI.modal({
+      title: `${icon('upload')} นำเข้างานที่จองไว้จาก Excel`, size: 'lg', body: `<div id="rqBox">${body()}</div>`,
+      onOpen(el) {
+        el.addEventListener('click', async e => {
+          if (e.target.closest('[data-rq-tpl]')) return rqTemplate();
+          if (e.target.closest('[data-rq-file]')) {
+            const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv'; i.onchange = () => res(i.files[0] || null); i.click(); });
+            if (!file) return; load(await file.arrayBuffer()); el.querySelector('#rqBox').innerHTML = body();
+          }
+        });
+      },
+      actions: [{ label: 'ปิด', value: null }, { label: 'นำเข้า', kind: 'btn-primary', icon: 'check', onClick: async el => {
+        const xs = ready(); if (!xs.length) { UI.toast('ยังไม่มีงานที่นำเข้าได้ — เลือกไฟล์ก่อน', 'error'); return false; }
+        if (!(await UI.confirm(`นำเข้า <b>${xs.length}</b> งาน?`, { ok: 'นำเข้า' }))) return false;
+        let ok = 0; const fail = [];
+        for (const it of xs.sort((a, b) => a.startAt.localeCompare(b.startAt))) { try { await S.importRequest(it); ok++; } catch (er) { fail.push(`แถว ${it.row}: ${er.message}`); } }
+        UI.toast(`นำเข้าแล้ว ${ok} งาน${fail.length ? ` · ไม่สำเร็จ ${fail.length}: ${fail.join(' | ')}` : ''}`, fail.length ? 'error' : 'ok');
         return true;
       } }]
     });
