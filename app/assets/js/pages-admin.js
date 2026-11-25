@@ -716,12 +716,12 @@
     const exp = (p, vId) => { if (!p) return ''; const xs = [['พ.ร.บ.', p.actExpiry], ['ภาษี', p.taxExpiry], ['ประกัน', p.insurance && p.insurance.expiry]].filter(x => x[1]).map(([l, d]) => { const n = daysTo(d); return n <= 30 ? `<span class="tag ${n <= 7 ? 'red' : ''}">${l} ${n < 0 ? 'หมดแล้ว' : n + ' วัน'}</span>` : ''; }).join(''); return xs + svcStatus(vId, p).filter(x => x.over || x.soon).map(x => `<span class="tag ${x.over ? 'red' : ''}">${icon('wrench')} ${esc(x.m.item || 'เช็คระยะ')} ${x.left != null ? (x.left <= 0 ? 'เลยระยะ' : `อีก ${fmt.num(x.left)} กม.`) : x.days < 0 ? 'เลยกำหนด' : `อีก ${x.days} วัน`}</span>`).join(''); };
     return {
       layout: 'admin',
-      html: `${head('ข้อมูลหลัก', 'ข้อมูลรถ', 'แก้ไขข้อมูลที่เผยแพร่ให้ครูดู และข้อมูลเชิงลึก (พ.ร.บ. ประกัน ประวัติซ่อม) ที่ไม่เผยแพร่', `<a class="btn btn-primary btn-sm" href="#/admin/vehicles/new">${icon('plus')} เพิ่มรถ</a>`)}
+      html: `${head('ข้อมูลหลัก', 'ข้อมูลรถ', 'แก้ไขข้อมูลที่เผยแพร่ให้ครูดู และข้อมูลเชิงลึก (พ.ร.บ. ประกัน ประวัติซ่อม) ที่ไม่เผยแพร่', `<button class="btn btn-ghost btn-sm" id="vpImport">${icon('upload')} นำเข้า พ.ร.บ./ภาษี/ประกัน จาก Excel</button><a class="btn btn-primary btn-sm" href="#/admin/vehicles/new">${icon('plus')} เพิ่มรถ</a>`)}
         <div class="card" style="padding:8px"><div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>รหัส</th><th>รถ</th><th>ที่นั่ง</th><th>คนขับที่รับผิดชอบ</th><th>สถานะตอนนี้</th><th>ไมล์ล่าสุด</th><th>เอกสาร / เช็คระยะ</th><th>ซ่อม (ครั้ง)</th></tr></thead>
           <tbody>${vs.map(v => { const p = S.db.vprivate[v.id], odo = Pages._lastOdo ? Pages._lastOdo(v.id) : null; return `<tr class="click" data-href="#/admin/vehicles/${v.id}"><td><b>${v.no || '-'}</b></td><td><b>${icon(kindIcon(v.kind))} ${esc(v.name)}</b><small>${esc(v.plate)} · ${esc(v.brand || '')} ${esc(v.model || '')}</small></td><td>${v.seats}</td><td>${esc(C.dName(v.driverId))}<small>${esc(C.dPhone(v.driverId))}</small></td><td>${pill(S.vehicleState(v))}</td><td class="nw">${odo != null ? fmt.num(odo) : '<small>—</small>'}</td><td>${exp(p, v.id) || '<small>—</small>'}</td><td>${p ? (p.repairs || []).length : 0}</td></tr>`; }).join('')}</tbody>
         </table></div></div>`,
-      mount(root) { root.addEventListener('click', e => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; }); }
+      mount(root) { root.addEventListener('click', e => { const tr = e.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; }); $('#vpImport', root).addEventListener('click', () => Pages._vpImport()); }
     };
   };
   Pages.adminVehicle = ({ params, query }) => {
@@ -767,11 +767,13 @@
         <div class="form-section"><h3>${icon('shield')} เอกสาร · พ.ร.บ. · ภาษี · ประกันภัย</h3>
           <div class="grid3">
             <div class="field"><label>พ.ร.บ. หมดอายุ</label><input type="date" name="actExpiry" value="${esc(p.actExpiry || '')}">${p.actExpiry ? `<span class="hint">อีก ${daysTo(p.actExpiry)} วัน</span>` : ''}</div>
+            <div class="field"><label>บริษัท พ.ร.บ.</label><input name="actCompany" value="${esc(p.actCompany || '')}"></div>
+            <div class="field"><label>เลขกรมธรรม์ พ.ร.บ.</label><input name="actNo" value="${esc(p.actNo || '')}"></div>
             <div class="field"><label>ภาษีรถ หมดอายุ</label><input type="date" name="taxExpiry" value="${esc(p.taxExpiry || '')}">${p.taxExpiry ? `<span class="hint">อีก ${daysTo(p.taxExpiry)} วัน</span>` : ''}</div>
             <div class="field"><label>ประกันภัย หมดอายุ</label><input type="date" name="insExpiry" value="${esc(p.insurance.expiry || '')}">${p.insurance.expiry ? `<span class="hint">อีก ${daysTo(p.insurance.expiry)} วัน</span>` : ''}</div>
-            <div class="field"><label>บริษัทประกัน</label><input name="insCompany" value="${esc(p.insurance.company || '')}"></div>
+            <div class="field"><label>บริษัทประกันภัย</label><input name="insCompany" value="${esc(p.insurance.company || '')}"></div>
             <div class="field"><label>ชั้นประกัน</label><input name="insCls" value="${esc(p.insurance.cls || '')}"></div>
-            <div class="field"><label>เลขกรมธรรม์</label><input name="insNo" value="${esc(p.insurance.policyNo || '')}"></div>
+            <div class="field"><label>เลขกรมธรรม์ ประกันภัย</label><input name="insNo" value="${esc(p.insurance.policyNo || '')}"></div>
             <div class="field"><label>เบอร์แจ้งเคลม</label><input name="insPhone" value="${esc(p.insurance.phone || '')}"></div>
             <div class="field"><label>เลขตัวถัง</label><input name="chassisNo" value="${esc(p.chassisNo || '')}"></div>
             <div class="field"><label>เลขเครื่องยนต์</label><input name="engineNo" value="${esc(p.engineNo || '')}"></div>
@@ -819,7 +821,7 @@
         }
         if (tab === 'private') {
           const getDocs = C.bindFilePicker(root, 'docs', p.docs, { pdf: true });
-          const save = () => { const f = UI.formData($('#pf', root)); Object.assign(p, { actExpiry: f.actExpiry, taxExpiry: f.taxExpiry, chassisNo: f.chassisNo, engineNo: f.engineNo, fuelType: f.fuelType, fuelCard: f.fuelCard, notes: f.notes, docs: getDocs(), insurance: { company: f.insCompany, cls: f.insCls, policyNo: f.insNo, expiry: f.insExpiry, phone: f.insPhone } }); return S.saveVehiclePrivate(v.id, p); };
+          const save = () => { const f = UI.formData($('#pf', root)); Object.assign(p, { actExpiry: f.actExpiry, actCompany: f.actCompany || '', actNo: f.actNo || '', taxExpiry: f.taxExpiry, chassisNo: f.chassisNo, engineNo: f.engineNo, fuelType: f.fuelType, fuelCard: f.fuelCard, notes: f.notes, docs: getDocs(), insurance: { company: f.insCompany, cls: f.insCls, policyNo: f.insNo, expiry: f.insExpiry, phone: f.insPhone } }); return S.saveVehiclePrivate(v.id, p); };
           const subModal = async (title, fields, init, withPhotos) => UI.modal({ title, body: `<form id="sm" class="grid2">${fields.map(([k, l, t = 'text']) => `<div class="field ${t === 'textarea' ? 'full' : ''}"><label>${l}</label>${t === 'textarea' ? `<textarea name="${k}" rows="2">${esc(init[k] || '')}</textarea>` : `<input name="${k}" type="${t}" value="${esc(init[k] ?? '')}">`}</div>`).join('')}${withPhotos ? `<div class="field full">${C.filePicker('smph', init.photos || [], { label: 'แนบรูปใบเสร็จ/รูปงานซ่อม' })}</div>` : ''}</form>`,
             actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึก', kind: 'btn-primary', onClick: el => ({ ...init, ...UI.formData(el.querySelector('#sm')), ...(withPhotos ? { photos: el._ph() } : {}) }) }],
             onOpen(el) { if (withPhotos) el._ph = C.bindFilePicker(el, 'smph', init.photos || []); } });
@@ -1607,5 +1609,101 @@
           teachers: f.teachers.value, students: f.students.value, others: 0, pickup: f.pickup.value, contactPhone: f.contactPhone.value, note: f.note.value }, { by: admin ? f.by.value : '' });
       } }]
     }).then(r => { if (r) UI.toast(admin ? `บันทึกคำสั่ง ${r.id} แล้ว — เลือกรถ/คนขับได้เลย` : `ส่งคำสั่ง ${r.id} แล้ว — แอดมินจะจัดรถ/คนขับให้`, 'ok'); return r; });
+  };
+
+  // ═════════ นำเข้าข้อมูลเชิงลึกของรถจาก Excel (พ.ร.บ. · ภาษี · ประกันภัย · เลขตัวถัง/เครื่องยนต์) ═════════
+  // จับคู่รถด้วยเลขทะเบียน · ช่องที่เป็น "-" หรือว่าง = เก็บค่าเดิม · รถที่หาไม่เจอ = ข้าม (เลือกจับคู่เองได้) · ไฟล์อ่านในเบราว์เซอร์เท่านั้น
+  const VP_FIELDS = [
+    ['actCompany', 'บริษัท พ.ร.บ.', h => /บริษัท/.test(h) && /พ\.?ร\.?บ/.test(h)],
+    ['actNo', 'เลขกรมธรรม์ พ.ร.บ.', h => /พ\.?ร\.?บ/.test(h) && /กรมธรรม์/.test(h)],
+    ['actExpiry', 'พ.ร.บ. หมดอายุ', h => /พ\.?ร\.?บ/.test(h) && /หมดอายุ/.test(h), 'date'],
+    ['taxExpiry', 'ภาษีรถ หมดอายุ', h => /ภาษี/.test(h), 'date'],
+    ['insurance.company', 'บริษัทประกันภัย', h => /บริษัท/.test(h) && /ประกัน/.test(h)],
+    ['insurance.cls', 'ชั้นประกัน', h => /ชั้น/.test(h)],
+    ['insurance.policyNo', 'เลขกรมธรรม์ ประกันภัย', h => /ประกัน/.test(h) && /กรมธรรม์/.test(h)],
+    ['insurance.expiry', 'ประกันภัย หมดอายุ', h => /ประกัน/.test(h) && /หมดอายุ/.test(h), 'date'],
+    ['insurance.phone', 'เบอร์แจ้งเคลม', h => /เคลม/.test(h)],
+    ['chassisNo', 'เลขตัวถัง', h => /ตัวถัง/.test(h)],
+    ['engineNo', 'เลขเครื่องยนต์', h => /เครื่องยนต์/.test(h)],
+    ['fuelType', 'ชนิดเชื้อเพลิง', h => /เชื้อเพลิง/.test(h)],
+    ['fuelCard', 'เลขบัตรเติมน้ำมัน', h => /บัตร/.test(h) && /น้ำมัน/.test(h)]
+  ];
+  const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const blankCell = x => x == null || /^[\s\-–—.]*$/.test(String(x));
+  const p2 = n => String(n).padStart(2, '0');
+  // วันที่: เลขวันที่ Excel (ปี พ.ศ. หรือ ค.ศ.) · "29 ก.ย.2570" · "29/09/2570" → YYYY-MM-DD (ค.ศ.)
+  function vpDate(x) {
+    if (blankCell(x)) return '';
+    const ce = y => (y > 2400 ? y - 543 : y < 100 ? y + (y > 60 ? 1957 : 2000) : y);
+    if (typeof x === 'number' && window.XLSX) { const d = XLSX.SSF.parse_date_code(x); if (d && d.y) return `${ce(d.y)}-${p2(d.m)}-${p2(d.d)}`; }
+    const s = String(x).replace(/\s+/g, ' ').trim();
+    let m = s.match(/^(\d{1,2})\s*([ก-ฮ.]+)\s*(\d{2,4})$/);
+    if (m) { const k = TH_MON.findIndex(t => t.replace(/\./g, '') === m[2].replace(/\./g, '')); if (k >= 0) return `${ce(+m[3])}-${p2(k + 1)}-${p2(+m[1])}`; }
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+    if (m) return `${ce(+m[3])}-${p2(+m[2])}-${p2(+m[1])}`;
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${ce(+m[1])}-${m[2]}-${m[3]}`;
+    return '';
+  }
+  // เลขทะเบียน → แกนหลัก (ตัดจังหวัด ช่องว่าง ขีด) เช่น "1 นฌ 8758\nกรุงเทพ" → "1นฌ8758" · "82-8443 ปทุมธานี" → "828443"
+  const plateKey = s => { const t = String(s || '').split(/\n/)[0]; const m = t.match(/\d?\s*[ก-ฮ]{1,3}\s*-?\s*\d{1,4}|\d{1,3}\s*-\s*\d{3,4}/); return (m ? m[0] : t).replace(/[\s\-]/g, ''); };
+  function vpParse(buf) {
+    if (!window.XLSX) throw new Error('ตัวอ่าน Excel ยังโหลดไม่เสร็จ — ลองใหม่อีกครั้ง');
+    const wb = XLSX.read(buf), out = [];
+    wb.SheetNames.forEach(n => {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
+      const hi = rows.findIndex(r => r.some(c => /ทะเบียน/.test(String(c))));
+      if (hi < 0) return;
+      const hs = rows[hi].map(c => String(c).replace(/\s+/g, ''));
+      const pc = hs.findIndex(h => /ทะเบียน/.test(h)), kc = hs.findIndex(h => /ประเภทรถ/.test(h));
+      const cols = VP_FIELDS.map(f => ({ f, i: hs.findIndex(f[2]) })).filter(x => x.i >= 0);
+      rows.slice(hi + 1).forEach((r, k) => {
+        if (blankCell(r[pc])) return;
+        const vals = {};
+        cols.forEach(({ f, i }) => { const raw = r[i]; if (blankCell(raw)) return; const v = f[3] === 'date' ? vpDate(raw) : String(raw).replace(/\s*\n\s*/g, ' ').trim(); if (v) vals[f[0]] = v; });
+        out.push({ row: hi + k + 2, plate: String(r[pc]).replace(/\s*\n\s*/g, ' ').trim(), kind: kc >= 0 ? String(r[kc]).trim() : '', key: plateKey(r[pc]), vals });
+      });
+    });
+    return out;
+  }
+  Pages._vpParse = vpParse;
+  const getP = (o, k) => k.split('.').reduce((a, x) => (a || {})[x], o);
+  const setP = (o, k, v) => { const ks = k.split('.'); let a = o; ks.slice(0, -1).forEach(x => { a[x] = a[x] || {}; a = a[x]; }); a[ks[ks.length - 1]] = v; };
+  Pages._vpImport = async (preset = null) => {
+    let buf = preset;
+    if (!buf) {
+      const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv'; i.onchange = () => res(i.files[0] || null); i.click(); });
+      if (!file) return;
+      buf = await file.arrayBuffer();
+    }
+    let rows; try { rows = vpParse(buf); } catch (e) { return UI.toast(e.message, 'error'); }
+    if (!rows.length) return UI.toast('ไม่พบตารางที่มีคอลัมน์ "ทะเบียน" ในไฟล์', 'error');
+    const vs = S.db.vehicles;
+    rows.forEach(r => { const v = vs.find(x => plateKey(x.plate) === r.key); r.vid = v ? v.id : ''; });
+    const fmtV = (k, v) => /Expiry|expiry/.test(k) ? fmt.date(v) : v;
+    const diff = r => { if (!r.vid) return []; const p = S.db.vprivate[r.vid] || {}; return Object.entries(r.vals).filter(([k, v]) => String(getP(p, k) || '') !== String(v)); };
+    const body = () => `<p class="hint">${icon('info')} พบ <b>${rows.length}</b> คันในไฟล์ · จับคู่ด้วยเลขทะเบียน · ช่องที่เป็น "-" หรือว่าง = เก็บข้อมูลเดิมไว้ · ไฟล์อ่านในเครื่องนี้เท่านั้น ไม่ได้อัปโหลด</p>
+      <div class="tbl-wrap"><table class="tbl vp-tbl" data-nostack><thead><tr><th>แถว</th><th>ทะเบียน (ในไฟล์)</th><th>รถในระบบ</th><th>จะเปลี่ยน</th></tr></thead><tbody>
+      ${rows.map((r, i) => { const d = diff(r); return `<tr class="${r.vid ? '' : 'vp-miss'}"><td>${r.row}</td><td><b>${esc(r.plate)}</b><small>${esc(r.kind)}</small></td>
+        <td><select class="input" data-vp="${i}"><option value="">— ข้าม (ไม่พบในระบบ) —</option>${vs.map(v => `<option value="${v.id}" ${v.id === r.vid ? 'selected' : ''}>${esc(v.name)} · ${esc(v.plate || '')}</option>`).join('')}</select></td>
+        <td>${!r.vid ? '<span class="hint">ข้าม</span>' : d.length ? `<b>${d.length} ช่อง</b><small>${d.map(([k, v]) => `${esc((VP_FIELDS.find(f => f[0] === k) || [])[1])}: ${esc(fmtV(k, v))}`).join('<br>')}</small>` : '<span class="hint">ข้อมูลตรงกันแล้ว</span>'}</td></tr>`; }).join('')}
+      </tbody></table></div>`;
+    return UI.modal({
+      title: `${icon('upload')} นำเข้า พ.ร.บ. · ภาษี · ประกันภัย จาก Excel`, size: 'lg', body: `<div id="vpBox">${body()}</div>`,
+      onOpen(el) { el.addEventListener('change', e => { const s = e.target.closest('[data-vp]'); if (!s) return; rows[+s.dataset.vp].vid = s.value; el.querySelector('#vpBox').innerHTML = body(); }); },
+      actions: [{ label: 'ยกเลิก', value: null }, { label: 'บันทึกทั้งหมด', kind: 'btn-primary', icon: 'check', onClick: async () => {
+        const todo = rows.filter(r => r.vid && diff(r).length);
+        const dup = todo.map(r => r.vid).filter((x, i, a) => a.indexOf(x) !== i);
+        if (dup.length) { UI.toast(`มีหลายแถวจับคู่กับรถคันเดียวกัน (${dup.map(id => C.vName(id)).join(', ')}) — แก้การจับคู่ก่อน`, 'error'); return false; }
+        if (!todo.length) { UI.toast('ไม่มีข้อมูลที่ต้องเปลี่ยน'); return true; }
+        for (const r of todo) {
+          const p = JSON.parse(JSON.stringify(S.db.vprivate[r.vid] || { id: r.vid, insurance: {}, repairs: [], maintenancePlan: [], accidents: [], docs: [], notes: '' }));
+          p.insurance = p.insurance || {};
+          Object.entries(r.vals).forEach(([k, v]) => setP(p, k, v));
+          await S.saveVehiclePrivate(r.vid, p);
+        }
+        UI.toast(`บันทึกข้อมูลเชิงลึก ${todo.length} คันแล้ว`, 'ok');
+        return true;
+      } }]
+    });
   };
 })();
