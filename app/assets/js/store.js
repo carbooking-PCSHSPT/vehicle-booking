@@ -1430,6 +1430,8 @@ const Store = (() => {
       if (!canAdd(cur)) throw new Error('ไม่มีสิทธิ์บันทึกค่าใช้จ่ายของงานนี้');
       // คนขับบันทึกย้อนหลังได้ภายใน 30 วันหลังปิดงาน (เลยกำหนด ให้แอดมินบันทึกแทน)
       if (!isAdmin(me) && cur.closedAt && Date.now() - new Date(cur.closedAt) > 30 * DAY) throw new Error('เลยกำหนดบันทึกย้อนหลัง 30 วันแล้ว — กรุณาส่งใบเสร็จให้แอดมินบันทึกแทน');
+      if (api.offline() && (ex.photos || []).some(p => /^data:/.test(p))) throw new Error('ไม่มีอินเทอร์เน็ต — ส่งรูปบิลไม่ได้ตอนนี้ บันทึกค่าใช้จ่ายเมื่อมีสัญญาณ (ย้อนหลังได้ 30 วัน)');
+      if (cur.garbage && !['fuel', 'other'].includes(ex.type)) throw new Error('รถขนขยะบันทึกได้เฉพาะค่าน้ำมันและค่าใช้จ่ายอื่น');
       const photos = await A.upload(ex.photos || [], { kind: 'receipt', ref: id, label: EXPENSE[ex.type] || 'ใบเสร็จ' });
       const e = { id: ex.id || uid('ex'), vehicleId: ex.vehicleId, type: ex.type || 'fuel', date: ex.date || nowISO().slice(0, 10), station: String(ex.station || '').trim(), brand: String(ex.brand || '').trim(), branch: String(ex.branch || '').trim(), liters: +ex.liters || 0, pricePerL: +ex.pricePerL || 0, amount: +ex.amount || 0, odo: ex.odo === '' || ex.odo == null ? null : +ex.odo, pay: ex.pay || 'cash', photos, note: String(ex.note || '').trim(), item: String(ex.item || '').trim(), by: me.email, byName: me.name, at: nowISO() };
       return mutateReq(id, r => {

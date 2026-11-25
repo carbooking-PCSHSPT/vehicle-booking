@@ -2413,3 +2413,4 @@ html.fs-2 { font-size: 131.25%; }
 .chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; margin: 4px 0 6px; }
 .side-order { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 10px; padding: 11px 14px; border: 0; border-radius: 14px; background: linear-gradient(135deg, var(--navy), #3a48a8); color: #fff; font: 600 .9rem var(--font-display); cursor: pointer; text-align: left; }
 .side-order .i { width: 18px; height: 18px; flex: none; }
+.exr-types.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }

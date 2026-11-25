@@ -40,8 +40,10 @@
     const cur = () => S.request(r.id) || r;
     const a0 = () => (cur().assignments || []).find(a => a.vehicleId === vId) || {};
     const minD = fmt.localDate(r.startAt), maxD = fmt.localDate(new Date(Math.max(Date.now(), new Date(r.endAt))));
-    const defDate = () => new Date(r.endAt) < new Date() ? fmt.localDate(a0().returnedAt || r.endAt) : fmt.localDate(new Date());
-    const multiDay = fmt.localDate(r.startAt) !== fmt.localDate(r.endAt);
+    const defDate = () => !gb && new Date(r.endAt) < new Date() ? fmt.localDate(a0().returnedAt || r.endAt) : fmt.localDate(new Date());
+    const gbDays = Array.from({ length: 8 }, (_, i) => fmt.localDate(new Date(Date.now() - i * 864e5)));
+    const gb = !!r.garbage, TYPES = gb ? EXP_TYPES.filter(([t]) => t === 'fuel' || t === 'other') : EXP_TYPES;
+    const multiDay = !gb && fmt.localDate(r.startAt) !== fmt.localDate(r.endAt);
     const days = (() => { const out = [], d = UI.dayOf(minD), end = UI.dayOf(maxD); while (d <= end && out.length < 60) { out.push(fmt.localDate(d)); d.setDate(d.getDate() + 1); } return out; })();
     const mem = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
     // แก้/ลบได้: แอดมินทุกรายการ · คนขับเฉพาะของตัวเอง ภายใน 30 วันหลังกลับถึง
@@ -53,7 +55,7 @@
       return `${vs.length > 1 ? `<div class="seg xh-veh">${vs.map(v => `<button type="button" class="${v.id === vId ? 'on' : ''}" data-veh="${v.id}">${esc(v.name)}</button>`).join('')}</div>` : ''}
         <div class="xh-head"><div><b>${esc(C.vName(vId))}</b><small>${esc(C.vPlate(vId) || '')} · ${esc(S.destName(r))}</small></div>${xs.length ? `<span class="xh-sum">${xs.length} รายการ · <b>${fmt.money(sum)} บาท</b></span>` : ''}</div>
         ${xs.length ? `<div class="stack" style="gap:10px">${xs.map(e => C.expItem(e, { edit: canEdit(e), showVeh: false })).join('')}</div>`
-          : `<div class="xh-empty">${icon('fuel')}<b>ยังไม่มีค่าใช้จ่ายของรถคันนี้</b><small>กด “เพิ่มค่าใช้จ่าย” แล้วบันทึกทีละรายการ เช่น ค่าน้ำมัน ค่าทางด่วน ค่าที่จอด</small></div>`}
+          : `<div class="xh-empty">${icon('fuel')}<b>ยังไม่มีค่าใช้จ่ายของรถคันนี้</b><small>${gb ? 'กด “เพิ่มค่าใช้จ่าย” แล้วบันทึกค่าน้ำมัน หรือค่าใช้จ่ายอื่น ทีละรายการ' : 'กด “เพิ่มค่าใช้จ่าย” แล้วบันทึกทีละรายการ เช่น ค่าน้ำมัน ค่าทางด่วน ค่าที่จอด'}</small></div>`}
         <button type="button" class="btn btn-gold xh-add" data-add>${icon('plus')} เพิ่มค่าใช้จ่าย${xs.length ? 'อีกรายการ' : ''}</button>
         <p class="hint">${icon('info')} มีหลายรายการ บันทึกทีละรายการ · บันทึกย้อนหลัง/แก้ไขได้ภายใน ${EDIT_DAYS} วันหลังกลับถึง</p>`;
     };
@@ -65,7 +67,7 @@
       return `<div class="exr xh-form">
         <div class="xh-ftitle">${icon(d.id ? 'edit' : 'plus')} <b>${d.id ? 'แก้ไขค่าใช้จ่าย' : 'เพิ่มค่าใช้จ่าย'}</b> <small>${esc(C.vName(vId))}</small></div>
         <div class="label-sm">ประเภท</div>
-        <div class="exr-types" role="radiogroup" aria-label="ประเภทค่าใช้จ่าย">${EXP_TYPES.map(([t, ic, l]) => `<label class="exr-type"><input type="radio" name="xty" data-k="type" value="${t}" ${t === ty ? 'checked' : ''}><span>${icon(ic)}${l}</span></label>`).join('')}</div>
+        <div class="exr-types ${gb ? 'two' : ''}" role="radiogroup" aria-label="ประเภทค่าใช้จ่าย">${TYPES.map(([t, ic, l]) => `<label class="exr-type"><input type="radio" name="xty" data-k="type" value="${t}" ${t === ty ? 'checked' : ''}><span>${icon(ic)}${l}</span></label>`).join('')}</div>
         <div class="other-only">
           <div class="label-sm">จ่ายค่าอะไร <b class="req">*</b></div>
           <div class="exr-brands xh-items" role="radiogroup">${[...OTHER_ITEMS, '_'].map(it => `<label class="exr-brand"><input type="radio" name="xit" data-k="itemSel" value="${esc(it)}" ${it === itemSel ? 'checked' : ''}><span>${it === '_' ? 'อื่น ๆ (พิมพ์เอง)' : esc(it)}</span></label>`).join('')}</div>
@@ -86,7 +88,7 @@
         <div class="field not-fuel"><label class="xh-place-l">สถานที่</label><input data-k="place" placeholder="" value="${d.type !== 'fuel' ? esc(d.station || '') : ''}"></div>
         <div class="exr-two">
           <div class="field"><label>วิธีชำระ</label><select data-k="pay">${Object.entries(S.PAY).map(([t, l]) => `<option value="${t}" ${t === pay ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-          ${multiDay ? `<div class="field"><label>วันที่</label><select data-k="date">${days.map(x => `<option value="${x}" ${x === (d.date || defDate()) ? 'selected' : ''}>${fmt.dayMonth(UI.dayOf(x))}</option>`).join('')}</select></div>` : `<input type="hidden" data-k="date" value="${d.date || defDate()}">`}
+          ${gb ? `<div class="field"><label>วันที่จ่าย</label><select data-k="date">${[...new Set([d.date, ...gbDays].filter(Boolean))].map(x => `<option value="${x}" ${x === (d.date || defDate()) ? 'selected' : ''}>${x === fmt.localDate(new Date()) ? 'วันนี้' : fmt.dayMonth(UI.dayOf(x))}</option>`).join('')}</select></div>` : multiDay ? `<div class="field"><label>วันที่</label><select data-k="date">${days.map(x => `<option value="${x}" ${x === (d.date || defDate()) ? 'selected' : ''}>${fmt.dayMonth(UI.dayOf(x))}</option>`).join('')}</select></div>` : `<input type="hidden" data-k="date" value="${d.date || defDate()}">`}
         </div>
         <div class="exr-pic">${C.filePicker('xhPh', d.photos || [], { label: 'ถ่ายรูปบิล', capture: true, multiple: true })}<p class="hint exr-need"></p></div>
         <div class="xh-actions">${single ? '' : `<button type="button" class="btn btn-ghost" data-back>${icon('arrowL')} กลับไปที่รายการ</button>`}<button type="button" class="btn btn-primary" data-save>${icon('check')} บันทึกรายการนี้</button></div>
@@ -102,7 +104,7 @@
         let editing = null;
         const showList = () => { editing = null; box.innerHTML = listHTML(); if (foot) foot.hidden = false; el.querySelector('.modal-body').scrollTop = 0; };
         const showForm = (d = null) => {
-          editing = d; box.innerHTML = formHTML(d || { type: items().some(e => e.type === 'fuel') ? 'toll' : 'fuel' });
+          editing = d; box.innerHTML = formHTML(d || { type: !gb && items().some(e => e.type === 'fuel') ? 'toll' : 'fuel' });
           if (foot) foot.hidden = true;
           const x = box.querySelector('.xh-form');
           picker = C.bindFilePicker(x, 'xhPh', (d && d.photos) || []);
