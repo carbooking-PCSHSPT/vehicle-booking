@@ -599,11 +599,12 @@
     const mode = RANGES[query.r] ? query.r : 'day';   // เข้ามาครั้งแรก = ดูงานวันนี้
     const ref = query.date ? UI.dayOf(query.date) : new Date();
     const linkL = o => { const p = { ...(adminView ? { d: d.id } : {}), r: mode, ...o }; Object.keys(p).forEach(k => { if (!p[k]) delete p[k]; }); return '#/driver?' + new URLSearchParams(p); };
-    const tab = ['cal', 'ot'].includes(query.tab) ? query.tab : 'list';
+    const gbDrv = (S.garbageVehicle() || {}).driverId === d.id;   // คนขับรถขนขยะ: ไม่มีแท็บค่าล่วงเวลา
+    const tab = ['cal', ...(gbDrv ? [] : ['ot'])].includes(query.tab) ? query.tab : 'list';
     const view = query.view === 'month' ? 'month' : 'week';   // ค่าเริ่มต้น = สัปดาห์ (ไม่มีมุมมองวันนี้แล้ว)
     const sel = UI.dayOf(query.date);
     const link = o => '#/driver?' + new URLSearchParams({ ...(adminView ? { d: d.id } : {}), tab: 'cal', view, date: fmt.localDate(sel), ...o });
-    const tabs = `<div class="seg" style="margin-top:16px;display:flex"><a href="#/driver${adminView ? `?d=${d.id}` : ''}" style="flex:1"><button class="${tab === 'list' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('list')} งานของฉัน</button></a><a href="${link({})}" style="flex:1"><button class="${tab === 'cal' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('calendar')} ปฏิทินงาน</button></a><a href="#/driver?${new URLSearchParams({ ...(adminView ? { d: d.id } : {}), tab: 'ot' })}" style="flex:1"><button class="${tab === 'ot' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('coins')} ค่าล่วงเวลา</button></a></div>`;
+    const tabs = `<div class="seg" style="margin-top:16px;display:flex"><a href="#/driver${adminView ? `?d=${d.id}` : ''}" style="flex:1"><button class="${tab === 'list' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('list')} งานของฉัน</button></a><a href="${link({})}" style="flex:1"><button class="${tab === 'cal' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('calendar')} ปฏิทินงาน</button></a>${gbDrv ? '' : `<a href="#/driver?${new URLSearchParams({ ...(adminView ? { d: d.id } : {}), tab: 'ot' })}" style="flex:1"><button class="${tab === 'ot' ? 'on' : ''}" tabindex="-1" style="width:100%">${icon('coins')} ค่าล่วงเวลา</button></a>`}</div>`;
     return {
       layout: 'driver',
       html: `<div class="drv ${tab === 'list' ? 'drv-wide' : ''}">
