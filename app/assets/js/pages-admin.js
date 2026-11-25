@@ -1737,7 +1737,27 @@
 
   // ═════════ นำเข้างานที่ครูจองไว้ (ระบบเดิม/ใบกระดาษ) จาก Excel ═════════
   // ดาวน์โหลดแบบฟอร์ม → กรอก 1 แถว = 1 งาน → เลือกไฟล์ → ตรวจตัวอย่าง → นำเข้า
-  const RQ_HEAD = ['ลำดับ', 'วันที่ไป', 'เวลาไป', 'วันที่กลับ', 'เวลากลับ', 'ปลายทาง', 'จังหวัด', 'ภารกิจ / วัตถุประสงค์', 'หมวดงาน', 'ผู้ขอใช้รถ', 'ฝ่าย / กลุ่มสาระ', 'เบอร์โทร', 'ครู', 'นักเรียน', 'อื่น ๆ', 'จุดขึ้นรถ', 'รถ', 'คนขับ', 'หมายเหตุ'];
+  // [หัวคอลัมน์, กว้าง, จำเป็น, คำแนะนำ]
+  const RQ_COLS = [
+    ['ลำดับ', 6, 0, ''],
+    ['วันที่ไป *', 13, 1, 'พิมพ์ 3/12 หรือ 3/12/2569 (ไม่ใส่ปี = ปีนี้)'],
+    ['เวลาไป *', 9, 1, 'กดลูกศรเลือกเวลา หรือพิมพ์ 8:30'],
+    ['เวลากลับ *', 9, 1, 'กดลูกศรเลือกเวลา หรือพิมพ์ 16:00'],
+    ['ปลายทาง *', 30, 1, 'เลือกสถานที่ที่เคยไป หรือพิมพ์ชื่อใหม่ · หลายที่คั่นด้วย ;'],
+    ['ผู้ขอใช้รถ *', 24, 1, 'เลือกชื่อครู (ระบบเติมฝ่าย/เบอร์ให้) หรือพิมพ์ชื่อเอง'],
+    ['หมวดงาน', 18, 0, 'ไม่ใส่ = อื่น ๆ'],
+    ['รถ', 24, 0, 'ใส่รถ = อนุมัติ+จัดรถเลย · ว่าง = รอแอดมินจัดรถ'],
+    ['คนขับ', 20, 0, 'ไม่ใส่ได้ ให้แอดมินเลือกในระบบ'],
+    ['ครู', 6, 0, 'จำนวนครู/บุคลากร'],
+    ['นักเรียน', 8, 0, 'จำนวนนักเรียน'],
+    ['วันที่กลับ', 13, 0, 'ว่าง = กลับวันเดียวกัน · ใส่เฉพาะงานค้างคืน'],
+    ['ภารกิจ', 28, 0, 'ว่าง = ใช้หมวดงาน + ปลายทาง'],
+    ['ฝ่าย / กลุ่มสาระ', 20, 0, 'ว่าง = ใช้ของครูในระบบ'],
+    ['เบอร์โทร', 13, 0, 'ว่าง = ใช้ของครูในระบบ'],
+    ['จุดขึ้นรถ', 16, 0, 'ว่าง = โรงเรียน'],
+    ['หมายเหตุ', 24, 0, '']
+  ];
+  const RQ_HEAD = RQ_COLS.map(c => c[0]);
   const RQ_COL = { no: /ลำดับ/, d1: /วันที่ไป|วันไป/, t1: /เวลาไป|เวลาออก/, d2: /วันที่กลับ|วันกลับ/, t2: /เวลากลับ/, dest: /ปลายทาง|สถานที่/, prov: /จังหวัด/, purpose: /ภารกิจ|วัตถุประสงค์/, cat: /หมวด/, req: /ผู้ขอ/, dept: /ฝ่าย|กลุ่มสาระ/, phone: /เบอร์|โทร/, t: /^ครู/, s: /นักเรียน/, o: /อื่น/, pickup: /จุดขึ้น/, veh: /^รถ$|ทะเบียน/, drv: /คนขับ/, note: /หมายเหตุ/ };
   // เวลา: เศษวันของ Excel (0.375) · "8:30" · "08.30" · "830"
   const rqTime = x => {
@@ -1746,18 +1766,62 @@
     const m = String(x).trim().match(/^(\d{1,2})\s*[:.]?\s*(\d{2})?/); return m ? `${p2(+m[1])}:${p2(+(m[2] || 0))}` : '';
   };
   const nk = s => String(s || '').replace(/\s+/g, '').replace(/^(นาย|นางสาว|นาง|ครู)/, '');
-  function rqTemplate() {
-    const cats = S.categories(true).filter(c => c.active !== false);
-    UI.exportSheets('แบบฟอร์มนำเข้างานจองรถ', [
-      { name: 'งานที่จองไว้', head: RQ_HEAD, rows: [[1, '3/12/2569', '08:30', '3/12/2569', '16:00', 'สพม.ปทุมธานี; ศาลากลางจังหวัด', 'ปทุมธานี', 'ส่งเอกสารการเงิน (ตัวอย่าง — ลบแถวนี้)', 'การเงิน', 'ครูตัวอย่าง ใจดี', 'ฝ่ายบริหารงานทั่วไป', '081-000-0000', 1, 0, 0, 'หน้าอาคารอำนวยการ', (S.db.vehicles[0] || {}).name || 'รถตู้ 01', '', '']] },
-      { name: 'ตัวเลือก (ห้ามแก้)', head: ['หมวดงาน', 'รถ (ชื่อหรือทะเบียน)', 'คนขับ'], rows: Array.from({ length: Math.max(cats.length, S.db.vehicles.length, S.db.drivers.length) }, (_, i) => [cats[i] ? (cats[i].id === 'other' ? 'อื่น ๆ' : cats[i].name) : '', S.db.vehicles[i] ? `${S.db.vehicles[i].name} (${S.db.vehicles[i].plate || ''})` : '', S.db.drivers[i] && !S.db.drivers[i].standby ? S.db.drivers[i].name : '']) },
-      { name: 'วิธีกรอก', head: ['คำแนะนำ'], rows: [['1 แถว = 1 งาน · ใส่เฉพาะงานตั้งแต่ 1 ธ.ค. 2569 เป็นต้นไป (งานที่ผ่านมาแล้วระบบจะข้าม)'], ['วันที่: 3/12/2569 หรือ 3 ธ.ค. 69 หรือใช้รูปแบบวันที่ของ Excel ก็ได้ · เวลา: 08:30'], ['ไปหลายที่: คั่นด้วย ; เช่น สพม.ปทุมธานี; ศาลากลาง'], ['หมวดงาน: ใช้ชื่อตามชีต "ตัวเลือก" · ไม่ตรง = อื่น ๆ'], ['รถ/คนขับ: ไม่บังคับ · ใส่รถ = อนุมัติและจัดรถให้เลย · ว่าง = รอตรวจสอบ ให้แอดมินจัดรถในระบบ'], ['ไม่ต้องแนบบันทึกข้อความ (มีใบกระดาษแล้ว)']] }
+  // แบบฟอร์ม Excel: รายการเลื่อนลง (หมวด · รถ · คนขับ · เวลา) · ช่องวันที่แสดงเป็น พ.ศ. · ช่องจำนวนรับเฉพาะตัวเลข (สร้างด้วย ExcelJS)
+  let excelJs = null;
+  const loadExcelJs = () => excelJs || (excelJs = new Promise((res, rej) => { if (window.ExcelJS) return res(window.ExcelJS); const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; sc.onload = () => res(window.ExcelJS); sc.onerror = () => { excelJs = null; rej(new Error('โหลดตัวสร้าง Excel ไม่สำเร็จ — ตรวจอินเทอร์เน็ตแล้วลองใหม่')); }; document.head.appendChild(sc); }));
+  async function rqTemplate() {
+    const EJ = await loadExcelJs();
+    const cats = S.categories(true).filter(c => c.active !== false).map(c => c.id === 'other' ? 'อื่น ๆ' : c.name);
+    const vehs = S.db.vehicles.filter(v => v.active !== false).sort((x, y) => (+x.no || 0) - (+y.no || 0)).map(v => `${v.name}${v.plate ? ` (${v.plate})` : ''}`);
+    const drvs = S.db.drivers.filter(d => d.active !== false && !d.standby).map(d => d.name);
+    const ppl = [...new Set(S.db.users.filter(u => u.active !== false && (u.roles || []).some(r => ['teacher', 'executive'].includes(r))).map(u => u.name).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'th'));
+    const places = S.db.places.slice().sort((x, y) => (y.count || 0) - (x.count || 0)).map(p => p.name).filter(Boolean).slice(0, 400);
+    const times = []; for (let m = 5 * 60; m <= 21 * 60; m += 30) times.push(`${p2(Math.floor(m / 60))}:${p2(m % 60)}`);
+    const LISTS = { 3: ['D', times], 4: ['D', times], 5: ['F', places, true], 6: ['E', ppl, true], 7: ['A', cats], 8: ['B', vehs], 9: ['C', drvs] };
+    const wb = new EJ.Workbook(); wb.creator = 'ระบบยานพาหนะ';
+    const NAVY = 'FF26307A', GREY = 'FF6B6F86', REQ = 'FFFFF6DD', N = 300, fmtDate = '[$-th-TH,107]d mmm yyyy';
+    const build = (ws, rows) => {
+      ws.columns = RQ_COLS.map(c => ({ header: c[0], width: c[1] }));
+      const hr = ws.getRow(1); hr.height = 36;
+      RQ_COLS.forEach((c, i) => { const cell = hr.getCell(i + 1); cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Tahoma' }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c[2] ? NAVY : GREY } }; cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; if (c[3]) cell.note = c[3]; });
+      rows.forEach(r => ws.addRow(r));
+      for (let r = 2; r <= Math.max(N, rows.length + 1); r++) {
+        const row = ws.getRow(r);
+        if (r > rows.length + 1) row.getCell(1).value = r - 1;
+        RQ_COLS.forEach((c, i) => { if (c[2]) row.getCell(i + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REQ } }; });
+        [2, 12].forEach(c => { row.getCell(c).numFmt = fmtDate; });
+        Object.entries(LISTS).forEach(([c, [col, list, free]]) => { if (!list.length) return; row.getCell(+c).dataValidation = { type: 'list', allowBlank: true, formulae: [`'ตัวเลือก'!$${col}$2:$${col}$${list.length + 1}`], showErrorMessage: !free, errorStyle: 'warning', errorTitle: 'ไม่อยู่ในรายการ', error: 'กด "ใช่" เพื่อใช้ค่าที่พิมพ์เอง' }; });
+        [10, 11].forEach(c => { row.getCell(c).dataValidation = { type: 'whole', operator: 'between', allowBlank: true, formulae: [0, 500], showErrorMessage: true, error: 'ใส่เป็นตัวเลขจำนวนคน' }; });
+      }
+      ws.views = [{ state: 'frozen', ySplit: 1, xSplit: 1 }];
+    };
+    build(wb.addWorksheet('งานที่จองไว้', { properties: { tabColor: { argb: NAVY } } }), []);
+    const U = (m, d) => new Date(Date.UTC(2026, m, d));   // Excel เก็บวันที่แบบไม่มีเขตเวลา
+    build(wb.addWorksheet('ตัวอย่าง (ไม่ถูกนำเข้า)', { properties: { tabColor: { argb: 'FFC9971C' } } }), [
+      [1, U(11, 3), '08:30', '16:00', places[0] || 'สพม.ปทุมธานี', ppl[0] || 'ครูตัวอย่าง ใจดี', cats.find(c => /การเงิน/.test(c)) || '', vehs[0] || '', drvs[0] || '', 1, 0, null, '', '', '', '', 'กรอกแค่ 5 ช่องแรก + รถ/คนขับ ก็พอ'],
+      [2, U(11, 5), '07:00', '18:00', 'อุทยานแห่งชาติเขาใหญ่', ppl[1] || 'ครูตัวอย่าง สอนดี', cats.find(c => /กิจกรรม/.test(c)) || '', '', '', 2, 30, U(11, 6), 'ค่ายวิทยาศาสตร์ ม.4', '', '', '', 'ค้างคืน → ใส่วันที่กลับ · ไม่ใส่รถ = รอแอดมินจัดรถ'],
+      [3, U(11, 8), '13:00', '15:00', 'ธนาคารกรุงไทย; ไปรษณีย์', ppl[2] || 'ครูตัวอย่าง', '', '', '', 1, 0, null, '', '', '', '', 'ไปหลายที่คั่นด้วย ;']
     ]);
+    const op = wb.addWorksheet('ตัวเลือก', { state: 'hidden' });
+    op.columns = ['หมวดงาน', 'รถ', 'คนขับ', 'เวลา', 'ผู้ขอใช้รถ', 'ปลายทาง'].map(h => ({ header: h, width: 26 }));
+    for (let i = 0; i < Math.max(cats.length, vehs.length, drvs.length, times.length, ppl.length, places.length); i++) op.addRow([cats[i] || null, vehs[i] || null, drvs[i] || null, times[i] || null, ppl[i] || null, places[i] || null]);
+    const hw = wb.addWorksheet('วิธีกรอก'); hw.columns = [{ header: 'วิธีกรอก (ใช้เวลาประมาณ 30 วินาทีต่องาน)', width: 110 }];
+    ['1 แถว = 1 งาน · กรอกในชีต "งานที่จองไว้" · ช่องสีเหลือง (หัวสีน้ำเงิน) ต้องกรอก 5 ช่อง ที่เหลือไม่บังคับ',
+      'วันที่ไป: พิมพ์ 3/12 ก็พอ (ไม่ใส่ปี = ปีนี้) · เวลา ผู้ขอ ปลายทาง หมวด รถ คนขับ: กดลูกศรเลือก หรือพิมพ์เอง',
+      'ใส่รถ = อนุมัติและจัดรถให้เลย คนขับเห็นงานทันที · ไม่ใส่ = รอตรวจสอบ ให้แอดมินจัดรถในระบบ',
+      'งานค้างคืนเท่านั้นที่ต้องใส่ "วันที่กลับ" · ไปหลายที่คั่นด้วย ; · เอาเมาส์ชี้หัวคอลัมน์เพื่อดูคำแนะนำ',
+      'ใส่เฉพาะงานตั้งแต่ 1 ธ.ค. 2569 (งานที่ผ่านมาแล้วระบบข้าม) · ไม่ต้องแนบบันทึกข้อความ',
+      'กรอกเสร็จ → ระบบ → คำขอใช้รถ → นำเข้างานจาก Excel → เลือกไฟล์นี้ → ตรวจตัวอย่าง → นำเข้า'].forEach(t => hw.addRow([t]));
+    hw.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }; hw.getRow(1).getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+    const buf = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const aEl = document.createElement('a'); aEl.href = url; aEl.download = 'แบบฟอร์มนำเข้างานจองรถ.xlsx'; document.body.appendChild(aEl); aEl.click(); aEl.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
   function rqParse(buf) {
     if (!window.XLSX) throw new Error('ตัวอ่าน Excel ยังโหลดไม่เสร็จ — ลองใหม่อีกครั้ง');
     const wb = XLSX.read(buf), out = [];
-    const n0 = wb.SheetNames.find(n => /จอง|งาน/.test(n)) || wb.SheetNames[0];
+    const n0 = wb.SheetNames.find(n => /จอง/.test(n) && !/ตัวอย่าง/.test(n)) || wb.SheetNames.find(n => !/ตัวอย่าง|ตัวเลือก|วิธี/.test(n)) || wb.SheetNames[0];
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[n0], { header: 1, raw: true, defval: '' });
     const hi = rows.findIndex(r => r.some(c => /ปลายทาง|สถานที่/.test(String(c))) && r.some(c => /วันที่ไป|วันไป/.test(String(c))));
     if (hi < 0) throw new Error('ไม่พบหัวตาราง (ต้องมีคอลัมน์ "วันที่ไป" และ "ปลายทาง") — ใช้แบบฟอร์มที่ดาวน์โหลดจากปุ่มนี้');
@@ -1769,19 +1833,21 @@
     rows.slice(hi + 1).forEach((r, k) => {
       if (blankCell(g(r, 'dest')) && blankCell(g(r, 'd1'))) return;
       const it = { row: hi + k + 2, errs: [], warns: [] };
-      const d1 = vpDate(g(r, 'd1')), d2 = vpDate(g(r, 'd2')) || d1, t1 = rqTime(g(r, 't1')) || '08:00', t2 = rqTime(g(r, 't2')) || '16:00';
+      const dNoYear = x => { const m = String(x || '').trim().match(/^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})$/); if (!m) return ''; const t = new Date(); let y = t.getFullYear(); const dd = new Date(y, +m[2] - 1, +m[1]); if (dd < new Date(t.getFullYear(), t.getMonth(), t.getDate())) y++; return `${y}-${p2(+m[2])}-${p2(+m[1])}`; };
+      const d1 = vpDate(g(r, 'd1')) || dNoYear(g(r, 'd1')), d2 = vpDate(g(r, 'd2')) || dNoYear(g(r, 'd2')) || d1, t1 = rqTime(g(r, 't1')) || '08:00', t2 = rqTime(g(r, 't2')) || '16:00';
       if (!d1) it.errs.push('ไม่มีวันที่ไป');
       it.startAt = d1 ? new Date(`${d1}T${t1}:00`).toISOString() : ''; it.endAt = d2 ? new Date(`${d2}T${t2}:00`).toISOString() : '';
       if (it.startAt && it.endAt && new Date(it.endAt) <= new Date(it.startAt)) it.errs.push('เวลากลับต้องหลังเวลาไป');
       if (it.startAt && new Date(it.startAt).getTime() < now) it.skip = 'วันที่ผ่านมาแล้ว';
       const prov = String(g(r, 'prov') || '').trim();
-      it.destinations = String(g(r, 'dest') || '').split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(n => ({ name: n, address: '', province: prov, lat: null, lng: null, km: 0, mins: 0 }));
+      it.destinations = String(g(r, 'dest') || '').split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(n => { const pl = S.db.places.find(p => p.name === n); return pl ? { name: pl.name, address: pl.address || '', province: prov || pl.province || '', lat: pl.lat ?? null, lng: pl.lng ?? null, km: +pl.km || 0, mins: +pl.mins || 0 } : { name: n, address: '', province: prov, lat: null, lng: null, km: 0, mins: 0 }; });
       if (!it.destinations.length) it.errs.push('ไม่มีปลายทาง');
-      it.purpose = String(g(r, 'purpose') || '').trim() || 'ใช้รถตามใบขอเดิม';
+
       const cn = String(g(r, 'cat') || '').trim(), cat = cn && cats.find(c => c.name.replace(/\s+/g, '') === cn.replace(/\s+/g, '') || c.name.includes(cn) || cn.includes(c.name.replace(/\s*\(.*\)/, '')));
       it.category = cat ? cat.id : 'other'; it.categoryOther = cat ? '' : (cn || 'นำเข้าจากระบบเดิม');
+      it.purpose = String(g(r, 'purpose') || '').trim() || `${cat && cat.id !== 'other' ? cat.name : 'ใช้รถ'} · ${it.destinations.map(d => d.name).join(', ') || '-'}`;
       it.requester = { name: String(g(r, 'req') || '').trim(), dept: String(g(r, 'dept') || '').trim(), phone: String(g(r, 'phone') || '').trim() };
-      if (!it.requester.name) it.warns.push('ไม่มีชื่อผู้ขอ');
+      if (!it.requester.name) it.errs.push('ไม่มีชื่อผู้ขอ');
       it.teachers = +g(r, 't') || 0; it.students = +g(r, 's') || 0; it.others = +g(r, 'o') || 0;
       it.pickup = String(g(r, 'pickup') || '').trim() || 'โรงเรียน'; it.note = String(g(r, 'note') || '').trim(); it.contactPhone = it.requester.phone;
       it.tripType = d1 && d2 && d1 !== d2 ? 'overnight' : 'day';
@@ -1813,7 +1879,7 @@
       title: `${icon('upload')} นำเข้างานที่จองไว้จาก Excel`, size: 'lg', body: `<div id="rqBox">${body()}</div>`,
       onOpen(el) {
         el.addEventListener('click', async e => {
-          if (e.target.closest('[data-rq-tpl]')) return rqTemplate();
+          const tb = e.target.closest('[data-rq-tpl]'); if (tb) return UI.busy(tb, () => rqTemplate()).catch(() => {});
           if (e.target.closest('[data-rq-file]')) {
             const file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv'; i.onchange = () => res(i.files[0] || null); i.click(); });
             if (!file) return; load(await file.arrayBuffer()); el.querySelector('#rqBox').innerHTML = body();
