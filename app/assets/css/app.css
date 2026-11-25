@@ -2414,3 +2414,15 @@ html.fs-2 { font-size: 131.25%; }
 .side-order { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 10px; padding: 11px 14px; border: 0; border-radius: 14px; background: linear-gradient(135deg, var(--navy), #3a48a8); color: #fff; font: 600 .9rem var(--font-display); cursor: pointer; text-align: left; }
 .side-order .i { width: 18px; height: 18px; flex: none; }
 .exr-types.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* รถขนขยะ: ย้อนหลัง 7 วัน */
+.gb-hist { margin-top: 16px; padding: 16px 18px; border-radius: 22px; background: var(--paper); border: 1px solid var(--line); }
+.gb-hist h3 { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; margin-bottom: 8px; }
+.gb-hist h3 .i { width: 20px; height: 20px; color: #15803d; }
+.gb-day { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px dashed var(--line); }
+.gb-day:first-of-type { border-top: 0; }
+.gb-d { font-size: .92rem; white-space: nowrap; min-width: 92px; } .gb-d b { color: var(--ink); }
+.gb-r { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: .88rem; color: var(--muted); }
+.gb-r i { font-style: normal; padding: 2px 8px; border-radius: 8px; background: #effaf3; color: #166534; }
+.gb-c { font-size: .88rem; color: var(--muted); white-space: nowrap; } .gb-c b { font-size: 1.1rem; color: var(--ink); }
+.gb-day.none .gb-d, .gb-day.none .gb-r { opacity: .6; }
+.gb-hist .hint { margin-top: 10px; }

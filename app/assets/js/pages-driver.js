@@ -319,6 +319,19 @@
       ${last || open ? `<button type="button" class="btn btn-ghost gb-fuel" data-fuel data-r="${(open || last).id}" data-v="${v.id}">${icon('fuel')} บันทึกค่าน้ำมันรถขยะ</button>` : ''}
     </section>`;
   }
+  // ย้อนหลัง 7 วัน: วันละกี่รอบ เวลาไหน (คนขับเช็กเองว่ากดครบ)
+  function garbageHistory() {
+    const v = S.garbageVehicle(); if (!v) return '';
+    const runs = gbRuns(v.id), days = [];
+    for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d); }
+    const tm = x => x ? fmt.time(x).replace(' น.', '') : '…';
+    return `<section class="gb-hist"><h3>${icon('calendar')} ย้อนหลัง 7 วัน</h3>
+      ${days.map(d => { const rs = runs.filter(r => UI.sameDay(r.startAt, d)).reverse(); const wk = [0, 6].includes(d.getDay());
+        return `<div class="gb-day ${rs.length ? '' : 'none'}"><span class="gb-d"><b>${['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'][d.getDay()]}</b> ${fmt.dayMonth(d)}</span>
+          <span class="gb-r">${rs.length ? rs.map(r => `<i>${tm(r.assignments[0].departedAt)}–${tm(r.assignments[0].returnedAt)}</i>`).join('') : (wk ? 'วันหยุด' : 'ไม่ได้ออก')}</span>
+          <span class="gb-c">${rs.length ? `<b>${rs.length}</b> รอบ` : '—'}</span></div>`; }).join('')}
+      <p class="hint">ลืมกดรอบไหน (ภายใน 24 ชม.) กดออก/กลับแล้วแก้เวลาได้ที่ “ลืมกด / ไม่มีเน็ต — แก้เวลา” · เกิน 24 ชม. แจ้งแอดมิน</p></section>`;
+  }
   async function garbageAction(kind, el) {
     const back = kind === 'back', r = back ? S.request(el.dataset.r) : null;
     const v = S.garbageVehicle() || {};
@@ -615,9 +628,9 @@
         ${garbagePanel(d, adminView)}
         ${(S.garbageVehicle() || {}).driverId === d.id ? '' : `<div class="go-btns"><button type="button" class="em-go" data-emgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('alert')}<span><b>ออกงานฉุกเฉิน</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)} — นำส่งผู้ป่วย` : 'นำส่งผู้ป่วย — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>
         ${d.standby ? '' : `<button type="button" class="em-go sp-go" data-spgo ${adminView ? `data-drv="${d.id}"` : ''}>${icon('package')}<span><b>ออกซื้อ / รับของ</b><small>${adminView ? `แอดมินบันทึกแทน ${esc(d.name)}` : 'งานประจำฝ่ายบริการ — ไม่ต้องรอคำขอ/อนุมัติ'}</small></span>${icon('chevR')}</button>`}</div>`}
-        ${(() => { const t = Pages._todayDuty && Pages._todayDuty(d.id); return t ? `<div class="note-box navy duty-today">${icon('clock')}<div><b>${t}</b></div></div>` : ''; })()}
-        ${tabs}
-        ${tab === 'ot' ? Pages._otDriver(d, query, adminView) : tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}
+        ${gbDrv ? '' : (() => { const t = Pages._todayDuty && Pages._todayDuty(d.id); return t ? `<div class="note-box navy duty-today">${icon('clock')}<div><b>${t}</b></div></div>` : ''; })()}
+        ${gbDrv ? garbageHistory() : `${tabs}
+        ${tab === 'ot' ? Pages._otDriver(d, query, adminView) : tab === 'cal' ? driverCalendar(jobs, { view, sel, link }) : overview(jobs, { mode, ref, link: linkL })}`}
       </div>`,
       patch: true,
       mount: bindJobs
